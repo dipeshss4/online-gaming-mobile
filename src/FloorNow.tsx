@@ -105,7 +105,7 @@ export function FloorBoards({ floor }: { floor: FloorState }) {
     <View style={s.card}>
       <Text style={s.kicker}>ON THE FLOOR</Text>
       {!rounds.length && <Text style={s.muted}>No rounds have been settled yet. Play one and it appears here.</Text>}
-      {rounds.slice(0, 6).map(round => <View key={round.betId} style={f.row}>
+      {rounds.slice(0, 4).map(round => <View key={round.betId} style={f.row}>
         <View style={s.grow}>
           <Text style={s.gameName}>{round.gameName}</Text>
           <Text style={s.small}>{name(round.player, round.playerRef)} · {ago(round.settledAt)}</Text>

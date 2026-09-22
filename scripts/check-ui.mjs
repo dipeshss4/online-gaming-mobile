@@ -41,6 +41,16 @@ const wallet = { balance: 125.5, currency: 'USD', held: 20, status: 'ACTIVE' }
 const transactions = { items: Array.from({ length: 6 }, (_, i) => ({ id: `t${i}`, type: i % 2 ? 'BET' : 'PAYOUT', amount: i % 2 ? -1.5 : 3.25, description: i % 2 ? 'Hot 7s stake' : 'Hot 7s payout', createdAt: now })), totalPages: 2 }
 const bets = { items: Array.from({ length: 6 }, (_, i) => ({ betId: `b${i}`, gameCode: 'HOT_7S', stake: 1.5, payout: i % 3 ? 0 : 7.5, status: i % 3 ? 'LOST' : 'WON', settledAt: now })), totalPages: 2 }
 
+const playHistory = {
+  items: Array.from({ length: 6 }, (_, i) => ({ id: `h${i}`, kind: i === 2 ? 'CRASH' : 'ROUND', gameCode: i === 2 ? 'ASCENT_CRASH' : 'HOT_7S', gameName: i === 2 ? 'Ascent Crash' : 'Hot 7s',
+    stake: 1.5, payout: i % 3 ? 0 : 7.5, multiplier: i % 3 ? 0 : 5, result: i % 3 ? 'LOSS' : 'WIN', outcome: null, symbols: i === 2 ? [] : ['7', 'BAR', 'CHERRY'],
+    notes: i === 2 ? ['Panel 1: lost', 'Crashed at 1.42×'] : [], freeSpin: false, balanceAfter: 120, playedAt: now })),
+  nextBefore: now,
+  games: [{ code: 'HOT_7S', name: 'Hot 7s', rounds: 5, staked: 7.5, returned: 15, wins: 2, biggestReturn: 7.5, bestMultiplier: 5 },
+    { code: 'ASCENT_CRASH', name: 'Ascent Crash', rounds: 1, staked: 1.5, returned: 0, wins: 0, biggestReturn: 0, bestMultiplier: 0 }],
+  summary: { code: null, name: 'All games', rounds: 6, staked: 9, returned: 15, wins: 2, biggestReturn: 7.5, bestMultiplier: 5 }
+}
+
 const protectionView = {
   limits: [
     { kind: 'DEPOSIT_DAY', amount: 100, used: 40, remaining: 60, pendingAmount: null, pendingRemoval: false, pendingEffectiveAt: null },
@@ -85,6 +95,7 @@ await page.route('**/api/**', async route => {
   if (path === '/api/wallet') return json(wallet)
   if (path === '/api/wallet/transactions') return json(transactions)
   if (path === '/api/bets') return json(bets)
+  if (path === '/api/bets/history') return json(playHistory)
   if (path === '/api/live') liveAuth.push(route.request().headers()['authorization'] || '')
   // An expired access token: the app must renew and retry rather than let the floor go quiet.
   if (path === '/api/live' && liveUnauthorized-- > 0) return route.fulfill({ status: 401, json: { message: 'Token expired' }, headers })
@@ -212,7 +223,7 @@ const back = page.getByText(/Back to lobby/).first()
 if (await back.count()) { await back.click(); await page.waitForTimeout(1500) }
 await page.getByText('All Games').first().waitFor({ timeout: 15000 })
 
-for (const [label, tabName, expected] of [['03-wallet', 'Wallet', 'Your wallet'], ['04-history', 'History', 'Your activity']]) {
+for (const [label, tabName, expected] of [['03-wallet', 'Wallet', 'Your wallet'], ['04-history', 'History', 'Every round you have played']]) {
   await page.getByText(tabName, { exact: true }).last().click()
   await page.getByText(expected).first().waitFor({ timeout: 15000 })
   await page.waitForTimeout(800)

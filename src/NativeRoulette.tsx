@@ -9,6 +9,7 @@ import { Tap } from './Tap';
 import { feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
 import { LandscapeGame } from './LandscapeGame';
+import { GameHistory } from './GameHistory';
 
 const order = [0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
 const red = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
@@ -20,7 +21,7 @@ export function NativeRoulette({game,token,userId,initialBalance,onClose,onSettl
   const [ticket,setTicket]=useState<Record<string,number>>({}),[chip,setChip]=useState(Math.round(game.minStake*100));
   const [pending,setPending]=useState<PendingBet|null>(null),[ready,setReady]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
   const [result,setResult]=useState<PlayResult|null>(null),[wallet,setWallet]=useState(initialBalance),[reduced,setReduced]=useState(false);
-  const [win,setWin]=useState<Win|null>(null);
+  const [win,setWin]=useState<Win|null>(null),[played,setPlayed]=useState(0);
   const locked=useRef(false),alive=useRef(true),rotation=useRef(new Animated.Value(0)).current;
   const total=Object.values(ticket).reduce((a,b)=>a+b,0);
   useEffect(()=>{alive.current=true;readPending(userId).then(p=>{if(alive.current){setPending(p);setReady(true);}}).catch(()=>setError('Cannot read saved bet. Play is locked.'));AccessibilityInfo.isReduceMotionEnabled().then(setReduced);const l=AccessibilityInfo.addEventListener('reduceMotionChanged',setReduced);return()=>{alive.current=false;l.remove();rotation.stopAnimation();};},[]);
@@ -45,13 +46,13 @@ export function NativeRoulette({game,token,userId,initialBalance,onClose,onSettl
       await clearPending(userId);setPending(null);setResult(data);setWallet({...wallet,balance:data.balance,currency:data.currency});setTicket({});
       feel(data.payout>0?'win':'tap');
       if(data.payout>0)setWin({payout:data.payout,stake:data.stake,multiplier:data.multiplier,currency:data.currency,id:data.betId});
-      onSettled();
-    }catch(e){if(!alive.current)return;if(!pending&&e instanceof ApiError&&[400,401,403,404,422,429].includes(e.status))await clearPending(userId).then(()=>setPending(null)).catch(()=>{});setError(`${e instanceof Error?e.message:'Unable to spin'}${sent?' Recover uses the same ticket ID, not a new bet.':''}`);onSettled();}
+      setPlayed(n=>n+1);onSettled();
+    }catch(e){if(!alive.current)return;if(!pending&&e instanceof ApiError&&[400,401,403,404,422,429].includes(e.status))await clearPending(userId).then(()=>setPending(null)).catch(()=>{});setError(`${e instanceof Error?e.message:'Unable to spin'}${sent?' Recover uses the same ticket ID, not a new bet.':''}`);setPlayed(n=>n+1);onSettled();}
     finally{locked.current=false;if(alive.current)setBusy(false);}
   }
   const button=(key:string)=><Tap key={key} accessibilityRole="button" accessibilityLabel={`Bet ${label(key)}`} disabled={busy||!!pending} onPress={()=>add(key)} style={[r.square,{backgroundColor:key.startsWith('number-')?color(Number(key.slice(7))):'#144837'},!!ticket[key]&&{borderColor:'#ffe3a1',borderWidth:2}]}><Text style={r.number}>{label(key)}</Text>{!!ticket[key]&&<Text style={r.chipValue}>{(ticket[key]/100).toFixed(2)}</Text>}</Tap>;
   // The betting table is the game here, so the controls side keeps more room than a slot cabinet needs.
-  return <LandscapeGame stage={0.52} stageItems={2}>
+  return <LandscapeGame stage={0.52} stageItems={2} below={<GameHistory token={token} game={game} refresh={played}/>}>
     {/* One header row: the wheel needs the height that three stacked lines were taking. */}
     <View style={r.topBar}><Tap disabled={busy} onPress={onClose}><Text style={s.link}>‹ Back to games</Text></Tap><Text numberOfLines={1} style={[s.title,{flex:1}]}>{game.name}</Text><Text numberOfLines={1} style={s.kicker}>SINGLE ZERO</Text></View>
     <LinearGradient colors={['#2b1915','#111117']} style={r.cabinet}><Text style={r.pointer}>▼</Text><Animated.View style={[r.wheel,{transform:[{rotate:rotation.interpolate({inputRange:[0,1800],outputRange:['0deg','1800deg']})}]}]}>{order.map((n,i)=>{const angle=i*2*Math.PI/37;return <View key={n} style={[r.pocket,{left:118+108*Math.sin(angle)-9,top:118-108*Math.cos(angle)-12,backgroundColor:color(n),transform:[{rotate:`${i*360/37}deg`}]}]}><Text style={{color:'#fff',fontSize:9}}>{n}</Text></View>;})}<View style={r.hub}><Text style={{color:'#e7c888',fontSize:42}}>✦</Text></View></Animated.View><Text accessibilityLiveRegion="polite" style={[s.title,{textAlign:'center'}]}>{busy?'Wheel in motion…':result?`Result: ${result.symbols[0]} ${result.symbols[1]}`:'Place your chips'}</Text><WinCelebration win={win}/></LinearGradient>

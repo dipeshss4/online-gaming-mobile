@@ -11,6 +11,13 @@ export type PlayResult = { requestId: string; betId: string; gameCode: string; s
 export type Transaction = { id: string; type: string; amount: number; description: string; createdAt: string };
 export type Bet = { betId: string; gameCode: string; stake: number; payout: number; status: string; settledAt: string };
 export type Page<T> = { items: T[]; totalPages: number };
+/** One round of the player's own history: a reel, grid or roulette bet, or a crash flight. */
+export type HistoryItem = { id: string; kind: 'ROUND' | 'CRASH'; gameCode: string; gameName: string; stake: number; payout: number;
+  multiplier: number; result: 'WIN' | 'EVEN' | 'LOSS' | 'OPEN'; outcome: string | null; symbols: string[]; notes: string[];
+  freeSpin: boolean; balanceAfter: number | null; playedAt: string };
+export type HistoryTotal = { code: string | null; name: string; rounds: number; staked: number; returned: number; wins: number; biggestReturn: number; bestMultiplier: number };
+/** {@code games} and {@code summary} come with the first page only; {@code nextBefore} is null on the last page. */
+export type HistoryPage = { items: HistoryItem[]; nextBefore: string | null; games: HistoryTotal[] | null; summary: HistoryTotal | null };
 /** Play limits and breaks, as served by /api/protection. Amounts are in the wallet's currency. */
 export type LimitKind = 'DEPOSIT_DAY' | 'DEPOSIT_WEEK' | 'DEPOSIT_MONTH' | 'LOSS_DAY' | 'LOSS_WEEK' | 'LOSS_MONTH';
 export type PlayerLimit = { kind: LimitKind; amount: number | null; used: number | null; remaining: number | null; pendingAmount: number | null; pendingRemoval: boolean; pendingEffectiveAt: string | null };

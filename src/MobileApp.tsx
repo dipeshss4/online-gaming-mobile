@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, KeyboardAvoidingView, Modal, Platform, RefreshControl, ScrollView, useWindowDimensions, Text, TextInput, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { API_URL, ApiError, Auth, Balance, Bet, Game, Identity, Page, onRenewed, request, session, Transaction } from './api';
+import { API_URL, ApiError, Auth, Balance, Game, Identity, Page, onRenewed, request, session, Transaction } from './api';
+import { HistoryScreen } from './GameHistory';
 import { s } from './styles';
 import { NativeSlots, supportsNativeSlots } from './NativeSlots';
 import { NativeRoulette } from './NativeRoulette';
@@ -37,7 +38,7 @@ function Main() {
   const [cash, setCash] = useState<Cash>('Deposit');
   // One poll for the floor, shown in two places: the pulse above the games, the boards below them.
   const floor = useFloor(token || '');
-  const [transactions, setTransactions] = useState<Transaction[]>([]), [bets, setBets] = useState<Bet[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]), [loads, setLoads] = useState(0);
   const [search, setSearch] = useState(''), [selected, setSelected] = useState<Game | null>(null);
   const [currentPassword, setCurrentPassword] = useState(''), [newPassword, setNewPassword] = useState('');
   const generation = useRef(0);
@@ -47,7 +48,7 @@ function Main() {
   useEffect(() => { void loadSite(); const listener = AppState.addEventListener('change', state => { if (state === 'active') void loadSite(); }); return () => listener.remove(); }, []);
   async function clearSession() {
     generation.current++;
-    setToken(null); setIdentity(null); setBalance(null); setGames([]); setTransactions([]); setBets([]); setSelected(null); setCurrentPassword(''); setNewPassword(''); setPassword(''); setTab('Discover');
+    setToken(null); setIdentity(null); setBalance(null); setGames([]); setTransactions([]); setSelected(null); setCurrentPassword(''); setNewPassword(''); setPassword(''); setTab('Discover');
     await session.clear();
   }
   // The session renews itself in api.ts; this keeps the token held here in step with it.
@@ -63,10 +64,10 @@ function Main() {
       const me = await request<Identity>('/api/auth/me', token);
       const data = await Promise.all([
         request<Game[]>('/api/games', token), request<Balance>('/api/wallet', token),
-        request<Page<Transaction>>('/api/wallet/transactions?page=0&size=20', token), request<Page<Bet>>('/api/bets?page=0&size=20', token),
+        request<Page<Transaction>>('/api/wallet/transactions?page=0&size=20', token),
       ]);
       if (version !== generation.current) return;
-      setIdentity(me); setGames(data[0]); setBalance(data[1]); setTransactions(data[2].items); setBets(data[3].items);
+      setIdentity(me); setGames(data[0]); setBalance(data[1]); setTransactions(data[2].items); setLoads(n => n + 1);
     } catch (e) {
       if (version !== generation.current) return;
       if (e instanceof ApiError && e.status === 401) await clearSession();
@@ -135,7 +136,7 @@ function Main() {
           {cash === 'Activity' && <><Text style={s.title}>Recent transactions</Text><Text style={s.small}>Latest 20 entries · Pull to refresh</Text>{transactions.map(t => <View style={s.row} key={t.id}><View style={s.grow}><Text style={s.gameName}>{t.description || t.type}</Text><Text style={s.small}>{new Date(t.createdAt).toLocaleString()}</Text></View><Text style={t.type === 'CREDIT' ? s.accent : s.muted}>{t.type === 'CREDIT' ? '+' : '−'}{money(t.amount)}</Text></View>)}{!transactions.length && <Text style={s.muted}>No transactions yet.</Text>}</>}
           {cash === 'Limits' && <PlayLimits token={token} currency={balance?.currency || 'USD'} onChanged={()=>{void load();}} />}
         </>}
-        {tab === 'Activity' && <><Text style={s.title}>Your activity</Text><Text style={s.muted}>Latest 20 bets from your account. No simulated players or results.</Text>{bets.map(b => <View style={s.card} key={b.betId}><Text style={s.gameName}>{b.gameCode.replaceAll('_', ' ')}</Text><Text style={s.small}>{b.status} · {b.settledAt ? new Date(b.settledAt).toLocaleString() : 'Pending'}</Text><View style={s.row}><Text style={s.muted}>Stake {money(b.stake)}</Text><Text style={s.accent}>Payout {money(b.payout)}</Text></View></View>)}{!bets.length && <Text style={s.muted}>Your bet history will appear here.</Text>}</>}
+        {tab === 'Activity' && token && <HistoryScreen token={token} games={games} refresh={loads} />}
         {tab === 'Account' && <><Text style={s.title}>Your account</Text><View style={s.card}><Text style={s.gameName}>{identity?.email}</Text><Text style={s.accent}>{identity?.role}</Text><Text style={s.small}>Access is controlled by your backend. Admin management remains in the web panel.</Text></View><Text style={s.title}>Security</Text><Text style={s.muted}>Changing your password signs out all devices.</Text><Field value={currentPassword} set={setCurrentPassword} placeholder="Current password" secret /><Field value={newPassword} set={setNewPassword} placeholder="New password (12–72 characters)" secret /><Button title="Update password" onPress={changePassword} disabled={busy || !currentPassword || !newPassword} /><Text style={s.small}>Sign out below revokes all sessions for this account.</Text><Button title="Sign out all devices" disabled={busy} onPress={confirmLogout} /></>}
       </ScrollView><View style={[s.tabs,landscape&&{width:76,flexDirection:'column',borderRightWidth:1,borderRightColor:'#bba16a2b',paddingVertical:8}]}>{(['Discover', 'Wallet', 'Activity'] as Tab[]).map((t, i) => <Tap haptic="select" accessibilityRole="tab" accessibilityState={{ selected: tab === t }} key={t} onPress={() => setTab(t)} style={[s.tab,landscape&&{flex:0,flexShrink:0,minHeight:72,paddingVertical:10}]}><View style={[s.tabMark, tab === t && s.tabMarkOn]}/><Text style={[s.tabIcon, tab === t && s.accent]}>{['⌂', '▤', '◷'][i]}</Text><Text style={[s.small, tab === t && s.accent]}>{t==='Discover'?'Home':t==='Activity'?'History':t}</Text></Tap>)}</View></View>
     </>}
