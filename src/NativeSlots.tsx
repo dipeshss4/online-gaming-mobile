@@ -9,6 +9,7 @@ import { SymbolArt } from './WebLook';
 import { Tap } from './Tap';
 import { feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
+import { GameHistory } from './GameHistory';
 
 export const supportsNativeSlots = (game: Game) => ['REEL_3', 'GRID_3X3'].includes(game.engine?.layout || '');
 const glyphs: Record<string, string> = { '7': '7', CHERRY: '🍒', LEMON: '🍋', ORANGE: '🍊', BELL: '🔔', STAR: '★', BAR: 'BAR', DIAMOND: '◆', KOI: '🐟', RED_LANTERN: '🏮', JADE_LION: '🦁', JADE_COMPASS: '◈', CRANE: '🪽', FLAME_LOTUS: '🪷' };
@@ -52,6 +53,8 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [result, setResult] = useState<PlayResult | null>(null), [stopped, setStopped] = useState(3), [reduced, setReduced] = useState(false);
   const [win, setWin] = useState<Win | null>(null);
+  // Bumped whenever a round settles, so the history under the reels picks it up.
+  const [played, setPlayed] = useState(0);
   const locked = useRef(false), alive = useRef(true);
   const grid = game.engine?.layout === 'GRID_3X3';
   const count = grid ? 9 : 3;
@@ -87,7 +90,7 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
       setWallet({ ...wallet, balance: data.balance, currency: data.currency });
       feel(data.payout > 0 ? 'win' : 'tap');
       if (data.payout > 0) setWin({ payout: data.payout, stake: data.stake, multiplier: data.multiplier, currency: data.currency, id: data.betId });
-      onSettled();
+      setPlayed(n => n + 1); onSettled();
     } catch (e) {
       if (!alive.current) return;
       // A first-attempt validation/auth rejection did not settle. Uncertain retries stay locked.
@@ -96,12 +99,12 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
       }
       feel('warn');
       setError(`${e instanceof Error ? e.message : 'Unable to play'}${submitted ? ' If a bet is pending, use Recover bet with the same request ID.' : ''}`);
-      setStopped(3); onSettled();
+      setStopped(3); setPlayed(n => n + 1); onSettled();
     } finally { locked.current = false; if (alive.current) setBusy(false); }
   }
   const display = result?.symbols || idle;
   const settled = result && !busy;
-  return <LandscapeGame stageItems={2}>
+  return <LandscapeGame stageItems={2} below={<GameHistory token={token} game={game} refresh={played} />}>
     {/* One row of chrome, not three: every line above the cabinet is height taken from the reels. */}
     <View style={g.topBar}>
       <Tap haptic="select" disabled={busy} onPress={onClose} style={s.inlineButton}><Text style={s.link}>{busy ? 'Round in progress…' : '← Back to lobby'}</Text></Tap>
