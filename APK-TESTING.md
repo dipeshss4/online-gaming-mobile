@@ -2,14 +2,16 @@
 
 ## GitHub Actions
 
-Pushes and pull requests run TypeScript checks and native bundle exports. To create a signed APK, run **Mobile checks and APK** manually on `native-app`. It uses the repository's `EXPO_TOKEN` secret and the existing EAS preview profile/signing key. On success, download `online-gaming-demo-apk` from the workflow artifacts (retained 14 days). No token belongs in source control. The cloud build may continue if the Actions job times out; inspect EAS before rerunning to avoid duplicate builds.
+Pushes and pull requests run TypeScript checks and Android/iOS bundle exports. After checks pass, pushes to `native-app` automatically build a signed Android demo APK. Other branches and pull requests never invoke EAS builds. Manual builds remain available via **Mobile checks and APK** on `native-app`. It uses the repository's `EXPO_TOKEN` secret and the existing EAS preview profile/signing key. On success, download `online-gaming-demo-apk` from the workflow artifacts (retained 14 days). No token belongs in source control. Builds consume EAS quota and may incur charges under the account's plan. Runs on the same branch are serialized without cancelling an active build. The cloud build may continue if the Actions job times out; inspect EAS before rerunning to avoid duplicate builds.
 
-## Current cloud build
+This is APK delivery for testing, not automatic installation or store publication. Testers download and install the new APK. iOS bundle exports validate JavaScript only; signed iPhone builds/TestFlight require a separate signing and distribution setup and are not enabled here.
 
-Submitted to `@dipeshss19/online-gaming-mobile` on 2026-09-16 (Nepal time):
-https://expo.dev/accounts/dipeshss19/projects/online-gaming-mobile/builds/af6be95b-c232-4e4a-810f-0f2f83bfb4c7
+## Previous successful build
 
-Build profile: `preview`; package: `com.onlinegaming.preview`; AWS URL: `https://d3m8fr7e7xbses.cloudfront.net`. EAS generated and stores the Android signing key. Last checked status: `IN_QUEUE`; no APK artifact available yet. Download/install only after the build finishes successfully. No phone testing has occurred.
+The manual workflow completed successfully on September 22, 2026:
+https://github.com/dipeshss4/online-gaming-mobile/actions/runs/35693328050
+
+Build profile: `preview`; package: `com.onlinegaming.preview`; AWS URL: `https://d3m8fr7e7xbses.cloudfront.net`. EAS stores the Android signing key. Download/install only after the selected run finishes successfully. Physical-device QA is still required.
 
 The EAS `preview` profile produces an installable APK, not an AAB and not an Expo Go-only bundle. Initial Android package: `com.onlinegaming.preview`.
 
@@ -21,7 +23,7 @@ From this folder:
 npx eas-cli build --platform android --profile preview
 ```
 
-Signing setup and the first project linkage require the account owner's input. No build has been submitted yet. There is no generated APK at this stage. Local builds require an Android SDK and compatible JDK, neither of which was available in the standard paths during the initial check.
+Project linkage and Android signing are already configured for the current Expo account. Local builds require an Android SDK and compatible JDK; CI builds use EAS instead.
 
 Before deployment, authenticate to the existing AWS account, identify the current server and domain, back up the database and existing release, validate migrations and tests, and deploy only to that existing environment. Do not run the root `deploy-aws.sh` for a routine update: it provisions new VPC, EC2, and RDS resources.
 

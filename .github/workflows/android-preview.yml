@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: mobile-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  group: mobile-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -29,7 +29,7 @@ jobs:
           EXPO_PUBLIC_API_URL: https://d3m8fr7e7xbses.cloudfront.net
 
   apk:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/native-app'
+    if: github.ref == 'refs/heads/native-app' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: checks
     runs-on: ubuntu-latest
     timeout-minutes: 120
