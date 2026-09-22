@@ -1,0 +1,68 @@
+name: Mobile checks and APK
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx expo export --platform android --platform ios
+        env:
+          EXPO_PUBLIC_API_URL: https://d3m8fr7e7xbses.cloudfront.net
+
+  apk:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/native-app'
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Build signed Android demo APK
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          test -n "$EXPO_TOKEN" || { echo 'EXPO_TOKEN secret is missing'; exit 1; }
+          npx --yes eas-cli@24.7.0 build --platform android --profile preview --non-interactive --wait --json > build-result.json
+      - name: Download successful APK
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const result = JSON.parse(fs.readFileSync('build-result.json', 'utf8'));
+          const build = Array.isArray(result) ? result[0] : result;
+          if (build.status !== 'FINISHED') throw new Error('EAS build did not finish successfully');
+          const url = build.artifacts?.applicationArchiveUrl || build.artifacts?.buildUrl;
+          if (!url || new URL(url).protocol !== 'https:') throw new Error('Missing HTTPS APK artifact');
+          const response = await fetch(url);
+          if (!response.ok) throw new Error('APK download failed: ' + response.status);
+          fs.writeFileSync('online-gaming-demo.apk', Buffer.from(await response.arrayBuffer()));
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Android demo APK\nBuild: ${build.id}\nDownload the APK from this run's artifacts.\nAWS testing endpoint; physical-device QA still required.\n`);
+          JS
+      - uses: actions/upload-artifact@v7
+        with:
+          name: online-gaming-demo-apk
+          path: online-gaming-demo.apk
+          if-no-files-found: error
+          retention-days: 14

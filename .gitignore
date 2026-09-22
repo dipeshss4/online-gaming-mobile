@@ -39,3 +39,11 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Generated visual checks and APK outputs (not source assets)
+/design-*.png
+/landscape-*.png
+/revamp-*.png
+/ui-shots/
+/build-result.json
+/*.apk

@@ -3,11 +3,12 @@
     "name": "Online Gaming",
     "slug": "online-gaming-mobile",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "landscape",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "requireFullScreen": true
     },
     "android": {
       "adaptiveIcon": {
@@ -23,6 +24,11 @@
     },
     "plugins": [
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "af1593a0-909e-4328-aca5-53a34ec0b47c"
+      }
+    }
   }
 }

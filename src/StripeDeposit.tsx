@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AppState, Linking, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { AppState, Linking, Platform, Text, TextInput, View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { randomUUID } from 'expo-crypto';
 import { request } from './api';
 import { s } from './styles';
+import { Tap } from './Tap';
 
 type Method = {providerCode:string;deposits:boolean;sandbox:boolean;currency:string;minAmount:number;maxAmount:number};
 type Deposit = {id:string;providerCode:string;sandbox:boolean;amount:number;currency:string;status:string;redirectUrl:string|null;failureReason:string|null};
@@ -31,7 +32,7 @@ export function StripeDeposit({token,userId,onRefresh}:{token:string;userId:stri
   }catch(e){if(alive.current)setError((e as Error).message);}finally{lock.current=false;if(alive.current)setBusy(false);}}
   async function open(){try{if(!deposit||deposit.sandbox!==true||deposit.status!=='PENDING'||!deposit.redirectUrl)throw new Error('No pending test checkout is available.');const url=new URL(deposit.redirectUrl);if(url.protocol!=='https:'||url.hostname!=='checkout.stripe.com'||url.username||url.password||!url.pathname.startsWith('/c/pay/cs_test_'))throw new Error('Blocked: this is not a standard Stripe test Checkout URL.');await Linking.openURL(url.href);}catch(e){setError((e as Error).message);}}
   async function reset(){if(!deposit||deposit.status==='PENDING')return;try{await persist(null);setAttempt(null);setDeposit(null);setError('');}catch{setError('Cannot clear the completed attempt.');}}
-  const button=(title:string,action:()=>void,disabled=false)=><Pressable accessibilityRole="button" disabled={disabled} onPress={action} style={[s.button,disabled&&{opacity:.5}]}><Text style={s.buttonText}>{title}</Text></Pressable>;
+  const button=(title:string,action:()=>void,disabled=false)=><Tap disabled={disabled} onPress={action} style={[s.button,disabled&&{opacity:.5}]}><Text style={s.buttonText}>{title}</Text></Tap>;
   return <View style={s.card}><Text style={s.title}>Load funds</Text><Text style={s.kicker}>STRIPE · TEST MODE ONLY</Text><Text style={s.small}>Use Stripe test payment details only. No live payments or withdrawals are enabled here.</Text>
     {!!error&&<Text accessibilityRole="alert" style={s.error}>{error}</Text>}{!ready&&button('Reload payment options',load)}
     {ready&&!method&&<Text style={s.muted}>Stripe test deposits are not available. Enable the existing Stripe test gateway in the backend.</Text>}

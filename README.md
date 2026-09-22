@@ -1,5 +1,48 @@
 # Online Gaming — Android and iOS
 
+## Shared AWS demo endpoint
+
+Native builds now default to `https://d3m8fr7e7xbses.cloudfront.net`; the EAS preview profile explicitly selects it. `npm run web` uses the loopback bridge on 8082 to reach this same HTTPS origin without changing server CORS. Restart the preview after changing the bridge configuration. Existing APKs require rebuilding/reinstalling to change the bundled endpoint. Sessions are namespaced by backend to prevent reuse of local-server credentials.
+
+The currently deployed AWS backend returns 401 for public `/api/site`. The mobile app displays a compatibility message until the newer backend is deployed; configuring the URL alone does not make login/games compatible. No fabricated site configuration or authentication bypass is provided.
+
+For local development, set `EXPO_PUBLIC_API_URL` and `MOBILE_API_UPSTREAM` to the same local backend origin when launching. The bridge stays loopback-only, permits only its two localhost browser origins, and forwards only `/api/` GET/POST requests. Native devices connect directly to the configured backend. AWS still uses HTTP between its edge and the origin; this is a temporary demo, not end-to-end TLS.
+
+## Landscape layout
+
+The first APK-inspired revamp adds a horizontal game shelf, compact category/search controls, session favorites and wider game stages. It reuses this project's artwork and existing server-backed games; no Unity binaries or original JUWA game logic were imported. Browser smoke checks use mocked accounts/catalogs, not real wallet transactions. Reconstructing the old game's mechanics remains separate work requiring gameplay references and agreed rules.
+
+Native builds are configured for landscape orientation, including game modals. Sign-in uses artwork beside a scrollable form; the lobby has a left navigation rail and four-column game cards. Wallet balance and funding controls appear side by side. Slots, roulette and crash use independently scrollable game and betting panes. Portrait browser previews retain a stacked fallback.
+
+Restart Expo after configuration changes. Rebuild and reinstall the native app to apply the orientation lock; refreshing a browser or an existing APK does not apply native orientation configuration. Browser checks at 844×390 use mocked account/game data. Physical Android/iOS rotation, keyboard and notch testing remain required. This change does not deploy AWS or generate an APK.
+
+## How the app is meant to feel
+
+`src/theme.ts` holds the tokens — one gold, one ground, one card, a four-step spacing rhythm. Before it there
+were 131 distinct colour literals across the screens, a dozen near-identical golds among them, which is what
+made the app look assembled rather than designed. New work uses the tokens; older screens move over as they are
+touched.
+
+`src/Tap.tsx` is the only thing that should be pressed. Every control dips and dims under the finger, ripples on
+Android where that is the platform's answer, and gives a short haptic through `feel()` — selection for switching
+between things, a heavier one for committing a stake, success for a win, warning for a refusal. Feedback used to
+be whatever each screen remembered to add: a couple of game tiles scaled, most buttons did nothing, nothing
+buzzed. Haptics are loaded lazily and wrapped, so a build without the native module degrades to silence instead
+of a crash, and the web preview simply has nothing to buzz.
+
+`src/Skeleton.tsx` replaces spinners and blank space: the lobby, the live floor and the first launch show the
+shape of what is coming. All animation respects the system's reduce-motion setting.
+
+The home screen shows the floor's totals in one line above the games and the boards below them. A scoreboard
+that pushes the games off the first screen has the app's priorities backwards.
+
+`src/WinCelebration.tsx` is what a win looks like, in all three games. The paying row swells twice under a gold
+wash — a beat later on each reel, so the eye is led along the payline — while a banner springs in above it with
+the amount counting up to what the server actually paid. The celebration is sized to the win: under 2× it is a
+short banner, from 2× it adds sparks, from 10× it is louder and holds longer. Treating a 1.5× return like a
+jackpot is how a game teaches players to ignore it. The banner sits above the paying row rather than across it,
+clears itself, and never blocks a tap. Under reduce-motion the win is still announced; it simply does not move.
+
 See [PARITY.md](./PARITY.md) for the current web-to-native audit and remaining work.
 
 ## Crash increment (2026-09-14)
@@ -65,6 +108,76 @@ See [API-CONTRACT.md](./API-CONTRACT.md) before changing response shapes. Mobile
 3. Extend native gameplay to roulette, crash and other engine-specific layouts; physical-device QA for the slot renderer.
 4. Add provider games/payment flows only after backend contracts and provider eligibility are established.
 5. Device QA, accessibility, final app identity/icons, signing, privacy disclosures and distribution review. This is not a store-ready release.
+
+## Running on a simulator and an emulator
+
+Both open the same Metro instance. Give the app an address the devices can reach: the Mac's LAN IP, not
+`localhost`, because the Android emulator's `localhost` is the emulator itself.
+
+```bash
+IP=$(ipconfig getifaddr en0)                       # the Mac on your network
+EXPO_PUBLIC_API_URL=http://$IP:8080 npx expo start --port 8091 --ios
+```
+
+`--ios` opens the booted simulator and installs the matching Expo Go if its version is behind. Metro's default
+port is 8081, which is also the API's metrics port, so pass `--port 8091`.
+
+For Android, with an emulator already running (`emulator -avd <name>` from `$ANDROID_HOME/emulator`):
+
+```bash
+adb install -r Expo-Go-57.0.9.apk                   # once; the URL is in api.expo.dev/v2/versions/latest
+adb shell am start -a android.intent.action.VIEW -d "exp://$IP:8091" host.exp.exponent
+```
+
+Both devices show the **landscape** layout, because `app.json` sets `"orientation": "landscape"` for native
+builds. A simulator left in portrait therefore shows the landscape layout rotated inside a portrait window;
+rotate the simulator (⌘→) to see it as a player would.
+
+Screenshots for a report: `xcrun simctl io booted screenshot ios.png` and `adb exec-out screencap -p > and.png`.
+
+## The floor
+
+The lobby opens with what everyone has been playing — rounds, total staked, players, and the day's best return —
+then today's biggest wins and the newest rounds, from `GET /api/live`. It is the same data the web lobby shows,
+under the same rules: players are named only where they opted in, and rounds from QA-forced outcomes or flagged
+test accounts never appear.
+
+The web receives these on its event stream. This app **asks every six seconds instead**: React Native has no
+`EventSource`, and streamed `fetch` is unreliable across both platforms, so a small poll is the honest option.
+It stops while the app is in the background and catches up when it returns.
+
+## Play limits and breaks
+
+The Wallet tab carries the same responsible-gambling controls as the web cashier, against the same API
+(`GET /api/protection`, `PUT /api/protection/limits/{kind}`, `POST /api/protection/break`):
+
+- deposit and loss limits per 24 hours, 7 days and 30 days, showing what is used and what is left;
+- a lower limit applies at once, while raising or removing one waits out the server's cooling period, which the
+  screen states and then shows as a pending change with the time it takes effect;
+- cooling-off (24 hours, 7 days, 30 days) and self-exclusion (6 months, 1 year, 5 years), both behind a
+  confirmation step that says what cannot be undone.
+
+The server owns every rule here; the screen only sends what the player asked for and shows what comes back.
+Enforcement of an active break also lives in the backend, so it holds whatever the app does.
+
+## Layout check (phones)
+
+`scripts/check-ui.mjs` opens the web preview at 390×844, walks sign-in → lobby → a slot game → wallet → withdraw
+→ limits → history → landscape, and fails if a screen scrolls sideways, if text is under 11px, or if a control is
+under 40px tall. Sideways it also checks the game itself: the stage must be the larger half of the screen and the
+reels a readable height, because the split was once decided by flex ratios that Android and the browser divided
+differently — leaving the game the smaller side on a real phone. It also checks what the money screens send: a limit save and removal, a break asking first, and a
+withdrawal requested, retried after a provider failure with the same requestId, then cancelled. The API is mocked,
+so it needs no backend and no account:
+
+```
+npm start -- --web --port 8090      # one terminal
+npx playwright install chromium     # once
+node scripts/check-ui.mjs           # another terminal; writes ui-shots/
+```
+
+It is a layout check on React Native for Web, not a substitute for looking at a real device: it cannot see
+native text scaling, safe-area insets on a notched phone, or touch behaviour.
 
 ## Verification notes
 
