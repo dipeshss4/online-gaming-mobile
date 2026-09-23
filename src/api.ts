@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
-export const BACKEND_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://d3m8fr7e7xbses.cloudfront.net').replace(/\/$/, '');
+export const BACKEND_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://loot777x.com').replace(/\/$/, '');
 export const API_URL = __DEV__ && Platform.OS === 'web' ? 'http://127.0.0.1:8082' : BACKEND_URL;
 /**
  * The store this build belongs to (EXPO_PUBLIC_STORE_CODE, fixed at build time). The server uses it in place of a

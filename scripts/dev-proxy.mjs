@@ -5,7 +5,7 @@ import https from 'node:https';
 export function startProxy() {
   const previewPort = process.env.PREVIEW_PORT || (process.argv.includes('--port') ? process.argv[process.argv.indexOf('--port') + 1] : '8081');
   const allowedOrigins = [`http://localhost:${previewPort}`, `http://127.0.0.1:${previewPort}`];
-  const target = new URL(process.env.MOBILE_API_UPSTREAM || process.env.EXPO_PUBLIC_API_URL || 'https://d3m8fr7e7xbses.cloudfront.net');
+  const target = new URL(process.env.MOBILE_API_UPSTREAM || process.env.EXPO_PUBLIC_API_URL || 'https://loot777x.com');
   if (!['http:', 'https:'].includes(target.protocol) || target.username || target.password || target.pathname !== '/' || target.search || target.hash) throw new Error('API upstream must be an HTTP(S) origin without credentials or a path.');
   const transport = target.protocol === 'https:' ? https : http;
   const server = http.createServer((req, res) => {
