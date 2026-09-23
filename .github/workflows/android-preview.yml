@@ -4,6 +4,15 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      store_code:
+        description: 'Store code for a store''s own app (e.g. abc). Empty builds the platform''s app.'
+        required: false
+        default: ''
+      app_name:
+        description: 'App name shown on the phone for a store''s app (e.g. ABC Games). Empty keeps the default.'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -40,6 +49,25 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      # A store's app is the preview build plus its store code: EXPO_PUBLIC_ values are bundled on the EAS worker, so
+      # they go into the build profile rather than this runner's environment. See README "One app per store".
+      - name: Tie the build to a store
+        if: inputs.store_code != ''
+        env:
+          STORE_CODE: ${{ inputs.store_code }}
+          APP_NAME: ${{ inputs.app_name }}
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const code = process.env.STORE_CODE.trim().toLowerCase();
+          if (!/^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])$/.test(code)) throw new Error(`"${code}" is not a store code`);
+          const eas = JSON.parse(fs.readFileSync('eas.json', 'utf8'));
+          const env = eas.build.preview.env;
+          env.EXPO_PUBLIC_STORE_CODE = code;
+          if (process.env.APP_NAME.trim()) env.STORE_APP_NAME = process.env.APP_NAME.trim();
+          fs.writeFileSync('eas.json', JSON.stringify(eas, null, 2));
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `### Store app\nStore: ${code}\n`);
+          JS
       - name: Build signed Android demo APK
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -62,7 +90,7 @@ jobs:
           JS
       - uses: actions/upload-artifact@v7
         with:
-          name: online-gaming-demo-apk
+          name: online-gaming-${{ inputs.store_code || 'demo' }}-apk
           path: online-gaming-demo.apk
           if-no-files-found: error
           retention-days: 14
