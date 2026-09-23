@@ -2,11 +2,38 @@
 
 ## Shared AWS demo endpoint
 
-Native builds now default to `https://d3m8fr7e7xbses.cloudfront.net`; the EAS preview profile explicitly selects it. `npm run web` uses the loopback bridge on 8082 to reach this same HTTPS origin without changing server CORS. Restart the preview after changing the bridge configuration. Existing APKs require rebuilding/reinstalling to change the bundled endpoint. Sessions are namespaced by backend to prevent reuse of local-server credentials.
+Native builds default to `https://loot777x.com`; the EAS preview profile explicitly selects it. `npm run web` uses the loopback bridge on 8082 to reach this same HTTPS origin without changing server CORS. Restart the preview after changing the bridge configuration. Existing APKs require rebuilding/reinstalling to change the bundled endpoint. Sessions are namespaced by backend to prevent reuse of local-server credentials.
 
 The currently deployed AWS backend returns 401 for public `/api/site`. The mobile app displays a compatibility message until the newer backend is deployed; configuring the URL alone does not make login/games compatible. No fabricated site configuration or authentication bypass is provided.
 
 For local development, set `EXPO_PUBLIC_API_URL` and `MOBILE_API_UPSTREAM` to the same local backend origin when launching. The bridge stays loopback-only, permits only its two localhost browser origins, and forwards only `/api/` GET/POST requests. Native devices connect directly to the configured backend. AWS still uses HTTP between its edge and the origin; this is a temporary demo, not end-to-end TLS.
+
+## One app per store
+
+The server runs one site per store (`abc.loot777x.com`), and a phone app has no subdomain, so each store that
+wants its own app gets its own build. `EXPO_PUBLIC_STORE_CODE` ties a build to its store, and the app sends it as
+`X-Store-Code` on every request. The server treats that exactly like the store's own site:
+- signups join that store
+- only that store's players (and staff) can sign in
+- the app shows the store's name and branding
+
+A build without a store code is the **platform's app**. It talks to `loot777x.com`, so signups become the
+platform's own players, and players of other stores are asked to use their store's app or site.
+
+**Building a store's APK:** in GitHub → Actions → *Mobile checks and APK* → *Run workflow* on `native-app`, enter
+the store code (e.g. `abc`) and optionally an app name (e.g. `ABC Games`). The APK appears as that run's
+`online-gaming-abc-apk` artifact.
+
+Locally, run `EXPO_PUBLIC_STORE_CODE=abc STORE_APP_NAME="ABC Games" eas build --profile preview --platform android`.
+`STORE_APP_ICON` sets the store's own icon.
+
+**Each store's app is a separate app on the phone.** Its Android package is `com.onlinegaming.preview.<code>`
+(override with `STORE_ANDROID_PACKAGE`), so it installs next to the platform app and the other stores' apps.
+EAS needs a signing key for each new package. Create it once per store with `eas credentials` (Android →
+preview), because the workflow builds non-interactively and cannot create one itself.
+
+The store must exist and be active on the server, and store sites must be switched on there
+(`TENANCY_BASE_DOMAIN`). Otherwise the app shows "This app's store is not open".
 
 ## Landscape layout
 

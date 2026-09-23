@@ -11,7 +11,7 @@ This is APK delivery for testing, not automatic installation or store publicatio
 The manual workflow completed successfully on September 22, 2026:
 https://github.com/dipeshss4/online-gaming-mobile/actions/runs/35693328050
 
-Build profile: `preview`; package: `com.onlinegaming.preview`; AWS URL: `https://d3m8fr7e7xbses.cloudfront.net`. EAS stores the Android signing key. Download/install only after the selected run finishes successfully. Physical-device QA is still required.
+Build profile: `preview`; package: `com.onlinegaming.preview`; API URL: `https://loot777x.com`. For a store's own APK, see README "One app per store". EAS stores the Android signing key. Download/install only after the selected run finishes successfully. Physical-device QA is still required.
 
 The EAS `preview` profile produces an installable APK, not an AAB and not an Expo Go-only bundle. Initial Android package: `com.onlinegaming.preview`.
 
