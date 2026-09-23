@@ -3,6 +3,13 @@ import * as SecureStore from 'expo-secure-store';
 
 export const BACKEND_URL = (process.env.EXPO_PUBLIC_API_URL || 'https://d3m8fr7e7xbses.cloudfront.net').replace(/\/$/, '');
 export const API_URL = __DEV__ && Platform.OS === 'web' ? 'http://127.0.0.1:8082' : BACKEND_URL;
+/**
+ * The store this build belongs to (EXPO_PUBLIC_STORE_CODE, fixed at build time). The server uses it in place of a
+ * web site's subdomain: sign-ups join this store, only its players can sign in, and it serves this store's branding.
+ * Empty builds the platform's own app, which signs players up to the sign-up store.
+ */
+export const STORE_CODE = (process.env.EXPO_PUBLIC_STORE_CODE || '').trim();
+const STORE_HEADER: Record<string, string> = STORE_CODE ? { 'X-Store-Code': STORE_CODE } : {};
 export type Identity = { userId: string; email: string; role: string; permissions: string[] };
 export type Auth = Identity & { accessToken: string };
 export type Balance = { balance: number; currency: string; held?: number; status?: string };
@@ -106,7 +113,7 @@ export function onRenewed(listener: ((token: string) => void) | null) { announce
 async function renew(): Promise<string | null> {
   const response = await fetch(`${API_URL}/api/auth/refresh`, {
     method: 'POST', ...WITH_COOKIES,
-    headers: { Accept: 'application/json', 'X-Session-Refresh': '1' },
+    headers: { Accept: 'application/json', 'X-Session-Refresh': '1', ...STORE_HEADER },
   });
   if (!response.ok) return null;
   const data = await response.json().catch(() => null) as { accessToken?: string } | null;
@@ -143,7 +150,7 @@ async function send<T>(path: string, token?: string | null, body?: unknown, meth
     const response = await fetch(`${API_URL}${path}`, {
       method: body === undefined ? 'GET' : method ?? 'POST', signal: controller.signal,
       ...WITH_COOKIES,
-      headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}) },
+      headers: { Accept: 'application/json', ...STORE_HEADER, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}) },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     const data = response.status === 204 ? null : await response.json().catch(() => null);

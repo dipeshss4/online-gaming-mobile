@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, KeyboardAvoidingView, Modal, Platform, RefreshControl, ScrollView, useWindowDimensions, Text, TextInput, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { API_URL, ApiError, Auth, Balance, Game, Identity, Page, onRenewed, request, session, Transaction } from './api';
+import { API_URL, ApiError, Auth, Balance, Game, Identity, Page, onRenewed, request, session, STORE_CODE, Transaction } from './api';
 import { HistoryScreen } from './GameHistory';
 import { s } from './styles';
 import { NativeSlots, supportsNativeSlots } from './NativeSlots';
@@ -44,7 +44,7 @@ function Main() {
   const generation = useRef(0);
   const [site, setSite] = useState<Site | null>(null);
   const [siteError, setSiteError] = useState('');
-  async function loadSite() { try { setSite(await request<Site>('/api/site')); setSiteError(''); } catch (e) { setSiteError(e instanceof ApiError && [401,404].includes(e.status) ? 'The configured backend does not expose the public site configuration required by this mobile version. Deploy the compatible backend before signing in.' : 'Cannot load site branding. Please retry.'); } }
+  async function loadSite() { try { setSite(await request<Site>('/api/site')); setSiteError(''); } catch (e) { setSiteError(e instanceof ApiError && e.status === 404 && STORE_CODE ? 'This app’s store is not open right now. Please contact the store.' : e instanceof ApiError && [401,404].includes(e.status) ? 'The configured backend does not expose the public site configuration required by this mobile version. Deploy the compatible backend before signing in.' : 'Cannot load site branding. Please retry.'); } }
   useEffect(() => { void loadSite(); const listener = AppState.addEventListener('change', state => { if (state === 'active') void loadSite(); }); return () => listener.remove(); }, []);
   async function clearSession() {
     generation.current++;
