@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Online Gaming",
+    "name": "Loot777x",
     "slug": "online-gaming-mobile",
     "version": "1.0.0",
     "orientation": "landscape",
@@ -12,7 +12,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#120822",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

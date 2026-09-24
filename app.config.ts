@@ -17,7 +17,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const icon = process.env.STORE_APP_ICON;
   return {
     ...config,
-    name: process.env.STORE_APP_NAME || config.name || 'Online Gaming',
+    name: process.env.STORE_APP_NAME || config.name || 'Loot777x',
     slug: config.slug || 'online-gaming-mobile',
     ...(icon ? { icon } : {}),
     ios: {

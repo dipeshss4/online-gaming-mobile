@@ -1,4 +1,4 @@
-# Online Gaming — Android and iOS
+# Loot777x — Android and iOS
 
 ## Shared AWS demo endpoint
 

@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Image, ImageBackground, Platform, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Game } from './api';
+import { API_URL, Game } from './api';
 import { s } from './styles';
 import { Tap } from './Tap';
 
 export type Site = { platformName: string; registrationEnabled: boolean; maintenanceMode: boolean; content: {
-  brand: { logoGlyph: string; tagline: string; creditsLabel: string; demoBadge: string; legalNotice: string; footerNote: string };
+  brand: { logoGlyph: string; logoImageId?: string; tagline: string; creditsLabel: string; demoBadge: string; legalNotice: string; footerNote: string };
   signIn: { formKicker: string; loginTitle: string; loginSubtitle: string; registerTitle: string; registerSubtitle: string; registrationClosed: string };
   lobby: { welcomeLabel: string; heroEnabled: boolean; featuredGameCode: string; heroEyebrow: string; heroHeadline: string; heroAccent: string; heroBody: string; heroNote: string; heroArtLabel: string; quickLinkTitle: string; quickLinkBody: string; libraryEyebrow: string; defaultBadge: string };
 } };
@@ -18,7 +18,14 @@ export function SymbolArt({ symbol, size = 80 }: { symbol: string; size?: number
   if (index < 0) return <Text style={{ color: '#efd49b', fontSize: size / 3, textAlign: 'center' }}>{symbol.replaceAll('_',' ')}</Text>;
   return <View accessibilityLabel={symbol} style={{ width: size, height: size, overflow: 'hidden' }}><Image source={special ? require('../assets/web/lucky-fire-blitz-symbols-v1.png') : require('../assets/web/slot-symbols.png')} style={{ position: 'absolute', width: size * 3, height: size * (special ? 2 : 3), left: -(index % 3) * size, top: -Math.floor(index / 3) * size }} /></View>;
 }
-export function Brand({ site }: { site: Site }) { return <View style={w.brand}><LinearGradient colors={['#fff0b4','#ad7c21']} style={w.logo}><Text style={w.logoText}>{site.content.brand.logoGlyph}</Text></LinearGradient><View style={w.brandLines}><Text numberOfLines={1} style={w.brandText}>{site.platformName.toUpperCase()}</Text><Text numberOfLines={1} style={w.tagline}>{site.content.brand.tagline}</Text></View></View>; }
+/** The logo, as on the website: the uploaded image, else the typed logo mark, else the Loot777x coin. */
+function LogoBadge({ brand }: { brand: Site['content']['brand'] }) {
+  if (brand.logoImageId) return <Image source={{ uri: `${API_URL}/api/media/${brand.logoImageId}` }} style={w.logoImage} accessibilityIgnoresInvertColors />;
+  if (brand.logoGlyph) return <LinearGradient colors={['#fff0b4','#ad7c21']} style={w.logo}><Text style={w.logoText}>{brand.logoGlyph}</Text></LinearGradient>;
+  return <Image source={LOOT777X_MARK} style={w.logoImage} accessibilityIgnoresInvertColors />;
+}
+const LOOT777X_MARK = require('../assets/brand/loot777x-mark.png');
+export function Brand({ site }: { site: Site }) { return <View style={w.brand}><LogoBadge brand={site.content.brand} /><View style={w.brandLines}><Text numberOfLines={1} style={w.brandText}>{site.platformName.toUpperCase()}</Text><Text numberOfLines={1} style={w.tagline}>{site.content.brand.tagline}</Text></View></View>; }
 export function AuthLook({ site, children }: { site: Site; children: React.ReactNode }) {
   const {width,height}=useWindowDimensions();
   if(width>height) return <View style={{flex:1,flexDirection:'row',backgroundColor:'#090706'}}><View style={{width:'43%',overflow:'hidden'}}><Image source={require('../assets/web/casino-host-login-v1.png')} style={{position:'absolute',width:height*1717/916,height,left:-height*.16}}/><LinearGradient colors={['#09070600','#090706bb']} style={{flex:1,padding:20,justifyContent:'space-between'}}><Brand site={site}/><Text style={[s.small,{color:'#e0cbaa'}]}>{site.content.brand.legalNotice}</Text></LinearGradient></View><ScrollView style={{flex:1}} contentContainerStyle={{padding:20,gap:14}} keyboardShouldPersistTaps="handled"><View style={[w.form,{marginTop:0,marginHorizontal:0,padding:20,gap:12}]}>{children}</View></ScrollView></View>;
@@ -64,6 +71,6 @@ export function WebLobby({site,games,onPlay}: {site:Site;games:Game[];onPlay:(g:
   </>;
 }
 const w=StyleSheet.create({
-  brand:{flexDirection:'row',alignItems:'center',gap:8,flexShrink:1,minWidth:0},brandLines:{flexShrink:1,minWidth:0},logo:{width:33,height:37,borderRadius:9,alignItems:'center',justifyContent:'center'},logoText:{color:'#201707',fontSize:25,fontWeight:'800'},brandText:{color:'#f3e9d3',fontSize:12,letterSpacing:1.5,fontWeight:'700'},tagline:{fontSize:11,letterSpacing:.8,color:'#b7a78d',marginTop:3},form:{marginHorizontal:24,marginTop:-42,padding:24,gap:18,borderWidth:1,borderColor:'#bb914a44',borderRadius:8,backgroundColor:'#14110e'},
+  brand:{flexDirection:'row',alignItems:'center',gap:8,flexShrink:1,minWidth:0},brandLines:{flexShrink:1,minWidth:0},logoImage:{width:36,height:36,borderRadius:18},logo:{width:33,height:37,borderRadius:9,alignItems:'center',justifyContent:'center'},logoText:{color:'#201707',fontSize:25,fontWeight:'800'},brandText:{color:'#f3e9d3',fontSize:12,letterSpacing:1.5,fontWeight:'700'},tagline:{fontSize:11,letterSpacing:.8,color:'#b7a78d',marginTop:3},form:{marginHorizontal:24,marginTop:-42,padding:24,gap:18,borderWidth:1,borderColor:'#bb914a44',borderRadius:8,backgroundColor:'#14110e'},
   spread:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:8},eyebrow:{color:'#ae9364',fontSize:11,letterSpacing:1.1},hero:{borderWidth:1,borderColor:'#bd925342',borderRadius:16,minHeight:250,padding:20,flexDirection:'row',overflow:'hidden'},headline:{fontFamily:serif,color:'#fff2db',fontSize:29,letterSpacing:-1,lineHeight:31,marginVertical:12},heroBody:{color:'#b8a8a4',fontSize:13,lineHeight:19},discover:{borderRadius:7,padding:12,marginTop:14},heroArt:{flex:1,minWidth:0,alignItems:'center',justifyContent:'center',paddingTop:20},artLabel:{fontFamily:serif,fontStyle:'italic',fontSize:18,color:'#ebcf8a',textAlign:'center',width:'100%'},quick:{flexDirection:'row',gap:12,alignItems:'center',paddingVertical:10,borderBottomWidth:1,borderBottomColor:'#ffffff12'},category:{borderWidth:1,borderColor:'#ffffff10',borderRadius:24,backgroundColor:'#14141b',paddingHorizontal:15,paddingVertical:13},poster:{borderRadius:14,overflow:'hidden',borderWidth:1,borderColor:'#ffffff22'},posterButton:{minHeight:224,alignItems:'center',justifyContent:'flex-end',padding:12},badge:{fontSize:11,letterSpacing:.8,color:'#e6c9a1',textAlign:'center'},posterTitle:{fontFamily:serif,fontWeight:'900',fontStyle:'italic',fontSize:23,color:'#ffdf9d',textAlign:'center',marginBottom:8},heart:{position:'absolute',left:9,top:9,width:44,height:44,alignItems:'center',justifyContent:'center',borderRadius:20,borderWidth:1,borderColor:'#ffffff35',backgroundColor:'#ffffff24'},caption:{fontSize:12,fontWeight:'600',color:'#eee4d5',marginTop:10,marginBottom:4},
 });
