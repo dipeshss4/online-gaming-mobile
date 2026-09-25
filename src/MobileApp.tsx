@@ -17,6 +17,8 @@ import { Tap } from './Tap';
 import { Feel, c, grad } from './theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { LobbySkeleton } from './Skeleton';
+import { sound, Scene } from './sound';
+import { InboxButton, PromoPopup, SoundToggle } from './Popups';
 
 type Tab = 'Discover' | 'Wallet' | 'Activity' | 'Account';
 /** The cashier's panes, in the order the web wallet uses them. */
@@ -28,6 +30,7 @@ function Button({ title, onPress, disabled = false, haptic }: { title: string; o
 function Field({ value, set, placeholder, secret = false }: { value: string; set: (v: string) => void; placeholder: string; secret?: boolean }) {
   return <TextInput accessibilityLabel={placeholder} placeholder={placeholder} placeholderTextColor="#8893a7" value={value} onChangeText={set} secureTextEntry={secret} autoCapitalize="none" autoCorrect={false} keyboardType={placeholder === 'Email address' ? 'email-address' : 'default'} style={s.input} />;
 }
+const sceneOf = (game: Game): Scene => game.code === 'ASCENT_CRASH' || game.engineType === 'CRASH' ? 'crash' : game.engine?.layout === 'ROULETTE' ? 'roulette' : 'slots';
 export default function App() { return <SafeAreaProvider><Main /></SafeAreaProvider>; }
 function Main() {
   const {width,height}=useWindowDimensions();
@@ -46,6 +49,10 @@ function Main() {
   const [site, setSite] = useState<Site | null>(null);
   const [siteError, setSiteError] = useState('');
   async function loadSite() { try { setSite(await request<Site>('/api/site')); setSiteError(''); } catch (e) { setSiteError(e instanceof ApiError && e.status === 404 && STORE_CODE ? 'This app’s store is not open right now. Please contact the store.' : e instanceof ApiError && [401,404].includes(e.status) ? 'The configured backend does not expose the public site configuration required by this mobile version. Deploy the compatible backend before signing in.' : 'Cannot load site branding. Please retry.'); } }
+  // Sound follows the player around: the lobby's music, then each game's own.
+  useEffect(() => { void sound.start(); }, []);
+  useEffect(() => { sound.configureSite(site?.content.sound); }, [site]);
+  useEffect(() => { sound.setScene(!token ? null : selected ? sceneOf(selected) : 'lobby', selected); }, [token, selected]);
   useEffect(() => { void loadSite(); const listener = AppState.addEventListener('change', state => { if (state === 'active') void loadSite(); }); return () => listener.remove(); }, []);
   async function clearSession() {
     generation.current++;
@@ -118,10 +125,10 @@ function Main() {
       <Button title={busy ? 'Processing…' : register ? 'Create Account' : 'Sign In'} onPress={authenticate} disabled={busy||(register&&!site.registrationEnabled)} />
       <Tap haptic="select" disabled={busy} onPress={() => { setRegister(!register); setError(''); }} style={s.inlineButton}><Text style={s.link}>{register ? 'Already registered? Sign in' : 'New here? Create an account'}</Text></Tap>
     </AuthLook> : <>
-      <View style={[s.header,landscape&&{paddingVertical:7}]}><Brand site={site}/><Tap haptic="select" accessibilityLabel="Open account" onPress={()=>setTab('Account')} hitSlop={12} style={s.iconButton}><Text style={[s.accent,{fontSize:22}]}>◎</Text></Tap><Tap haptic="select" accessibilityLabel="Open wallet" onPress={()=>setTab('Wallet')} style={s.pill}><Text style={s.small}>{site.content.brand.creditsLabel}</Text><Text style={s.accent}>{balance ? `${money(balance.balance)} ${balance.currency}` : 'Wallet —'}</Text></Tap></View>
+      <View style={[s.header,landscape&&{paddingVertical:7}]}><Brand site={site}/><View style={{flexDirection:'row',alignItems:'center'}}><SoundToggle/><InboxButton token={token}/></View><Tap haptic="select" accessibilityLabel="Open wallet" onPress={()=>setTab('Wallet')} style={s.pill}><Text style={s.small}>{site.content.brand.creditsLabel}</Text><Text style={s.accent}>{balance ? `${money(balance.balance)} ${balance.currency}` : 'Wallet —'}</Text></Tap></View>
       <View style={{flex:1,flexDirection:landscape?'row-reverse':'column'}}><ScrollView style={{flex:1}} key={tab} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={busy} onRefresh={load} tintColor="#efd49b" />}>
         {!!error && <View style={s.card}><Text accessibilityRole="alert" style={s.error}>{error}</Text><Button title="Retry" onPress={load} disabled={busy} /></View>}
-        {tab === 'Discover' && <>{!!token && <FloorTotals floor={floor} currency={balance?.currency || 'USD'} />}{!games.length && busy ? <LobbySkeleton landscape={landscape}/> : <WebLobby site={site} games={games} onPlay={setSelected}/>}{!!token && <FloorBoards floor={floor} />}{!landscape&&<Button title="＋ Load funds · Stripe test" onPress={()=>setTab('Wallet')}/>}</>}
+        {tab === 'Discover' && <>{!!token && <FloorTotals floor={floor} currency={balance?.currency || 'USD'} />}{!games.length && busy ? <LobbySkeleton landscape={landscape}/> : <WebLobby site={site} games={games} onPlay={setSelected}/>}{!!identity && games.length > 0 && <PromoPopup promo={site.content.promo} email={identity.email} games={games} onPlay={setSelected}/>}{!!token && <FloorBoards floor={floor} />}{!landscape&&<Button title="＋ Load funds · Stripe test" onPress={()=>setTab('Wallet')}/>}</>}
         {tab === 'Wallet' && <>
           <Text style={s.title}>Your wallet</Text>
           <View style={[s.hero]}><Text style={s.kicker}>AVAILABLE BALANCE</Text><Text style={s.heroTitle}>{balance ? money(balance.balance) : '—'}</Text><Text style={s.accent}>{balance?.currency || ''} · {balance?.status || 'Account wallet'}</Text>
@@ -139,7 +146,7 @@ function Main() {
         </>}
         {tab === 'Activity' && token && <HistoryScreen token={token} games={games} refresh={loads} />}
         {tab === 'Account' && <><Text style={s.title}>Your account</Text><View style={s.card}><Text style={s.gameName}>{identity?.email}</Text><Text style={s.accent}>{identity?.role}</Text><Text style={s.small}>Access is controlled by your backend. Admin management remains in the web panel.</Text></View><Text style={s.title}>Security</Text><Text style={s.muted}>Changing your password signs out all devices.</Text><Field value={currentPassword} set={setCurrentPassword} placeholder="Current password" secret /><Field value={newPassword} set={setNewPassword} placeholder="New password (12–72 characters)" secret /><Button title="Update password" onPress={changePassword} disabled={busy || !currentPassword || !newPassword} /><Text style={s.small}>Sign out below revokes all sessions for this account.</Text><Button title="Sign out all devices" disabled={busy} onPress={confirmLogout} /></>}
-      </ScrollView><View style={[s.tabs,landscape&&{width:76,flexDirection:'column',borderRightWidth:1,borderRightColor:'#b56cff40',paddingVertical:8}]}>{(['Discover', 'Wallet', 'Activity'] as Tab[]).map((t, i) => <Tap haptic="select" accessibilityRole="tab" accessibilityState={{ selected: tab === t }} key={t} onPress={() => setTab(t)} style={[s.tab,landscape&&{flex:0,flexShrink:0,minHeight:72,paddingVertical:10}]}><View style={[s.tabMark, tab === t && s.tabMarkOn]}/><Text style={[s.tabIcon, tab === t && s.accent]}>{['⌂', '▤', '◷'][i]}</Text><Text style={[s.small, tab === t && s.accent]}>{t==='Discover'?'Home':t==='Activity'?'History':t}</Text></Tap>)}</View></View>
+      </ScrollView><View style={[s.tabs,landscape&&{width:76,flexDirection:'column',borderRightWidth:1,borderRightColor:'#b56cff40',paddingVertical:8}]}>{(['Discover', 'Wallet', 'Activity', 'Account'] as Tab[]).map((t, i) => <Tap haptic="select" accessibilityRole="tab" accessibilityState={{ selected: tab === t }} key={t} onPress={() => setTab(t)} style={[s.tab,landscape&&{flex:0,flexShrink:0,minHeight:72,paddingVertical:10}]}><View style={[s.tabMark, tab === t && s.tabMarkOn]}/><Text style={[s.tabIcon, tab === t && s.accent]}>{['⌂', '▤', '◷', '◎'][i]}</Text><Text style={[s.small, tab === t && s.accent]}>{t==='Discover'?'Home':t==='Activity'?'History':t}</Text></Tap>)}</View></View>
     </>}
     <Modal supportedOrientations={['landscape-left','landscape-right']} visible={!!selected} animationType="slide" onRequestClose={() => { if (!selected || !(supportsNativeSlots(selected) || selected.engine?.layout === 'ROULETTE' || selected.code === 'ASCENT_CRASH')) setSelected(null); }}><SafeAreaView style={s.root}>{selected && token && identity && selected.code === 'ASCENT_CRASH' ? <NativeCrash key={selected.code} game={selected} token={token} userId={identity.userId} onClose={()=>{setSelected(null);void load();}} onSettled={()=>{void load();}}/> : selected && token && identity && selected.engine?.layout === 'ROULETTE' ? <NativeRoulette key={selected.code} game={selected} token={token} userId={identity.userId} initialBalance={balance} onClose={()=>{setSelected(null);void load();}} onSettled={()=>{void load();}}/> : selected && token && identity && supportsNativeSlots(selected) ? <NativeSlots key={selected.code} game={selected} token={token} userId={identity.userId} initialBalance={balance} onClose={() => { setSelected(null); void load(); }} onSettled={() => { void load(); }} /> : <ScrollView contentContainerStyle={s.content}><Button title="← Back to games" onPress={() => setSelected(null)} /><Text style={s.heroTitle}>{selected?.name}</Text><Text style={s.muted}>{selected?.description}</Text><View style={s.card}><Text style={s.kicker}>SERVER STAKE LIMITS</Text><Text style={s.title}>{selected?.minStake} – {selected?.maxStake}</Text></View>{selected?.engine?.rules?.map((rule, i) => <Text key={i} style={s.muted}>• {rule}</Text>)}<View style={s.card}><Text style={s.gameName}>Native game screen · Coming next</Text><Text style={s.muted}>This milestone supports browsing only. No stake is placed and no wallet balance is changed from this screen.</Text></View></ScrollView>}</SafeAreaView></Modal>
   </KeyboardAvoidingView></SafeAreaView>;

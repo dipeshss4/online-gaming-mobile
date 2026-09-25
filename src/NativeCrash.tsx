@@ -8,6 +8,8 @@ import { s } from './styles';
 import { Tap } from './Tap';
 import { c as t, feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
+import { sound } from './sound';
+import { SoundToggle } from './Popups';
 import { LandscapeGame } from './LandscapeGame';
 import { GameHistory } from './GameHistory';
 
@@ -41,7 +43,7 @@ export function NativeCrash({ game, token, userId, onClose, onSettled }: { game:
     if (!alive.current) return;
     if (next.status === 'FLYING') anchor.current = { id: next.id, started: Date.parse(next.startedAt), offset: Date.parse(next.serverTime) - Date.now(), growth: next.growthRate ?? 0.12 };
     setRound(previous => {
-      if (previous?.id === next.id && previous.status === 'FLYING' && next.status === 'CRASHED') feel('warn');
+      if (previous?.id === next.id && previous.status === 'FLYING' && next.status === 'CRASHED') { feel('warn'); sound.play('crash'); }
       return next;
     });
     setError(''); setHistory(previous => [next, ...previous.filter(r => r.id !== next.id)].slice(0, 20));
@@ -107,7 +109,7 @@ export function NativeCrash({ game, token, userId, onClose, onSettled }: { game:
       await persist(a); if (alive.current) setAttempt(a);
       const next = await request<Flight>('/api/crash', token, a);
       await persist(null);
-      if (alive.current) { setAttempt(null); apply(next); setPlayed(n => n + 1); callback.current(); }
+      if (alive.current) { setAttempt(null); apply(next); setPlayed(n => n + 1); callback.current(); sound.play('spin'); }
     } catch (e) { if (alive.current) setError(`${(e as Error).message} Recover keeps the same request and stakes.`); }
     finally { lock.current = false; if (alive.current) setBusy(false); }
   }
@@ -119,7 +121,7 @@ export function NativeCrash({ game, token, userId, onClose, onSettled }: { game:
       apply(next);
       // Only a server-confirmed collection is celebrated; the displayed multiplier is never the authority.
       const paid = next.tickets.find(x => x.panel === panel);
-      if (paid && paid.payout > 0) { feel('win'); setWin({ payout: paid.payout, stake: paid.stake, multiplier: Number((paid.payout / (paid.stake || 1)).toFixed(2)), currency: '', id: `${next.id}-${panel}-${paid.payout}` }); }
+      if (paid && paid.payout > 0) { feel('win'); sound.play('cashout'); setWin({ payout: paid.payout, stake: paid.stake, multiplier: Number((paid.payout / (paid.stake || 1)).toFixed(2)), currency: '', id: `${next.id}-${panel}-${paid.payout}` }); }
       setPlayed(n => n + 1); callback.current();
     } catch { if (alive.current) setError('Cash-out not confirmed. Retry the same panel; only the server can confirm it.'); }
     finally { lock.current = false; if (alive.current) setBusy(false); }
@@ -151,7 +153,7 @@ export function NativeCrash({ game, token, userId, onClose, onSettled }: { game:
 
   return <LandscapeGame stage={0.62} stageItems={2} below={<GameHistory token={token} game={game} refresh={played} />}>
     <View style={x.topBar}>
-      <Tap haptic="select" disabled={busy} onPress={onClose} style={s.inlineButton}><Text style={s.link}>‹ Back</Text></Tap>
+      <Tap haptic="select" disabled={busy} onPress={onClose} style={s.inlineButton}><Text style={s.link}>‹ Back</Text></Tap><SoundToggle />
       <Text numberOfLines={1} style={[s.title, { flex: 1, fontSize: 20 }]}>{game.name}</Text>
       <View style={[x.liveDot, flying && { backgroundColor: t.win }]} /><Text style={s.kicker}>{flying ? 'IN FLIGHT' : 'READY'}</Text>
     </View>

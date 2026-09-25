@@ -8,6 +8,8 @@ import { s } from './styles';
 import { Tap } from './Tap';
 import { feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
+import { sound } from './sound';
+import { SoundToggle } from './Popups';
 import { LandscapeGame } from './LandscapeGame';
 import { GameHistory } from './GameHistory';
 
@@ -27,7 +29,7 @@ export function NativeRoulette({game,token,userId,initialBalance,onClose,onSettl
   const locked=useRef(false),alive=useRef(true),rotation=useRef(new Animated.Value(0)).current;
   const total=Object.values(ticket).reduce((a,b)=>a+b,0);
   useEffect(()=>{alive.current=true;readPending(userId).then(p=>{if(alive.current){setPending(p);setReady(true);}}).catch(()=>setError('Cannot read saved bet. Play is locked.'));AccessibilityInfo.isReduceMotionEnabled().then(setReduced);const l=AccessibilityInfo.addEventListener('reduceMotionChanged',setReduced);return()=>{alive.current=false;l.remove();rotation.stopAnimation();};},[]);
-  function add(key:string){if(busy||pending)return;setError('');setTicket(prev=>{const next=(prev[key]||0)+chip;const sum=Object.values(prev).reduce((a,b)=>a+b,0)+chip;if(next>Math.round(game.maxStake*100)||sum>Math.round(Math.min(game.maxStake,1000)*100)){setError('This ticket exceeds the game stake limit.');return prev;}return {...prev,[key]:next};});}
+  function add(key:string){if(busy||pending)return;sound.play('tap');setError('');setTicket(prev=>{const next=(prev[key]||0)+chip;const sum=Object.values(prev).reduce((a,b)=>a+b,0)+chip;if(next>Math.round(game.maxStake*100)||sum>Math.round(Math.min(game.maxStake,1000)*100)){setError('This ticket exceeds the game stake limit.');return prev;}return {...prev,[key]:next};});}
   async function spin(){
     if(locked.current||!ready||(pending&&pending.gameCode!==game.code))return;
     if(!pending&&(!total||total<game.minStake*100)){setError('Add at least one bet before spinning.');return;}
@@ -42,11 +44,11 @@ export function NativeRoulette({game,token,userId,initialBalance,onClose,onSettl
       const number=Number(data.symbols?.[0]);
       if(data.requestId!==bet.requestId||data.gameCode!==game.code||!Number.isInteger(number)||number<0||number>36)throw new Error('Unexpected server result. Recover this ticket.');
       if(!alive.current)return;
-      rotation.setValue(0);
+      rotation.setValue(0);sound.play('spin');
       await new Promise<void>(resolve=>Animated.timing(rotation,{toValue:1440+(360-order.indexOf(number)*360/37)%360,duration:reduced?0:2600,easing:Easing.out(Easing.cubic),useNativeDriver:true}).start(()=>resolve()));
       if(!alive.current)return;
       await clearPending(userId);setPending(null);setResult(data);setWallet({...wallet,balance:data.balance,currency:data.currency});setTicket({});
-      feel(data.payout>0?'win':'tap');
+      feel(data.payout>0?'win':'tap');sound.result(data.payout>0?data.multiplier:0);
       if(data.payout>0)setWin({payout:data.payout,stake:data.stake,multiplier:data.multiplier,currency:data.currency,id:data.betId});
       setPlayed(n=>n+1);onSettled();
     }catch(e){if(!alive.current)return;if(!pending&&e instanceof ApiError&&[400,401,403,404,422,429].includes(e.status))await clearPending(userId).then(()=>setPending(null)).catch(()=>{});setError(`${e instanceof Error?e.message:'Unable to spin'}${sent?' Recover uses the same ticket ID, not a new bet.':''}`);setPlayed(n=>n+1);onSettled();}
@@ -56,7 +58,7 @@ export function NativeRoulette({game,token,userId,initialBalance,onClose,onSettl
   // The betting table is the game here, so the controls side keeps more room than a slot cabinet needs.
   return <LandscapeGame stage={0.52} stageItems={2} below={<GameHistory token={token} game={game} refresh={played}/>}>
     {/* One header row: the wheel needs the height that three stacked lines were taking. */}
-    <View style={r.topBar}><Tap disabled={busy} onPress={onClose}><Text style={s.link}>‹ Back to games</Text></Tap><Text numberOfLines={1} style={[s.title,{flex:1}]}>{game.name}</Text><Text numberOfLines={1} style={s.kicker}>SINGLE ZERO</Text></View>
+    <View style={r.topBar}><Tap disabled={busy} onPress={onClose}><Text style={s.link}>‹ Back to games</Text></Tap><SoundToggle/><Text numberOfLines={1} style={[s.title,{flex:1}]}>{game.name}</Text><Text numberOfLines={1} style={s.kicker}>SINGLE ZERO</Text></View>
     <LinearGradient colors={['#3a0f5e','#12062b']} style={r.cabinet}><Text style={r.pointer}>▼</Text><Animated.View style={[r.wheel,{transform:[{rotate:rotation.interpolate({inputRange:[0,1800],outputRange:['0deg','1800deg']})}]}]}>{order.map((n,i)=>{const angle=i*2*Math.PI/37;return <View key={n} style={[r.pocket,{left:118+108*Math.sin(angle)-9,top:118-108*Math.cos(angle)-12,backgroundColor:color(n),transform:[{rotate:`${i*360/37}deg`}]}]}><Text style={{color:'#fff',fontSize:9}}>{n}</Text></View>;})}<View style={r.hub}><Text style={{color:'#e7c888',fontSize:42}}>✦</Text></View></Animated.View><Text accessibilityLiveRegion="polite" style={[s.title,{textAlign:'center'}]}>{busy?'Wheel in motion…':result?`Result: ${result.symbols[0]} ${result.symbols[1]}`:'Place your chips'}</Text><WinCelebration win={win}/></LinearGradient>
     <View style={s.card}><Text style={s.accent}>Balance {wallet?.balance.toFixed(2)??'—'} {wallet?.currency}</Text><Text style={s.muted}>Total bet {(pending?.stake??total/100).toFixed(2)}</Text>{result&&<Text accessibilityLiveRegion="polite" style={s.accent}>Return {result.payout.toFixed(2)} · Net {(result.payout-result.stake).toFixed(2)}</Text>}</View>
     {!!error&&<Text accessibilityRole="alert" style={s.error}>{error}</Text>}{pending&&!busy&&<Text style={s.muted}>Pending ticket: {pending.gameCode} · {pending.stake.toFixed(2)}{pending.gameCode!==game.code?' — open that game to recover.':''}</Text>}

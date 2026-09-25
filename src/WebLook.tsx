@@ -9,6 +9,7 @@ import { grad } from './theme';
 export type Site = { platformName: string; registrationEnabled: boolean; maintenanceMode: boolean; content: {
   brand: { logoGlyph: string; logoImageId?: string; tagline: string; creditsLabel: string; demoBadge: string; legalNotice: string; footerNote: string };
   signIn: { formKicker: string; loginTitle: string; loginSubtitle: string; registerTitle: string; registerSubtitle: string; registrationClosed: string };
+  promo?: import('./Popups').Promo; sound?: import('./sound').SiteSound;
   lobby: { welcomeLabel: string; heroEnabled: boolean; featuredGameCode: string; heroEyebrow: string; heroHeadline: string; heroAccent: string; heroBody: string; heroNote: string; heroArtLabel: string; quickLinkTitle: string; quickLinkBody: string; libraryEyebrow: string; defaultBadge: string };
 } };
 const serif = Platform.OS === 'android' ? 'serif' : 'Georgia';
