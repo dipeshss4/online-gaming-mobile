@@ -422,11 +422,23 @@ if (!(await soundButton.count())) findings.push('sound: no sound switch in the h
 else { await soundButton.click(); await page.waitForTimeout(300); if (!(await page.getByRole('button', { name: /Turn sound on/ }).count())) findings.push('sound: the switch did not turn sound off') }
 console.log('## welcome offer, new message, inbox and sound switch')
 
+// Log out: in plain sight on the Account tab, asks first, tells the server, and lands on the sign-in screen.
+await page.getByRole('tab', { name: /Account/ }).first().click()
+await page.getByText('Your account').waitFor({ timeout: 10000 })
+await page.waitForTimeout(400)
+await audit('18-account')
+const loggedOut = page.waitForRequest(r => r.method() === 'POST' && r.url().endsWith('/api/auth/logout'), { timeout: 10000 })
+page.once('dialog', dialog => dialog.accept())
+await page.getByText('⏻  Log out', { exact: true }).click()
+await loggedOut
+await page.getByText('Welcome back.').waitFor({ timeout: 10000 })
+console.log('## log out  (asks first, POST /api/auth/logout, back to sign-in)')
+
 await browser.close()
 
 if (findings.length) {
   console.error('\nFAIL\n' + findings.map(line => '  ' + line).join('\n'))
   process.exitCode = 1
 } else {
-  console.log(`\nPASS: sign-in, lobby, slots, wallet, withdraw, history, landscape (lobby, wallet, game), welcome offer, new message, inbox and sound switch fit a phone. Screenshots in ${OUT}/.`)
+  console.log(`\nPASS: sign-in, lobby, slots, wallet, withdraw, history, landscape (lobby, wallet, game), welcome offer, new message, inbox, sound switch and log out fit a phone. Screenshots in ${OUT}/.`)
 }

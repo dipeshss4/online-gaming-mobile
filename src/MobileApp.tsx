@@ -90,19 +90,25 @@ function Main() {
     try { const auth = await request<Auth>(`/api/auth/${register ? 'register' : 'login'}`, null, { email: email.trim(), password }); await session.save(auth.accessToken); setIdentity(auth); setToken(auth.accessToken); setPassword(''); }
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
+  /** Signs this phone out. The phone forgets the session even if the server cannot be reached, so Log out always works. */
   async function logout() {
     setBusy(true); setError('');
-    try { await request('/api/auth/logout', token, {}); await clearSession(); }
-    catch (e) { if (e instanceof ApiError && e.status === 401) await clearSession(); else setError('Server logout failed. Retry to revoke all sessions.'); }
+    try { await request('/api/auth/logout', token, {}); } catch { /* the session still ends here; the server's expires on its own */ }
+    finally { await clearSession(); setBusy(false); }
+  }
+  /** Signs out every device and browser on the account. Only reported as done once the server confirms it. */
+  async function logoutEverywhere() {
+    setBusy(true); setError('');
+    try { await request('/api/auth/logout-all', token, {}); await clearSession(); }
+    catch (e) { if (e instanceof ApiError && e.status === 401) await clearSession(); else setError('Could not sign out your other devices. Check your connection and try again.'); }
     finally { setBusy(false); }
   }
-  function confirmLogout() {
-    if (Platform.OS === 'web') {
-      if (window.confirm('Sign out all devices? This also signs you out of the web app.')) void logout();
-    } else {
-      Alert.alert('Sign out all devices?', 'This also signs you out of the web app.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Sign out', onPress: logout }]);
-    }
+  function confirm(title: string, message: string, action: string, run: () => Promise<void>) {
+    if (Platform.OS === 'web') { if (window.confirm(`${title}\n${message}`)) void run(); }
+    else Alert.alert(title, message, [{ text: 'Cancel', style: 'cancel' }, { text: action, style: 'destructive', onPress: () => void run() }]);
   }
+  const confirmLogout = () => confirm('Log out?', 'You will need your email and password to sign in again.', 'Log out', logout);
+  const confirmLogoutEverywhere = () => confirm('Sign out all devices?', 'This signs you out on every phone and browser, including the website.', 'Sign out all', logoutEverywhere);
   async function changePassword() {
     if (newPassword.length < 12 || newPassword.length > 72) { setError('New password must be 12–72 characters.'); return; }
     setBusy(true); setError('');
@@ -145,7 +151,7 @@ function Main() {
           {cash === 'Limits' && <PlayLimits token={token} currency={balance?.currency || 'USD'} onChanged={()=>{void load();}} />}
         </>}
         {tab === 'Activity' && token && <HistoryScreen token={token} games={games} refresh={loads} />}
-        {tab === 'Account' && <><Text style={s.title}>Your account</Text><View style={s.card}><Text style={s.gameName}>{identity?.email}</Text><Text style={s.accent}>{identity?.role}</Text><Text style={s.small}>Access is controlled by your backend. Admin management remains in the web panel.</Text></View><Text style={s.title}>Security</Text><Text style={s.muted}>Changing your password signs out all devices.</Text><Field value={currentPassword} set={setCurrentPassword} placeholder="Current password" secret /><Field value={newPassword} set={setNewPassword} placeholder="New password (12–72 characters)" secret /><Button title="Update password" onPress={changePassword} disabled={busy || !currentPassword || !newPassword} /><Text style={s.small}>Sign out below revokes all sessions for this account.</Text><Button title="Sign out all devices" disabled={busy} onPress={confirmLogout} /></>}
+        {tab === 'Account' && <><Text style={s.title}>Your account</Text><View style={s.card}><Text style={s.gameName}>{identity?.email}</Text><Text style={s.accent}>{identity?.role}</Text><Text style={s.small}>Access is controlled by your backend. Admin management remains in the web panel.</Text></View><Button title={busy ? 'Signing out…' : '⏻  Log out'} disabled={busy} haptic="heavy" onPress={confirmLogout} /><Text style={s.title}>Security</Text><Text style={s.muted}>Changing your password signs out all devices.</Text><Field value={currentPassword} set={setCurrentPassword} placeholder="Current password" secret /><Field value={newPassword} set={setNewPassword} placeholder="New password (12–72 characters)" secret /><Button title="Update password" onPress={changePassword} disabled={busy || !currentPassword || !newPassword} /><Text style={s.small}>Lost a phone, or signed in somewhere you shouldn't have? This ends every session on the account.</Text><Tap haptic="warn" disabled={busy} onPress={confirmLogoutEverywhere} style={[s.secondary, s.danger, busy && s.disabled]}><Text style={s.dangerText}>Sign out all devices</Text></Tap></>}
       </ScrollView><View style={[s.tabs,landscape&&{width:76,flexDirection:'column',borderRightWidth:1,borderRightColor:'#b56cff40',paddingVertical:8}]}>{(['Discover', 'Wallet', 'Activity', 'Account'] as Tab[]).map((t, i) => <Tap haptic="select" accessibilityRole="tab" accessibilityState={{ selected: tab === t }} key={t} onPress={() => setTab(t)} style={[s.tab,landscape&&{flex:0,flexShrink:0,minHeight:72,paddingVertical:10}]}><View style={[s.tabMark, tab === t && s.tabMarkOn]}/><Text style={[s.tabIcon, tab === t && s.accent]}>{['⌂', '▤', '◷', '◎'][i]}</Text><Text style={[s.small, tab === t && s.accent]}>{t==='Discover'?'Home':t==='Activity'?'History':t}</Text></Tap>)}</View></View>
     </>}
     <Modal supportedOrientations={['landscape-left','landscape-right']} visible={!!selected} animationType="slide" onRequestClose={() => { if (!selected || !(supportsNativeSlots(selected) || selected.engine?.layout === 'ROULETTE' || selected.code === 'ASCENT_CRASH')) setSelected(null); }}><SafeAreaView style={s.root}>{selected && token && identity && selected.code === 'ASCENT_CRASH' ? <NativeCrash key={selected.code} game={selected} token={token} userId={identity.userId} onClose={()=>{setSelected(null);void load();}} onSettled={()=>{void load();}}/> : selected && token && identity && selected.engine?.layout === 'ROULETTE' ? <NativeRoulette key={selected.code} game={selected} token={token} userId={identity.userId} initialBalance={balance} onClose={()=>{setSelected(null);void load();}} onSettled={()=>{void load();}}/> : selected && token && identity && supportsNativeSlots(selected) ? <NativeSlots key={selected.code} game={selected} token={token} userId={identity.userId} initialBalance={balance} onClose={() => { setSelected(null); void load(); }} onSettled={() => { void load(); }} /> : <ScrollView contentContainerStyle={s.content}><Button title="← Back to games" onPress={() => setSelected(null)} /><Text style={s.heroTitle}>{selected?.name}</Text><Text style={s.muted}>{selected?.description}</Text><View style={s.card}><Text style={s.kicker}>SERVER STAKE LIMITS</Text><Text style={s.title}>{selected?.minStake} – {selected?.maxStake}</Text></View>{selected?.engine?.rules?.map((rule, i) => <Text key={i} style={s.muted}>• {rule}</Text>)}<View style={s.card}><Text style={s.gameName}>Native game screen · Coming next</Text><Text style={s.muted}>This milestone supports browsing only. No stake is placed and no wallet balance is changed from this screen.</Text></View></ScrollView>}</SafeAreaView></Modal>
