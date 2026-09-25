@@ -24,7 +24,12 @@ catch { defaults = { brand: { logoGlyph: '7', tagline: 'THE ORIGINAL COLLECTION'
 const findings = []
 const now = new Date().toISOString()
 
-const site = { platformName: 'Online Game', supportEmail: 'support@example.com', currency: 'USD', registrationEnabled: true, maintenanceMode: false, content: defaults }
+// The welcome pop-up and new-message pop-up are switched off until their own scenario, so they do not cover the
+// screens the layout checks look at.
+const site = { platformName: 'Online Game', supportEmail: 'support@example.com', currency: 'USD', registrationEnabled: true, maintenanceMode: false, content: { ...defaults, promo: { ...(defaults.promo || {}), enabled: false } } }
+const promoOn = { enabled: true, imageId: '', title: 'WELCOME', intro: 'Your lucky floor is open', amount: '$20', amountLabel: 'BONUS', body: 'Spin the reels, chase the multiplier, and find the game that feels lucky tonight.', gameCode: 'HOT_7S', gameLine: "Let's try {game} first!", button: 'Play now' }
+let inboxView = { unread: 0, messages: [{ id: 'm0', title: 'Welcome to the floor', body: 'Thanks for joining.', createdAt: now, read: true }] }
+const inboxReads = []
 const identity = { userId: 'u1', email: 'player@example.com', role: 'USER', permissions: [] }
 const engine = {
   layout: 'REEL_3', symbols: ['7', 'BAR', 'CHERRY', 'LEMON', 'BELL'], payline: [0, 1, 2],
@@ -84,6 +89,8 @@ await page.route('**/api/**', async route => {
   const json = data => route.fulfill({ json: data, headers })
   if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers })
   if (path === '/api/site') return json(site)
+  if (path === '/api/inbox') return json(inboxView)
+  if (path.startsWith('/api/inbox/')) { inboxReads.push(path); return route.fulfill({ status: 204, headers }) }
   if (path === '/api/auth/login' || path === '/api/auth/register') return json({ ...identity, accessToken: 'preview-token' })
   if (path === '/api/auth/refresh') {
     if (!route.request().headers()['x-session-refresh']) return route.fulfill({ status: 400, json: { message: 'Missing X-Session-Refresh header' }, headers })
@@ -384,11 +391,54 @@ await page.getByText('does not provide live activity').waitFor({ timeout: 15000 
 await audit('11-floor-unavailable')
 console.log('## floor unavailable  (says the server has no live activity instead of showing nothing)')
 
+// A broadcast and the welcome offer: the offer first, then the new message, one at a time; then the inbox.
+liveMissing = false
+site.content = { ...site.content, promo: promoOn }
+inboxView = { unread: 1, messages: [{ id: 'm1', title: 'Weekend bonus is live', body: 'Every deposit this weekend gets 20% extra credits. Good luck on the floor!', createdAt: now, read: false }, ...inboxView.messages] }
+await page.goto(PREVIEW, { waitUntil: 'networkidle' })
+await page.waitForTimeout(2500)
+await page.getByPlaceholder(/email/i).fill('player@example.com').catch(() => {})
+await page.locator('input[type=password], input[secureTextEntry]').first().fill('password123').catch(() => {})
+await page.getByText(/^(Sign in|Sign In)$/).first().click().catch(() => {})
+await page.getByText('WELCOME', { exact: true }).waitFor({ timeout: 20000 })
+await page.waitForTimeout(900)
+if (await page.getByText('Weekend bonus is live').count()) findings.push('welcome-popup: the new message opened on top of the welcome offer')
+if (!(await page.getByText('Hot 7s', { exact: true }).count())) findings.push('welcome-popup: the offer does not name its game')
+await audit('15-welcome-popup')
+await page.getByRole('button', { name: 'Close', exact: true }).first().click()
+await page.getByText('Weekend bonus is live').waitFor({ timeout: 10000 })
+await page.waitForTimeout(600)
+await audit('16-new-message')
+await page.getByText('Got it', { exact: true }).click()
+await page.waitForTimeout(600)
+if (!inboxReads.some(path => path.endsWith('/m1/read'))) findings.push('new-message: "Got it" did not mark the message read')
+await page.getByRole('button', { name: /^Inbox/ }).first().click()
+await page.getByText('Welcome to the floor').waitFor({ timeout: 10000 })
+await page.waitForTimeout(500)
+await audit('17-inbox')
+await page.getByRole('button', { name: 'Close', exact: true }).first().click()
+const soundButton = page.getByRole('button', { name: /Turn sound off/ }).first()
+if (!(await soundButton.count())) findings.push('sound: no sound switch in the header')
+else { await soundButton.click(); await page.waitForTimeout(300); if (!(await page.getByRole('button', { name: /Turn sound on/ }).count())) findings.push('sound: the switch did not turn sound off') }
+console.log('## welcome offer, new message, inbox and sound switch')
+
+// Log out: in plain sight on the Account tab, asks first, tells the server, and lands on the sign-in screen.
+await page.getByRole('tab', { name: /Account/ }).first().click()
+await page.getByText('Your account').waitFor({ timeout: 10000 })
+await page.waitForTimeout(400)
+await audit('18-account')
+const loggedOut = page.waitForRequest(r => r.method() === 'POST' && r.url().endsWith('/api/auth/logout'), { timeout: 10000 })
+page.once('dialog', dialog => dialog.accept())
+await page.getByText('⏻  Log out', { exact: true }).click()
+await loggedOut
+await page.getByText('Welcome back.').waitFor({ timeout: 10000 })
+console.log('## log out  (asks first, POST /api/auth/logout, back to sign-in)')
+
 await browser.close()
 
 if (findings.length) {
   console.error('\nFAIL\n' + findings.map(line => '  ' + line).join('\n'))
   process.exitCode = 1
 } else {
-  console.log(`\nPASS: sign-in, lobby, slots, wallet, withdraw, history and landscape (lobby, wallet, game) fit a phone. Screenshots in ${OUT}/.`)
+  console.log(`\nPASS: sign-in, lobby, slots, wallet, withdraw, history, landscape (lobby, wallet, game), welcome offer, new message, inbox, sound switch and log out fit a phone. Screenshots in ${OUT}/.`)
 }

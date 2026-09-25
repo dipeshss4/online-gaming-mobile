@@ -9,6 +9,8 @@ import { SymbolArt } from './WebLook';
 import { Tap } from './Tap';
 import { feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
+import { sound } from './sound';
+import { SoundToggle } from './Popups';
 import { GameHistory } from './GameHistory';
 
 export const supportsNativeSlots = (game: Game) => ['REEL_3', 'GRID_3X3'].includes(game.engine?.layout || '');
@@ -77,6 +79,7 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
       const bet = pending || { gameCode: game.code, requestId: randomUUID(), stake: amount };
       // Persist before sending; never create a new request ID after an uncertain response.
       await savePending(userId, bet); setPending(bet); submitted = true;
+      sound.play('spin');
       const data = await request<PlayResult>(`/api/games/${encodeURIComponent(game.code)}/play`, token, { requestId: bet.requestId, stake: bet.stake });
       if (data.requestId !== bet.requestId || data.gameCode !== game.code || data.symbols.length !== count) throw new Error('Unexpected result. Keep this request for reconciliation.');
       if (!alive.current) return;
@@ -84,11 +87,11 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
       for (let reel = 1; reel <= 3; reel++) {
         if (!reduced) await new Promise(resolve => setTimeout(resolve, reel === 1 ? 900 : 350));
         if (!alive.current) return;
-        setStopped(reel);
+        setStopped(reel); sound.play('reel-stop');
       }
       await clearPending(userId); setPending(null);
       setWallet({ ...wallet, balance: data.balance, currency: data.currency });
-      feel(data.payout > 0 ? 'win' : 'tap');
+      feel(data.payout > 0 ? 'win' : 'tap'); sound.result(data.payout > 0 ? data.multiplier : 0);
       if (data.payout > 0) setWin({ payout: data.payout, stake: data.stake, multiplier: data.multiplier, currency: data.currency, id: data.betId });
       setPlayed(n => n + 1); onSettled();
     } catch (e) {
@@ -108,6 +111,7 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
     {/* One row of chrome, not three: every line above the cabinet is height taken from the reels. */}
     <View style={g.topBar}>
       <Tap haptic="select" disabled={busy} onPress={onClose} style={s.inlineButton}><Text style={s.link}>{busy ? 'Round in progress…' : '← Back to lobby'}</Text></Tap>
+      <SoundToggle />
       <Text numberOfLines={1} style={[s.kicker, { flex: 1 }]}>{game.presentation?.eyebrow || 'THE ORIGINAL COLLECTION'}</Text>
       <Text style={s.accent}>{wallet ? `${cash(wallet.balance)} ${wallet.currency}` : 'Refresh wallet in lobby'}</Text>
     </View>
