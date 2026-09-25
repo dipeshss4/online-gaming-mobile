@@ -130,7 +130,7 @@ export function Withdraw({ token, balance, onChanged }: { token: string; balance
             const chosen = item.providerCode === provider;
             return <Tap key={item.providerCode} accessibilityRole="radio" accessibilityState={{ selected: chosen }}
               accessibilityLabel={`Withdraw with ${item.displayName}`} onPress={() => { setProvider(item.providerCode); setSaid(null); }}
-              style={[s.secondary, chosen && { borderColor: '#efd49b', backgroundColor: '#272026' }]}>
+              style={[s.secondary, chosen && { borderColor: '#ffd23f', backgroundColor: '#272026' }]}>
               <Text style={s.secondaryText}>{item.displayName}{item.sandbox ? ' · test' : ''}</Text>
             </Tap>;
           })}</View>

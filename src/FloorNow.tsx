@@ -125,17 +125,17 @@ export function FloorBoards({ floor }: { floor: FloorState }) {
 
 function Stat({ value, label, accent }: { value: string; label: string; accent?: boolean }) {
   return <View style={f.stat}>
-    <Text style={[f.statValue, accent && { color: '#7ad3a0' }]}>{value}</Text>
+    <Text style={[f.statValue, accent && { color: '#2ee57a' }]}>{value}</Text>
     <Text style={s.small}>{label}</Text>
   </View>;
 }
 
 const f = {
   strip: { flexDirection: 'row' as const, flexWrap: 'wrap' as const, gap: 18, alignItems: 'center' as const,
-    padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#bba16a2b', backgroundColor: '#17151c' },
+    padding: 14, borderRadius: 12, borderWidth: 1, borderColor: '#b56cff40', backgroundColor: '#22104a' },
   stat: { gap: 2, minWidth: 0 },
   statValue: { color: '#f4efe4', fontSize: 19, fontWeight: '700' as const },
   row: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 12, paddingVertical: 8 },
-  place: { color: '#938c9e', fontSize: 12, width: 16 },
-  win: { color: '#7ad3a0', fontWeight: '700' as const, fontSize: 15 },
+  place: { color: '#9a8cc4', fontSize: 12, width: 16 },
+  win: { color: '#2ee57a', fontWeight: '700' as const, fontSize: 15 },
 };

@@ -7,20 +7,31 @@ import { useEffect, useState } from 'react';
  * designed. New work reaches for these names; the older screens are moved over as they are touched.
  */
 export const c = {
-  ink: '#111117',            // the app's ground
-  surface: '#19171e',        // cards
-  surfaceLift: '#211d26',    // a card that is pressed, selected, or raised
-  line: '#bba16a2b',         // hairline on dark
-  lineStrong: '#bba16a55',
-  gold: '#efd49b',           // the one gold: actions, focus, brand accents
-  goldDeep: '#c9a366',       // the shadow half of a gold gradient
-  goldInk: '#271d11',        // text on gold
-  text: '#f2f0f6',
-  muted: '#aaa1b1',
-  faint: '#938c9e',
-  win: '#7ad3a0',
+  ink: '#12062b',            // the app's ground: deep casino indigo
+  surface: '#1c0b3d',        // cards
+  surfaceLift: '#2b1456',    // a card that is pressed, selected, or raised
+  line: '#b56cff40',         // hairline on dark
+  lineStrong: '#b56cff77',
+  gold: '#ffd23f',           // the one gold: actions, focus, brand accents
+  goldDeep: '#ff9f1a',       // the shadow half of a gold gradient
+  goldInk: '#3b1600',        // text on gold
+  text: '#f7f2ff',
+  muted: '#c9b8e8',
+  faint: '#9a8cc4',
+  win: '#2ee57a',
   bad: '#ffb5ad',
+  pink: '#ff3cac',           // neon highlights: the selected tab, eyebrows, glows
+  violet: '#8a3cff',
+  cyan: '#22e1ff',
 } as const;
+
+/** The gradients the vibrant look is built from, as on the website: gold for actions, hot pink-violet for "you are here". */
+export const grad = {
+  cta: ['#ffe45c', '#ffb01f', '#ff7a1a'] as const,
+  hot: ['#ff3cac', '#a43cff', '#3c7bff'] as const,
+  hero: ['#c2188a', '#6a1fd1', '#2a0f6e'] as const,
+  panel: ['#2b1456', '#1a0a3a'] as const,
+};
 
 /** A four-step rhythm. Anything between these is a decision nobody made on purpose. */
 export const sp = { xs: 4, s: 8, m: 12, l: 16, xl: 24 } as const;

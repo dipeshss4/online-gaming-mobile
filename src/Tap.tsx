@@ -33,7 +33,7 @@ export function Tap({ children, onPress, onLongPress, style, disabled, haptic = 
     accessibilityState={{ disabled: !!disabled, ...accessibilityState }}
     disabled={disabled}
     hitSlop={hitSlop}
-    android_ripple={ripple && Platform.OS === 'android' ? { color: '#efd49b26' } : undefined}
+    android_ripple={ripple && Platform.OS === 'android' ? { color: '#ffd23f26' } : undefined}
     onLongPress={onLongPress}
     onPress={() => { feel(haptic); onPress?.(); }}
     style={state => {

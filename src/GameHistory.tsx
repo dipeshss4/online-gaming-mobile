@@ -110,7 +110,7 @@ export function HistoryRow({ item, showGame = true }: { item: HistoryItem; showG
       </View>
       <View style={{ alignItems: 'flex-end', gap: 4 }}>
         <Text style={[h.amount, won ? { color: c.win } : value < 0 ? { color: c.muted } : null]}>{item.result === 'OPEN' ? 'In play' : signed(value)}</Text>
-        <View style={[h.badge, won && { backgroundColor: '#7ad3a022' }]}><Text style={[h.badgeText, won && { color: c.win }]}>{item.result === 'OPEN' ? 'LIVE' : `${item.multiplier.toFixed(2)}×`}</Text></View>
+        <View style={[h.badge, won && { backgroundColor: '#2ee57a22' }]}><Text style={[h.badgeText, won && { color: c.win }]}>{item.result === 'OPEN' ? 'LIVE' : `${item.multiplier.toFixed(2)}×`}</Text></View>
       </View>
     </View>
     {open && <View style={h.details}>
@@ -191,7 +191,7 @@ function Chip({ label, count, on, onPress }: { label: string; count: number; on:
 }
 
 const h = StyleSheet.create({
-  panel: { gap: sp.s, padding: sp.m, borderRadius: radius.l, borderWidth: 1, borderColor: c.line, backgroundColor: '#15141a' },
+  panel: { gap: sp.s, padding: sp.m, borderRadius: radius.l, borderWidth: 1, borderColor: c.line, backgroundColor: '#1a0a3a' },
   panelHead: { flexDirection: 'row', alignItems: 'center', gap: sp.s },
   panelTitle: { color: c.text, fontSize: 17, fontWeight: '700', marginTop: 2 },
   totals: { flexDirection: 'row', gap: sp.s },
@@ -199,7 +199,7 @@ const h = StyleSheet.create({
   statValue: { color: c.text, fontSize: 16, fontWeight: '800' },
   statLabel: { color: c.faint, fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' },
   row: { borderRadius: radius.m, backgroundColor: c.surface, borderWidth: 1, borderColor: '#ffffff0d', overflow: 'hidden' },
-  rowWin: { borderColor: '#7ad3a033' },
+  rowWin: { borderColor: '#2ee57a33' },
   bar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: '#ee8f9855' },
   rowMain: { flexDirection: 'row', alignItems: 'center', gap: sp.m, paddingVertical: 10, paddingLeft: 14, paddingRight: 12 },
   rowTitle: { color: c.text, fontWeight: '700', fontSize: 14 },
