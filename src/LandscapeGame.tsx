@@ -23,8 +23,8 @@ export function LandscapeGame({ children, stageItems = 4, stage = 0.68, below }:
   // Wide enough for a stake field and a row of chips, and never more than half the screen: whatever a game
   // asks for, the thing being played stays the larger side.
   const controls = Math.round(Math.max(210, Math.min(width * 0.5, width * (1 - stage))));
-  return <View style={{ flex: 1, flexDirection: 'row', backgroundColor: '#111117' }}>
+  return <View style={{ flex: 1, flexDirection: 'row', backgroundColor: '#12062b' }}>
     <ScrollView style={{ width: width - controls }} contentContainerStyle={[s.content, { padding: 12, gap: 8 }]} keyboardShouldPersistTaps="handled">{items.slice(0, stageItems)}{below}</ScrollView>
-    <ScrollView style={{ width: controls, borderLeftWidth: 1, borderLeftColor: '#bba16a44', backgroundColor: '#17131c' }} contentContainerStyle={[s.content, { padding: 12, gap: 8 }]} keyboardShouldPersistTaps="handled">{items.slice(stageItems)}</ScrollView>
+    <ScrollView style={{ width: controls, borderLeftWidth: 1, borderLeftColor: '#b56cff66', backgroundColor: '#17131c' }} contentContainerStyle={[s.content, { padding: 12, gap: 8 }]} keyboardShouldPersistTaps="handled">{items.slice(stageItems)}</ScrollView>
   </View>;
 }

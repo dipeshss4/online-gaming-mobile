@@ -156,12 +156,12 @@ export function NativeCrash({ game, token, userId, onClose, onSettled }: { game:
       <View style={[x.liveDot, flying && { backgroundColor: t.win }]} /><Text style={s.kicker}>{flying ? 'IN FLIGHT' : 'READY'}</Text>
     </View>
 
-    <LinearGradient colors={['#0d2233', '#0a1522', '#0b0f19']} style={x.sky} onLayout={measure}>
+    <LinearGradient colors={['#3a0f5e', '#1c0b4d', '#0e0822']} style={x.sky} onLayout={measure}>
       {[0.25, 0.5, 0.75].map(f => <View key={f} style={[x.gridLine, { top: pad.top + f * (size.h - pad.top - pad.bottom) }]} />)}
       <View style={[x.axis, { left: pad.left, bottom: pad.bottom, width: Math.max(0, size.w - pad.left - 12) }]} />
       <View style={[x.axisY, { left: pad.left, bottom: pad.bottom, top: pad.top - 20 }]} />
       {/* Recent crash points, newest first, coloured by how far each flight went. */}
-      <View style={x.recent}>{recent.map(f => <View key={f.id} style={[x.recentChip, { backgroundColor: f.status === 'COLLECTED' ? '#7ad3a022' : f.multiplier >= 2 ? '#efd49b1f' : '#ef7b6b1c' }]}>
+      <View style={x.recent}>{recent.map(f => <View key={f.id} style={[x.recentChip, { backgroundColor: f.status === 'COLLECTED' ? '#2ee57a22' : f.multiplier >= 2 ? '#ffd23f1f' : '#ef7b6b1c' }]}>
         <Text style={[x.recentText, { color: f.status === 'COLLECTED' ? t.win : f.multiplier >= 2 ? t.gold : '#ef9a8c' }]}>{f.multiplier.toFixed(2)}×</Text></View>)}</View>
 
       {trail.map(([a, b], i) => {
@@ -215,7 +215,7 @@ export function NativeCrash({ game, token, userId, onClose, onSettled }: { game:
 const x = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#6d6878' },
-  sky: { height: 300, borderRadius: 18, borderWidth: 1, borderColor: '#4f6b8a55', overflow: 'hidden' },
+  sky: { height: 300, borderRadius: 18, borderWidth: 1, borderColor: '#22e1ff66', overflow: 'hidden' },
   gridLine: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: '#ffffff0a' },
   axis: { position: 'absolute', height: 1, backgroundColor: '#bdc6d533' },
   axisY: { position: 'absolute', width: 1, backgroundColor: '#bdc6d533' },
@@ -228,7 +228,7 @@ const x = StyleSheet.create({
   multiplier: { fontSize: 58, fontWeight: '900', letterSpacing: -1, fontVariant: ['tabular-nums'] },
   caption: { fontSize: 12, fontWeight: '800', letterSpacing: 2 },
   cashRow: { flexDirection: 'row', gap: 8 },
-  cashButton: { flex: 1, minHeight: 58, borderRadius: 14, backgroundColor: '#3fb57a', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#9ff0c4' },
+  cashButton: { flex: 1, minHeight: 58, borderRadius: 14, backgroundColor: '#2ee57a', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#9ff0c4' },
   cashLabel: { color: '#08251a', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
   cashValue: { color: '#08251a', fontSize: 18, fontWeight: '900' },
   panel: { gap: 8, padding: 12, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.line },
@@ -236,7 +236,7 @@ const x = StyleSheet.create({
   ticket: { color: t.gold, fontSize: 12, fontWeight: '700' },
   stakeRow: { flexDirection: 'row', gap: 6, alignItems: 'center' },
   stake: { minHeight: 44, paddingVertical: 8, paddingHorizontal: 12, fontSize: 16 },
-  quick: { flex: 1, minWidth: 44, minHeight: 44, paddingHorizontal: 8, borderRadius: 10, borderWidth: 1, borderColor: t.lineStrong, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1f1b25' },
+  quick: { flex: 1, minWidth: 44, minHeight: 44, paddingHorizontal: 8, borderRadius: 10, borderWidth: 1, borderColor: t.lineStrong, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2e1660' },
   quickText: { color: t.gold, fontWeight: '800', fontSize: 13 },
   launch: { minHeight: 56, borderRadius: 14, backgroundColor: t.gold, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff0c4' },
   launchText: { color: t.goldInk, fontWeight: '900', fontSize: 16, letterSpacing: 0.5 },

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, KeyboardAvoidingView, Modal, Platform, RefreshControl, ScrollView, useWindowDimensions, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, KeyboardAvoidingView, Modal, Platform, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, Text, TextInput, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { API_URL, ApiError, Auth, Balance, Game, Identity, Page, onRenewed, request, session, STORE_CODE, Transaction } from './api';
@@ -14,7 +14,8 @@ import { Withdraw } from './Withdraw';
 import { FloorBoards, FloorTotals, useFloor } from './FloorNow';
 import { AuthLook, Brand, Site, WebLobby } from './WebLook';
 import { Tap } from './Tap';
-import { Feel, c } from './theme';
+import { Feel, c, grad } from './theme';
+import { LinearGradient } from 'expo-linear-gradient';
 import { LobbySkeleton } from './Skeleton';
 
 type Tab = 'Discover' | 'Wallet' | 'Activity' | 'Account';
@@ -22,7 +23,7 @@ type Tab = 'Discover' | 'Wallet' | 'Activity' | 'Account';
 type Cash = 'Deposit' | 'Withdraw' | 'Activity' | 'Limits';
 const money = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 });
 function Button({ title, onPress, disabled = false, haptic }: { title: string; onPress: () => void; disabled?: boolean; haptic?: Feel }) {
-  return <Tap haptic={haptic} disabled={disabled} onPress={onPress} style={s.button}><Text style={s.buttonText}>{title}</Text></Tap>;
+  return <Tap haptic={haptic} disabled={disabled} onPress={onPress} style={s.button}><LinearGradient colors={grad.cta} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} /><Text style={s.buttonText}>{title}</Text></Tap>;
 }
 function Field({ value, set, placeholder, secret = false }: { value: string; set: (v: string) => void; placeholder: string; secret?: boolean }) {
   return <TextInput accessibilityLabel={placeholder} placeholder={placeholder} placeholderTextColor="#8893a7" value={value} onChangeText={set} secureTextEntry={secret} autoCapitalize="none" autoCorrect={false} keyboardType={placeholder === 'Email address' ? 'email-address' : 'default'} style={s.input} />;
@@ -138,7 +139,7 @@ function Main() {
         </>}
         {tab === 'Activity' && token && <HistoryScreen token={token} games={games} refresh={loads} />}
         {tab === 'Account' && <><Text style={s.title}>Your account</Text><View style={s.card}><Text style={s.gameName}>{identity?.email}</Text><Text style={s.accent}>{identity?.role}</Text><Text style={s.small}>Access is controlled by your backend. Admin management remains in the web panel.</Text></View><Text style={s.title}>Security</Text><Text style={s.muted}>Changing your password signs out all devices.</Text><Field value={currentPassword} set={setCurrentPassword} placeholder="Current password" secret /><Field value={newPassword} set={setNewPassword} placeholder="New password (12–72 characters)" secret /><Button title="Update password" onPress={changePassword} disabled={busy || !currentPassword || !newPassword} /><Text style={s.small}>Sign out below revokes all sessions for this account.</Text><Button title="Sign out all devices" disabled={busy} onPress={confirmLogout} /></>}
-      </ScrollView><View style={[s.tabs,landscape&&{width:76,flexDirection:'column',borderRightWidth:1,borderRightColor:'#bba16a2b',paddingVertical:8}]}>{(['Discover', 'Wallet', 'Activity'] as Tab[]).map((t, i) => <Tap haptic="select" accessibilityRole="tab" accessibilityState={{ selected: tab === t }} key={t} onPress={() => setTab(t)} style={[s.tab,landscape&&{flex:0,flexShrink:0,minHeight:72,paddingVertical:10}]}><View style={[s.tabMark, tab === t && s.tabMarkOn]}/><Text style={[s.tabIcon, tab === t && s.accent]}>{['⌂', '▤', '◷'][i]}</Text><Text style={[s.small, tab === t && s.accent]}>{t==='Discover'?'Home':t==='Activity'?'History':t}</Text></Tap>)}</View></View>
+      </ScrollView><View style={[s.tabs,landscape&&{width:76,flexDirection:'column',borderRightWidth:1,borderRightColor:'#b56cff40',paddingVertical:8}]}>{(['Discover', 'Wallet', 'Activity'] as Tab[]).map((t, i) => <Tap haptic="select" accessibilityRole="tab" accessibilityState={{ selected: tab === t }} key={t} onPress={() => setTab(t)} style={[s.tab,landscape&&{flex:0,flexShrink:0,minHeight:72,paddingVertical:10}]}><View style={[s.tabMark, tab === t && s.tabMarkOn]}/><Text style={[s.tabIcon, tab === t && s.accent]}>{['⌂', '▤', '◷'][i]}</Text><Text style={[s.small, tab === t && s.accent]}>{t==='Discover'?'Home':t==='Activity'?'History':t}</Text></Tap>)}</View></View>
     </>}
     <Modal supportedOrientations={['landscape-left','landscape-right']} visible={!!selected} animationType="slide" onRequestClose={() => { if (!selected || !(supportsNativeSlots(selected) || selected.engine?.layout === 'ROULETTE' || selected.code === 'ASCENT_CRASH')) setSelected(null); }}><SafeAreaView style={s.root}>{selected && token && identity && selected.code === 'ASCENT_CRASH' ? <NativeCrash key={selected.code} game={selected} token={token} userId={identity.userId} onClose={()=>{setSelected(null);void load();}} onSettled={()=>{void load();}}/> : selected && token && identity && selected.engine?.layout === 'ROULETTE' ? <NativeRoulette key={selected.code} game={selected} token={token} userId={identity.userId} initialBalance={balance} onClose={()=>{setSelected(null);void load();}} onSettled={()=>{void load();}}/> : selected && token && identity && supportsNativeSlots(selected) ? <NativeSlots key={selected.code} game={selected} token={token} userId={identity.userId} initialBalance={balance} onClose={() => { setSelected(null); void load(); }} onSettled={() => { void load(); }} /> : <ScrollView contentContainerStyle={s.content}><Button title="← Back to games" onPress={() => setSelected(null)} /><Text style={s.heroTitle}>{selected?.name}</Text><Text style={s.muted}>{selected?.description}</Text><View style={s.card}><Text style={s.kicker}>SERVER STAKE LIMITS</Text><Text style={s.title}>{selected?.minStake} – {selected?.maxStake}</Text></View>{selected?.engine?.rules?.map((rule, i) => <Text key={i} style={s.muted}>• {rule}</Text>)}<View style={s.card}><Text style={s.gameName}>Native game screen · Coming next</Text><Text style={s.muted}>This milestone supports browsing only. No stake is placed and no wallet balance is changed from this screen.</Text></View></ScrollView>}</SafeAreaView></Modal>
   </KeyboardAvoidingView></SafeAreaView>;
