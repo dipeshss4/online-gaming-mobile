@@ -378,6 +378,22 @@ winningRound = false
 await page.getByText(/Back to lobby/).first().click()
 await page.getByText('All Games').first().waitFor({ timeout: 15000 })
 await page.getByLabel('Play Dragon Tide').first().click()
+// Every game opens behind the branded loading screen: the logo, the game's name and a progress bar that moves.
+await page.getByTestId('game-loading').waitFor({ timeout: 10000 })
+const readings = []
+let loadingText = ''
+for (let i = 0; i < 6; i++) {
+  const text = await page.getByTestId('game-loading').innerText().catch(() => '')
+  const match = /(\d+)%/.exec(text); if (match) readings.push(Number(match[1]))
+  if (!loadingText) loadingText = text
+  if (i === 1) await page.screenshot({ path: `${OUT}/19a-game-loading.png` })
+  await page.waitForTimeout(150)
+}
+if (!/LOOT777X/.test(loadingText)) findings.push('game loading: the Loot777x logo is missing')
+if (!(readings.length >= 2 && readings[readings.length - 1] > readings[0])) findings.push(`game loading: the progress did not move (${readings.join(', ')})`)
+await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 10000 }).catch(() => findings.push('game loading: the loading screen never left'))
+const loadingNow = readings.join('→')
+console.log(`## game loading screen  (logo, progress ${loadingNow}%, then gone)`)
 await page.getByLabel('Back to games').waitFor({ timeout: 30000 })
 await page.waitForFunction(() => document.querySelector('canvas')?.getBoundingClientRect().height > 0, null, { timeout: 30000 })
 await page.waitForTimeout(2500)
