@@ -96,6 +96,9 @@ for (const [name, notes] of [['win-small', [440, 554]], ['win-good', [330, 440, 
 { const b = buffer(1.1); burst(b, 0, .9, .9, 900); sweep(b, 420, 70, 0, .8, 'sawtooth', .18, 1200, 200); write('crash', b, .75) }
 { const b = buffer(.9); [988, 1319, 1568, 1976].forEach((note, i) => { tone(b, note, i * .07, .35, 'sine', .12); tone(b, note * 2, i * .07 + .01, .12, 'square', .02) }); write('cashout', b, .7) }
 { const b = buffer(.25); tone(b, 880, 0, .08, 'sine', .12); tone(b, 1175, .06, .14, 'sine', .1); write('tap', b, .35) }
+// The fish table: a cannon's falling zap, and a run of coin pings for a catch.
+{ const b = buffer(.14); sweep(b, 880, 220, 0, .1, 'square', .05); write('shot', b, .45) }
+{ const b = buffer(.7); [1320, 1500, 1680, 1320, 1500, 1680].forEach((note, i) => tone(b, note, i * .055, .12, 'sine', .09)); write('coins', b, .7) }
 // Message arrived: a two-note bell.
 { const b = buffer(1.2); for (const [note, at] of [[1047, 0], [1319, .16]]) { tone(b, note, at, .9, 'sine', .14); tone(b, note * 2.01, at, .4, 'sine', .04) } write('message', b, .6) }
 // The welcome pop-up: a rising sparkle and a coin shower.
@@ -117,6 +120,7 @@ for (const [name, notes] of [['win-small', [440, 554]], ['win-good', [330, 440, 
 const scenes = {
   lobby: { notes: [110, 165, 220, 277], pace: .9, wave: 'sine' }, slots: { notes: [196, 247, 294, 392], pace: .52, wave: 'triangle' },
   roulette: { notes: [130, 196, 233, 311], pace: .76, wave: 'sine' }, crash: { notes: [82, 123, 164, 246], pace: .43, wave: 'sawtooth' },
+  fish: { notes: [147, 196, 294, 392], pace: 1.1, wave: 'sine' },
 }
 for (const [name, { notes, pace, wave: kind }] of Object.entries(scenes)) {
   const steps = 16, b = buffer(steps * pace)

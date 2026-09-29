@@ -40,6 +40,12 @@ const games = [
   { code: 'HOT_7S', name: 'Hot 7s', description: 'Turn up the heat on a classic three-reel cabinet.', minStake: 0.1, maxStake: 50, engineType: 'SLOT', featuredSymbol: '7', engine, presentation: { eyebrow: 'House original', tagline: 'Turn up the heat', badge: 'POPULAR', tileSubtitle: 'Slots · From 0.10 credits', collection: 'Originals' } },
   { code: 'FRUIT_RUSH', name: 'Fruit Rush', description: 'A fresh spin on play with juicy multipliers.', minStake: 0.1, maxStake: 25, engineType: 'SLOT', featuredSymbol: 'CHERRY', engine, presentation: { eyebrow: 'House original', tagline: 'A fresh spin', badge: 'NEW', tileSubtitle: 'Slots · From 0.10 credits', collection: 'Originals' } },
   { code: 'ROULETTE', name: 'Roulette', description: 'European single-zero table with multi-bet tickets.', minStake: 0.1, maxStake: 100, engineType: 'ROULETTE', engine: { ...engine, layout: 'ROULETTE' }, presentation: { tileSubtitle: 'Table · From 0.10 credits' } },
+  { code: 'DRAGON_TIDE', name: 'Dragon Tide', description: 'Fish-table shooter.', minStake: 0.1, maxStake: 10, engineType: 'FISH', featuredSymbol: 'DRAGON',
+    engine: { layout: 'FISH', symbols: ['SHRIMP', 'SHARK', 'DRAGON'], payline: [0, 1], rules: ['Each bullet costs the bet when it hits a creature.'],
+      paytable: [['SHRIMP', 'Shrimp', 2], ['CLOWNFISH', 'Clownfish', 3], ['PUFFER', 'Pufferfish', 5], ['ANGELFISH', 'Angelfish', 8], ['TURTLE', 'Sea Turtle', 12], ['LANTERN', 'Lanternfish', 15],
+        ['OCTOPUS', 'Octopus', 20], ['STINGRAY', 'Stingray', 30], ['SWORDFISH', 'Swordfish', 50], ['SHARK', 'Great Shark', 80], ['WHALE', 'Golden Whale', 120]].map(([code, label, multiplier]) => ({ label, multiplier, pattern: [code, 'HIT'] }))
+        .concat([100, 150, 200, 300, 500].map(x => ({ label: `Tide Dragon ${x}x`, multiplier: x, pattern: ['DRAGON', `HIT${x}`] }))) },
+    presentation: { glyph: '🐉', tileSubtitle: 'Fish table · Up to 500x' } },
   { code: 'ASCENT_CRASH', name: 'Ascent Crash', description: 'Cash out before the climb ends.', minStake: 0.1, maxStake: 50, engineType: 'CRASH', presentation: { tileSubtitle: 'Arcade · From 0.10 credits' } }
 ]
 const wallet = { balance: 125.5, currency: 'USD', held: 20, status: 'ACTIVE' }
@@ -74,6 +80,8 @@ let payoutFails = 1
 let liveMissing = false
 // The access token lasts 15 minutes. These let the check play out what happens when it runs out mid-session.
 let winningRound = false
+const fishShots = []
+let fishBalance = 125.5
 let liveUnauthorized = 0
 let refreshed = false
 const liveAuth = []
@@ -145,6 +153,13 @@ await page.route('**/api/**', async route => {
   if (path.startsWith('/api/games/') && path.endsWith('/play')) {
     // A paying round when the scenario asks for one, so the win celebration can be checked.
     const body = JSON.parse(route.request().postData() || '{}')
+    if (path === '/api/games/DRAGON_TIDE/play') {
+      fishShots.push(body)
+      const multiplier = fishShots.length % 2 ? ({ SHRIMP: 2, CLOWNFISH: 3, PUFFER: 5 }[body.selection] ?? 0) : 0
+      fishBalance = Math.round((fishBalance - body.stake + body.stake * multiplier) * 100) / 100
+      return json({ requestId: body.requestId, betId: `f${fishShots.length}`, gameCode: 'DRAGON_TIDE', symbols: [body.selection, multiplier ? 'HIT' : 'MISS'], stake: body.stake,
+        payout: Math.round(body.stake * multiplier * 100) / 100, balance: fishBalance, currency: 'USD', outcome: multiplier ? 'SMALL_WIN' : 'LOSS', multiplier, walletSequence: 100 + fishShots.length })
+    }
     if (winningRound) return json({ requestId: body.requestId, betId: `b-win-${Date.now()}`, gameCode: 'HOT_7S', symbols: ['7', '7', '7'], stake: 1, payout: 50, balance: 174.5, currency: 'USD', outcome: 'WIN', multiplier: 50 })
     return json({ requestId: body.requestId, betId: 'b9', gameCode: 'HOT_7S', symbols: ['7', '7', 'BAR'], stake: 1, payout: 0, balance: 124.5, currency: 'USD', outcome: 'LOSS', multiplier: 0 })
   }
@@ -359,6 +374,34 @@ await page.getByText('BIG WIN').waitFor({ state: 'hidden', timeout: 20000 })
 console.log('## win celebration clears  (banner leaves by itself)')
 winningRound = false
 
+// Dragon Tide, the fish table, drawn with Skia: it fills the sideways screen, and firing at a creature is a bet on it.
+await page.getByText(/Back to lobby/).first().click()
+await page.getByText('All Games').first().waitFor({ timeout: 15000 })
+await page.getByLabel('Play Dragon Tide').first().click()
+await page.getByLabel('Back to games').waitFor({ timeout: 30000 })
+await page.waitForFunction(() => document.querySelector('canvas')?.getBoundingClientRect().height > 0, null, { timeout: 30000 })
+await page.waitForTimeout(2500)
+const table = await page.evaluate(() => { const box = document.querySelector('canvas').getBoundingClientRect(); return { width: Math.round(box.width), height: Math.round(box.height) } })
+if (table.height < 360 || table.width < 640) findings.push(`the fish table is only ${table.width}x${table.height} on a phone held sideways`)
+await audit('19-fish-table')
+const box = await page.locator('canvas').first().boundingBox()
+await page.mouse.move(box.x + box.width * .5, box.y + box.height * .4)
+await page.mouse.down()
+for (let i = 0; i < 40 && fishShots.length < 3; i++) await page.waitForTimeout(250)
+await page.mouse.up()
+await page.waitForTimeout(1200)
+if (!fishShots.length) findings.push('fish table: holding on the table fired no bet at a creature')
+for (const shot of fishShots) if (!shot.selection || shot.stake !== 0.1 || !/^[0-9a-f-]{36}$/.test(shot.requestId)) findings.push(`fish table: a malformed bet ${JSON.stringify(shot)}`)
+await page.getByTestId('fish-balance').filter({ hasText: fishBalance.toFixed(2) }).waitFor({ timeout: 10000 }).catch(() => findings.push(`fish table: the credits did not show ${fishBalance.toFixed(2)} after the shots`))
+await audit('20-fish-table-play')
+await page.getByLabel('Paytable and rules').click()
+await page.getByText('×100–500').waitFor({ timeout: 5000 }).catch(() => findings.push('fish table: the paytable does not show the dragon'))
+await audit('21-fish-paytable')
+await page.getByLabel('Close').last().click()
+console.log(`## fish table  (${table.width}x${table.height}, ${fishShots.length} bets on ${[...new Set(fishShots.map(s => s.selection))].join(', ')})`)
+await page.getByLabel('Back to games').click()
+await page.getByText('All Games').first().waitFor({ timeout: 15000 })
+
 // An expired token must not kill the floor: the app renews the session and the data keeps coming.
 liveUnauthorized = 1
 liveAuth.length = 0
@@ -440,5 +483,5 @@ if (findings.length) {
   console.error('\nFAIL\n' + findings.map(line => '  ' + line).join('\n'))
   process.exitCode = 1
 } else {
-  console.log(`\nPASS: sign-in, lobby, slots, wallet, withdraw, history, landscape (lobby, wallet, game), welcome offer, new message, inbox, sound switch and log out fit a phone. Screenshots in ${OUT}/.`)
+  console.log(`\nPASS: sign-in, lobby, slots, wallet, withdraw, history, landscape (lobby, wallet, game), the Dragon Tide fish table, welcome offer, new message, inbox, sound switch and log out fit a phone. Screenshots in ${OUT}/.`)
 }
