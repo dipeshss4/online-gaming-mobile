@@ -9,21 +9,22 @@ import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
  * → Sound for the lobby and master volume, Admin → Games → Gameplay & sound for each game — and the player's
  * own switch wins over both.
  */
-export type Scene = 'lobby' | 'slots' | 'roulette' | 'crash';
+export type Scene = 'lobby' | 'slots' | 'roulette' | 'crash' | 'fish';
 export type SiteSound = { lobbyMusic: boolean; introSound: boolean; masterVolume: number };
 export type GameSound = { enabled: boolean; music: boolean; effects: boolean; musicVolume: number; effectsVolume: number };
-type Effect = 'chime' | 'spin' | 'reel-stop' | 'lose' | 'win-small' | 'win-good' | 'win-big' | 'crash' | 'cashout' | 'tap' | 'message' | 'fanfare' | 'intro';
+type Effect = 'chime' | 'spin' | 'reel-stop' | 'lose' | 'win-small' | 'win-good' | 'win-big' | 'crash' | 'cashout' | 'tap' | 'message' | 'fanfare' | 'intro' | 'shot' | 'coins';
 
 const EFFECTS: Record<Effect, number> = {
   chime: require('../assets/sounds/chime.wav'), spin: require('../assets/sounds/spin.wav'), 'reel-stop': require('../assets/sounds/reel-stop.wav'),
   lose: require('../assets/sounds/lose.wav'), 'win-small': require('../assets/sounds/win-small.wav'), 'win-good': require('../assets/sounds/win-good.wav'),
   'win-big': require('../assets/sounds/win-big.wav'), crash: require('../assets/sounds/crash.wav'), cashout: require('../assets/sounds/cashout.wav'),
   tap: require('../assets/sounds/tap.wav'), message: require('../assets/sounds/message.wav'), fanfare: require('../assets/sounds/fanfare.wav'),
-  intro: require('../assets/sounds/intro.wav'),
+  intro: require('../assets/sounds/intro.wav'), shot: require('../assets/sounds/shot.wav'), coins: require('../assets/sounds/coins.wav'),
 };
 const MUSIC: Record<Scene, number> = {
   lobby: require('../assets/sounds/music-lobby.wav'), slots: require('../assets/sounds/music-slots.wav'),
   roulette: require('../assets/sounds/music-roulette.wav'), crash: require('../assets/sounds/music-crash.wav'),
+  fish: require('../assets/sounds/music-fish.wav'),
 };
 const FULL: GameSound = { enabled: true, music: true, effects: true, musicVolume: 70, effectsVolume: 80 };
 const KEY = 'loot777x-sound';

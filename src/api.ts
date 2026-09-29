@@ -13,10 +13,10 @@ const STORE_HEADER: Record<string, string> = STORE_CODE ? { 'X-Store-Code': STOR
 export type Identity = { userId: string; email: string; role: string; permissions: string[] };
 export type Auth = Identity & { accessToken: string };
 export type Balance = { balance: number; currency: string; held?: number; status?: string };
-export type Game = { theme?: string; featuredSymbol?: string; engineType?: string; code: string; name: string; description: string; minStake: number; maxStake: number; engine?: { layout: string; symbols: string[]; payline: number[]; rules: string[]; paytable: { label: string; multiplier: number }[] }; presentation?: { skin?: string; eyebrow?: string; tagline?: string; badge?: string; tileSubtitle?: string; glyph?: string; collection?: string };
+export type Game = { theme?: string; featuredSymbol?: string; engineType?: string; code: string; name: string; description: string; minStake: number; maxStake: number; engine?: { layout: string; symbols: string[]; payline: number[]; rules: string[]; paytable: { label: string; multiplier: number; pattern?: string[] }[] }; presentation?: { skin?: string; eyebrow?: string; tagline?: string; badge?: string; tileSubtitle?: string; glyph?: string; collection?: string };
   /** Admin → Games → Gameplay & sound. Older servers leave it out. */
   settings?: { sound?: { enabled: boolean; music: boolean; effects: boolean; musicVolume: number; effectsVolume: number } } };
-export type PlayResult = { requestId: string; betId: string; gameCode: string; symbols: string[]; stake: number; payout: number; balance: number; currency: string; outcome: string; multiplier: number };
+export type PlayResult = { requestId: string; betId: string; gameCode: string; symbols: string[]; stake: number; payout: number; balance: number; currency: string; outcome: string; multiplier: number; walletSequence?: number };
 export type Transaction = { id: string; type: string; amount: number; description: string; createdAt: string };
 export type Bet = { betId: string; gameCode: string; stake: number; payout: number; status: string; settledAt: string };
 export type Page<T> = { items: T[]; totalPages: number };

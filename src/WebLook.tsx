@@ -34,7 +34,7 @@ export function AuthLook({ site, children }: { site: Site; children: React.React
   const pictureWidth=Math.max(width,680);
   return <ScrollView style={{backgroundColor:'#12062b'}} contentContainerStyle={{paddingBottom:30}} keyboardShouldPersistTaps="handled"><View style={{height:362,overflow:'hidden'}}><Image source={require('../assets/web/casino-host-login-v1.png')} resizeMode="cover" style={{position:'absolute',width:pictureWidth,height:pictureWidth*916/1717,left:-(pictureWidth-width)*.28,top:0}}/><LinearGradient colors={['#12062b00','#12062b']} style={{flex:1,padding:24}}><Brand site={site}/></LinearGradient></View><View style={w.form}>{children}</View><Text style={[s.small,{textAlign:'center',padding:24}]}>{site.content.brand.legalNotice}</Text></ScrollView>;
 }
-const kind = (game: Game) => game.engine?.layout === 'ROULETTE' ? 'Table games' : game.engineType === 'CRASH' ? 'Arcade' : 'Slots';
+const kind = (game: Game) => game.engine?.layout === 'ROULETTE' ? 'Table games' : game.engineType === 'CRASH' || game.engine?.layout === 'FISH' ? 'Arcade' : 'Slots';
 export function WebLobby({site,games,onPlay}: {site:Site;games:Game[];onPlay:(g:Game)=>void}) {
   const {width,height}=useWindowDimensions();
   const landscape=width>height;
