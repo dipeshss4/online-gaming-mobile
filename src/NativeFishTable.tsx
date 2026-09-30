@@ -1,20 +1,17 @@
 import React, { Suspense, lazy } from 'react';
-import { ActivityIndicator, Platform, View } from 'react-native';
-import { WithSkiaWeb } from '@shopify/react-native-skia/lib/module/web';
+import { ActivityIndicator, View } from 'react-native';
 import type { FishProps } from './fish/FishStage';
 
 /**
- * Dragon Tide, the fish table. The stage is loaded on first use: on the web preview Skia's engine (CanvasKit) has to
- * be fetched before anything that draws with Skia is even imported; phones have it built in.
+ * Dragon Tide, the fish table, on phones: Skia is built into the app, so the stage loads straight away. The web
+ * preview has its own version (NativeFishTable.web.tsx) that fetches Skia's browser engine first; keeping that out of
+ * this file keeps the browser engine (and its Node-only imports) out of the Android and iOS bundles.
  */
 const Loading = () => <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#041630' }}><ActivityIndicator color="#ffd54a" /></View>;
-const NativeStage = lazy(() => import('./fish/FishStage'));
-const CANVASKIT = 'https://cdn.jsdelivr.net/npm/canvaskit-wasm@0.41.0/bin/full/';
+const Stage = lazy(() => import('./fish/FishStage'));
 
 export const supportsFishTable = (game: { engine?: { layout: string } }) => game.engine?.layout === 'FISH';
 
 export function NativeFishTable(props: FishProps) {
-  if (Platform.OS === 'web') return <WithSkiaWeb getComponent={() => import('./fish/FishStage')} componentProps={props} fallback={<Loading />}
-    opts={{ locateFile: file => CANVASKIT + file }} />;
-  return <Suspense fallback={<Loading />}><NativeStage {...props} /></Suspense>;
+  return <Suspense fallback={<Loading />}><Stage {...props} /></Suspense>;
 }
