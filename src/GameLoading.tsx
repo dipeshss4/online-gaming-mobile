@@ -15,8 +15,9 @@ const BY_KIND: Record<string, string[]> = {
   FISH: ['Hold to keep firing. Lock sends every bullet to one creature.', 'Watch for the Tide Dragon: up to 500x.'],
   CRASH: ['Cash out before the flight ends.'],
   ROULETTE: ['Tap chips onto the table, then spin.'],
+  KENO: ['Mark up to 10 numbers. Quick pick chooses for you.', 'More numbers marked: rarer, bigger wins, up to 10,000x.'],
 };
-const THEMES: Record<string, [string, string]> = { FISH: ['#1fa6d6', '#041630'], CRASH: ['#2f7dff', '#0a1030'], ROULETTE: ['#1fae6a', '#06180f'], GRID_3X3: ['#ff6a1a', '#1a0602'] };
+const THEMES: Record<string, [string, string]> = { FISH: ['#1fa6d6', '#041630'], CRASH: ['#2f7dff', '#0a1030'], ROULETTE: ['#1fae6a', '#06180f'], GRID_3X3: ['#ff6a1a', '#1a0602'], KENO: ['#22e1ff', '#0b0626'] };
 const kindOf = (game: Game) => game.engineType === 'CRASH' || game.code === 'ASCENT_CRASH' ? 'CRASH' : game.engine?.layout ?? 'REEL_3';
 
 export function GameLoading({ game, legal, onDone }: { game: Game; legal?: string; onDone: () => void }) {
@@ -58,8 +59,8 @@ export function GameLoading({ game, legal, onDone }: { game: Game; legal?: strin
       <View style={[st.body, landscape && st.bodyWide]}>
         <Animated.View style={[st.poster, { width: poster, height: poster, transform: [{ scale: pop }] }]}>
           <LinearGradient colors={['#ff3c7a', '#b0105a', '#3a0730']} style={StyleSheet.absoluteFill} />
-          <Text style={st.glyphFallback}>{kind === 'FISH' ? '🐉' : kind === 'CRASH' ? '🚀' : ''}</Text>
-          {kind !== 'FISH' && kind !== 'CRASH' && <SymbolArt symbol={game.featuredSymbol || '7'} size={poster * .72} />}
+          <Text style={st.glyphFallback}>{kind === 'FISH' ? '🐉' : kind === 'CRASH' ? '🚀' : kind === 'KENO' ? '🎱' : ''}</Text>
+          {!['FISH', 'CRASH', 'KENO'].includes(kind) && <SymbolArt symbol={game.featuredSymbol || '7'} size={poster * .72} />}
         </Animated.View>
         <View style={[st.info, landscape && { alignItems: 'flex-start' }]}>
           <Text style={[st.name, landscape && { fontSize: 24 }]} numberOfLines={1}>{game.name}</Text>
