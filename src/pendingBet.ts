@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-export type PendingBet = { gameCode: string; requestId: string; stake: number; selections?: { selection: string; stake: number }[] };
+export type PendingBet = { gameCode: string; requestId: string; stake: number; selection?: string; selections?: { selection: string; stake: number }[] };
 const key = (user: string) => `pending-bet-${user}`;
 export async function readPending(user: string): Promise<PendingBet | null> {
   const value = Platform.OS === 'web' ? localStorage.getItem(key(user)) : await SecureStore.getItemAsync(key(user));

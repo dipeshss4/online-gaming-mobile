@@ -11,7 +11,6 @@ import { Win, WinCelebration } from './WinCelebration';
 import { sound } from './sound';
 import { SoundToggle } from './Popups';
 import { LandscapeGame } from './LandscapeGame';
-import { GameHistory } from './GameHistory';
 
 type Ticket = { panel: number; stake: number; payout: number; collectedAt: number | null; status: string };
 type Flight = { id: string; serverTime: string; startedAt: string; status: 'FLYING' | 'COLLECTED' | 'CRASHED'; multiplier: number; tickets: Ticket[]; growthRate?: number };
@@ -31,7 +30,7 @@ const FRAME_MS = 33;
 export function NativeCrash({ game, token, userId, onClose, onSettled }: { game: Game; token: string; userId: string; onClose: () => void; onSettled: () => void }) {
   const [stakes, setStakes] = useState([String(game.minStake), '0']), [round, setRound] = useState<Flight | null>(null), [history, setHistory] = useState<Flight[]>([]);
   const [attempt, setAttempt] = useState<Attempt | null>(null), [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
-  const [win, setWin] = useState<Win | null>(null), [played, setPlayed] = useState(0);
+  const [win, setWin] = useState<Win | null>(null);
   const [live, setLive] = useState(1), [elapsed, setElapsed] = useState(0), [size, setSize] = useState({ w: 0, h: 0 });
   const alive = useRef(true), lock = useRef(false), polling = useRef(false), version = useRef(0), anchor = useRef<Anchor | null>(null);
   const callback = useRef(onSettled); callback.current = onSettled;
@@ -47,7 +46,7 @@ export function NativeCrash({ game, token, userId, onClose, onSettled }: { game:
       return next;
     });
     setError(''); setHistory(previous => [next, ...previous.filter(r => r.id !== next.id)].slice(0, 20));
-    if (next.status !== 'FLYING') { setPlayed(n => n + 1); callback.current(); }
+    if (next.status !== 'FLYING') { callback.current(); }
   }
   async function restore() {
     setError('');
@@ -109,7 +108,7 @@ export function NativeCrash({ game, token, userId, onClose, onSettled }: { game:
       await persist(a); if (alive.current) setAttempt(a);
       const next = await request<Flight>('/api/crash', token, a);
       await persist(null);
-      if (alive.current) { setAttempt(null); apply(next); setPlayed(n => n + 1); callback.current(); sound.play('spin'); }
+      if (alive.current) { setAttempt(null); apply(next); callback.current(); sound.play('spin'); }
     } catch (e) { if (alive.current) setError(`${(e as Error).message} Recover keeps the same request and stakes.`); }
     finally { lock.current = false; if (alive.current) setBusy(false); }
   }
@@ -122,7 +121,7 @@ export function NativeCrash({ game, token, userId, onClose, onSettled }: { game:
       // Only a server-confirmed collection is celebrated; the displayed multiplier is never the authority.
       const paid = next.tickets.find(x => x.panel === panel);
       if (paid && paid.payout > 0) { feel('win'); sound.play('cashout'); setWin({ payout: paid.payout, stake: paid.stake, multiplier: Number((paid.payout / (paid.stake || 1)).toFixed(2)), currency: '', id: `${next.id}-${panel}-${paid.payout}` }); }
-      setPlayed(n => n + 1); callback.current();
+      callback.current();
     } catch { if (alive.current) setError('Cash-out not confirmed. Retry the same panel; only the server can confirm it.'); }
     finally { lock.current = false; if (alive.current) setBusy(false); }
   }
@@ -151,7 +150,7 @@ export function NativeCrash({ game, token, userId, onClose, onSettled }: { game:
   const total = stakes.map(Number).reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0);
   const quick = [...new Set([game.minStake, 1, 2, 5].filter(v => v >= game.minStake && v <= game.maxStake))];
 
-  return <LandscapeGame stage={0.62} stageItems={2} below={<GameHistory token={token} game={game} refresh={played} />}>
+  return <LandscapeGame stage={0.62} stageItems={2}>
     <View style={x.topBar}>
       <Tap haptic="select" disabled={busy} onPress={onClose} style={s.inlineButton}><Text style={s.link}>‹ Back</Text></Tap><SoundToggle />
       <Text numberOfLines={1} style={[s.title, { flex: 1, fontSize: 20 }]}>{game.name}</Text>

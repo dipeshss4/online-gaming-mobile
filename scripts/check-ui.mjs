@@ -46,6 +46,18 @@ const games = [
         ['OCTOPUS', 'Octopus', 20], ['STINGRAY', 'Stingray', 30], ['SWORDFISH', 'Swordfish', 50], ['SHARK', 'Great Shark', 80], ['WHALE', 'Golden Whale', 120]].map(([code, label, multiplier]) => ({ label, multiplier, pattern: [code, 'HIT'] }))
         .concat([100, 150, 200, 300, 500].map(x => ({ label: `Tide Dragon ${x}x`, multiplier: x, pattern: ['DRAGON', `HIT${x}`] }))) },
     presentation: { glyph: '🐉', tileSubtitle: 'Fish table · Up to 500x' } },
+  { code: 'SEVEN_STARS_DELUXE', name: 'Seven Stars Deluxe', description: 'Five reels, twenty lines, wilds and free spins.', minStake: 0.2, maxStake: 100, engineType: 'VIDEO_5X3', featuredSymbol: '7',
+    engine: { layout: 'VIDEO_5X3', symbols: ['7', 'BAR', 'BELL', 'STAR', 'WATERMELON', 'GRAPE', 'ORANGE', 'LEMON', 'CHERRY', 'WILD', 'SCATTER'], payline: [],
+      rules: ['Five reels, three rows and twenty fixed lines.', 'Three or more SCATTER symbols anywhere award 8 free spins. Every free-spin win pays double.'],
+      // The server's twenty lines (VideoSlotRules.LINE_ROWS), as cell indexes into a screen.
+      lines: [[1,1,1,1,1],[0,0,0,0,0],[2,2,2,2,2],[0,1,2,1,0],[2,1,0,1,2],[0,0,1,2,2],[2,2,1,0,0],[1,0,0,0,1],[1,2,2,2,1],[0,1,1,1,0],
+        [2,1,1,1,2],[1,0,1,2,1],[1,2,1,0,1],[0,1,0,1,0],[2,1,2,1,2],[1,1,0,1,1],[1,1,2,1,1],[0,2,0,2,0],[2,0,2,0,2],[0,2,2,2,0]].map(rows => rows.map((row, reel) => row * 5 + reel)),
+      paytable: [['7', 'Sevens', 10, 40, 200], ['BAR', 'Bars', 5, 20, 80], ['WILD', 'Wilds', 20, 100, 500]].flatMap(([code, label, ...pays]) => pays.map((multiplier, i) => ({ label: `${i + 3} ${label}`, multiplier, pattern: Array(i + 3).fill(code) }))) },
+    presentation: { eyebrow: 'DELUXE SERIES', badge: 'NEW · VIDEO SLOT', tileSubtitle: '20 LINES · FREE SPINS' } },
+  { code: 'GALAXY_KENO', name: 'Galaxy Keno', description: 'Mark up to ten numbers.', minStake: 0.1, maxStake: 2, engineType: 'KENO', featuredSymbol: 'STAR',
+    engine: { layout: 'KENO', symbols: Array.from({ length: 80 }, (_, i) => String(i + 1)), payline: [], rules: ['Mark 1 to 10 numbers from 1 to 80, then play.'],
+      paytable: [[1, 1, 3.8], [2, 2, 15.8], [3, 2, 2.5], [3, 3, 43]].map(([picks, hits, multiplier]) => ({ label: `${picks} picks, ${hits} hits`, multiplier, pattern: [`PICK${picks}`, `HIT${hits}`] })) },
+    presentation: { glyph: '🎱', badge: 'NEW · KENO', tileSubtitle: 'UP TO 10,000X' } },
   { code: 'ASCENT_CRASH', name: 'Ascent Crash', description: 'Cash out before the climb ends.', minStake: 0.1, maxStake: 50, engineType: 'CRASH', presentation: { tileSubtitle: 'Arcade · From 0.10 credits' } }
 ]
 const wallet = { balance: 125.5, currency: 'USD', held: 20, status: 'ACTIVE' }
@@ -81,6 +93,8 @@ let liveMissing = false
 // The access token lasts 15 minutes. These let the check play out what happens when it runs out mid-session.
 let winningRound = false
 const fishShots = []
+const videoBets = []
+const kenoBets = []
 let fishBalance = 125.5
 let liveUnauthorized = 0
 let refreshed = false
@@ -159,6 +173,21 @@ await page.route('**/api/**', async route => {
       fishBalance = Math.round((fishBalance - body.stake + body.stake * multiplier) * 100) / 100
       return json({ requestId: body.requestId, betId: `f${fishShots.length}`, gameCode: 'DRAGON_TIDE', symbols: [body.selection, multiplier ? 'HIT' : 'MISS'], stake: body.stake,
         payout: Math.round(body.stake * multiplier * 100) / 100, balance: fishBalance, currency: 'USD', outcome: multiplier ? 'SMALL_WIN' : 'LOSS', multiplier, walletSequence: 100 + fishShots.length })
+    }
+    if (path === '/api/games/GALAXY_KENO/play') {
+      kenoBets.push(body)
+      const drawn = [42, 3, 7, 55, 19, 61, 70, 12, 33, 28, 80, 1, 64, 50, 45, 9, 77, 22, 36, 58].map(String)
+      return json({ requestId: body.requestId, betId: 'k1', gameCode: 'GALAXY_KENO', symbols: [body.selection, ...drawn], stake: body.stake, payout: 4.3, balance: 129.6, currency: 'USD', outcome: 'BIG_WIN', multiplier: 43 })
+    }
+    if (path === '/api/games/SEVEN_STARS_DELUXE/play') {
+      videoBets.push(body)
+      // Three 7s on the middle line and three scatters on the top row, then eight free spins: the first pays three BARs.
+      const quiet = rows => [0, 1, 2].flatMap(row => [0, 1, 2, 3, 4].map(reel => rows[reel][row]))
+      const blanks = [['CHERRY', 'LEMON', 'GRAPE'], ['BELL', 'ORANGE', 'STAR'], ['WATERMELON', 'LEMON', 'CHERRY'], ['GRAPE', 'BELL', 'ORANGE'], ['STAR', 'CHERRY', 'LEMON']]
+      const base = ['SCATTER', 'BAR', 'SCATTER', 'BELL', 'SCATTER', '7', '7', '7', 'LEMON', 'CHERRY', 'BELL', 'CHERRY', 'LEMON', 'BAR', 'GRAPE']
+      const bars = quiet(blanks); bars[5] = bars[6] = bars[7] = 'BAR'
+      const symbols = [...base, ...bars, ...Array.from({ length: 7 }, () => quiet(blanks))].flat()
+      return json({ requestId: body.requestId, betId: 'v1', gameCode: 'SEVEN_STARS_DELUXE', symbols, stake: body.stake, payout: 4, balance: 129.3, currency: 'USD', outcome: 'BIG_WIN', multiplier: 20 })
     }
     if (winningRound) return json({ requestId: body.requestId, betId: `b-win-${Date.now()}`, gameCode: 'HOT_7S', symbols: ['7', '7', '7'], stake: 1, payout: 50, balance: 174.5, currency: 'USD', outcome: 'WIN', multiplier: 50 })
     return json({ requestId: body.requestId, betId: 'b9', gameCode: 'HOT_7S', symbols: ['7', '7', 'BAR'], stake: 1, payout: 0, balance: 124.5, currency: 'USD', outcome: 'LOSS', multiplier: 0 })
@@ -418,6 +447,50 @@ console.log(`## fish table  (${table.width}x${table.height}, ${fishShots.length}
 await page.getByLabel('Back to games').click()
 await page.getByText('All Games').first().waitFor({ timeout: 15000 })
 
+// The five-reel video slot opens behind the loading screen and plays: a round, then the free spins its scatters award.
+await page.getByLabel('Play Seven Stars Deluxe').first().click()
+await page.getByTestId('game-loading').waitFor({ timeout: 10000 })
+await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 10000 }).catch(() => findings.push('video slot: the loading screen never left'))
+await page.getByLabel(/^Reel 5:/).waitFor({ timeout: 15000 }).catch(() => findings.push('video slot: the five reels did not show'))
+const reels = await page.evaluate(() => [...document.querySelectorAll('[aria-label^="Reel "]')].map(el => { const box = el.getBoundingClientRect(); return { width: Math.round(box.width), height: Math.round(box.height) } }))
+if (reels.length !== 5 || reels.some(reel => reel.width < 40 || reel.height < 120)) findings.push(`video slot: the reels are ${JSON.stringify(reels)}`)
+await audit('22-video-slot')
+await page.getByRole('button', { name: /^SPIN$/ }).click()
+await page.getByText('8 FREE SPINS', { exact: true }).waitFor({ timeout: 20000 }).catch(() => findings.push('video slot: three scatters did not announce the free spins'))
+await page.screenshot({ path: `${OUT}/23a-video-free-spins.png` })
+await page.getByText('Return 4.00 USD').waitFor({ timeout: 40000 }).catch(() => findings.push('video slot: the round never showed the server\'s return'))
+await page.getByText('129.30 USD').first().waitFor({ timeout: 5000 }).catch(() => findings.push('video slot: the balance did not move to the server\'s'))
+if (videoBets.length !== 1 || videoBets[0].stake !== 0.2 || !/^[0-9a-f-]{36}$/.test(videoBets[0].requestId)) findings.push(`video slot: the bets sent were ${JSON.stringify(videoBets)}`)
+await audit('23-video-slot-played')
+console.log(`## video slot  (${reels.length} reels ${reels[0]?.width}x${reels[0]?.height}, one bet, 8 free spins, return 4.00)`)
+await page.getByText(/Back to lobby/).first().click()
+await page.getByText('All Games').first().waitFor({ timeout: 15000 })
+
+// The lobby's dock files games by kind, as the game rooms do: keno sits under OTHER, the fish table under FISHING.
+await page.getByRole('tab', { name: 'OTHER' }).click()
+await page.getByLabel('Play Galaxy Keno').first().waitFor({ timeout: 5000 }).catch(() => findings.push('lobby: keno is not under OTHER'))
+if (await page.getByLabel('Play Hot 7s').count()) findings.push('lobby: a slot shows under OTHER')
+await audit('24-lobby-other')
+await page.getByRole('tab', { name: 'FISHING' }).click()
+await page.getByLabel('Play Dragon Tide').first().waitFor({ timeout: 5000 }).catch(() => findings.push('lobby: the fish table is not under FISHING'))
+await page.getByRole('tab', { name: 'OTHER' }).click()
+
+// Galaxy Keno: mark three numbers, play, watch twenty balls; the ticket sent is the numbers marked.
+await page.getByLabel('Play Galaxy Keno').first().click()
+await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 15000 }).catch(() => findings.push('keno: the loading screen never left'))
+await page.getByLabel('Keno board').waitFor({ timeout: 15000 })
+for (const n of [42, 7, 19]) await page.getByLabel(`Number ${n}`, { exact: true }).click()
+const board = await page.getByLabel('Keno board').boundingBox()
+if (!board || board.height < 300) findings.push(`keno: the board is only ${board?.height}px tall sideways`)
+await audit('25-keno-marked')
+await page.getByRole('button', { name: /^PLAY$/ }).click()
+await page.getByText('3 hits · Return 4.30 USD').waitFor({ timeout: 20000 }).catch(() => findings.push('keno: the result never showed the server\'s return'))
+if (kenoBets.length !== 1 || kenoBets[0].selection !== '7-19-42' || kenoBets[0].stake !== 0.1 || !/^[0-9a-f-]{36}$/.test(kenoBets[0].requestId)) findings.push(`keno: the bets sent were ${JSON.stringify(kenoBets)}`)
+await audit('26-keno-played')
+console.log(`## keno  (board ${Math.round(board?.width)}x${Math.round(board?.height)}, ticket ${kenoBets[0]?.selection}, 3 hits, return 4.30)`)
+await page.getByText(/← Lobby/).first().click()
+await page.getByRole('tab', { name: 'ALL GAMES' }).click()
+
 // An expired token must not kill the floor: the app renews the session and the data keeps coming.
 liveUnauthorized = 1
 liveAuth.length = 0
@@ -499,5 +572,5 @@ if (findings.length) {
   console.error('\nFAIL\n' + findings.map(line => '  ' + line).join('\n'))
   process.exitCode = 1
 } else {
-  console.log(`\nPASS: sign-in, lobby, slots, wallet, withdraw, history, landscape (lobby, wallet, game), the Dragon Tide fish table, welcome offer, new message, inbox, sound switch and log out fit a phone. Screenshots in ${OUT}/.`)
+  console.log(`\nPASS: sign-in, lobby, slots, wallet, withdraw, history, landscape (lobby, wallet, game), the Dragon Tide fish table, the video slot with free spins, the lobby's categories, keno, welcome offer, new message, inbox, sound switch and log out fit a phone. Screenshots in ${OUT}/.`)
 }
