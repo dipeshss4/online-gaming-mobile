@@ -10,7 +10,7 @@ import { BetBar } from './BetBar';
 import { c, feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
 import { sound } from './sound';
-import { SoundToggle } from './Popups';
+import { GameShell, PayRow, Rules } from './GameShell';
 
 /**
  * Galaxy Keno: mark 1 to 10 of the 80 numbers, play, and the server draws 20. The draw is shown one ball at a time;
@@ -29,9 +29,6 @@ function paysFor(game: Game, picks: number) {
 }
 
 export function NativeKeno({ game, token, userId, initialBalance, onClose, onSettled }: { game: Game; token: string; userId: string; initialBalance: Balance | null; onClose: () => void; onSettled: () => void }) {
-  const { width, height } = useWindowDimensions(), landscape = width > height;
-  // Sideways the board takes the full height on the left; upright it takes the full width above the controls.
-  const cell = landscape ? Math.floor(Math.min((height - 28) / 8, (width * .58 - 24) / COLUMNS)) : Math.floor((width - 32) / COLUMNS);
   const [picks, setPicks] = useState<number[]>([]), [stake, setStake] = useState(String(game.minStake));
   const [wallet, setWallet] = useState(initialBalance), [pending, setPending] = useState<PendingBet | null>(null);
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
@@ -111,62 +108,65 @@ export function NativeKeno({ game, token, userId, initialBalance, onClose, onSet
     } finally { locked.current = false; if (alive.current) setBusy(false); }
   }
 
-  const board = <View style={[k.board, { width: cell * COLUMNS + 12 }]} accessibilityLabel="Keno board">
+  const board = (cell: number, columns: number) => <View style={[k.board, { width: cell * columns + 12 }]} accessibilityLabel="Keno board">
     {Array.from({ length: NUMBERS }, (_, i) => i + 1).map(n => {
       const marked = shownPicks.includes(n), out = drawn.includes(n), hit = marked && out;
       return <Tap key={n} haptic="none" disabled={!editable} accessibilityLabel={`Number ${n}${marked ? ', marked' : ''}${out ? ', drawn' : ''}`} accessibilityState={{ selected: marked }}
         onPress={() => toggle(n)} style={{ width: cell, height: cell, padding: 2 }}>
-        {hit ? <LinearGradient colors={['#5aff9d', '#12a85a']} style={k.ball}><Text style={[k.number, { color: '#04220f', fontSize: cell * .4 }]}>{n}</Text></LinearGradient>
-          : marked ? <LinearGradient colors={['#ffe45c', '#ff9f1a']} style={k.ball}><Text style={[k.number, { color: c.goldInk, fontSize: cell * .4 }]}>{n}</Text></LinearGradient>
-          : <View style={[k.ball, k.plain, out && k.out]}><Text style={[k.number, { fontSize: cell * .36 }, out && { color: '#ffffff' }]}>{n}</Text></View>}
+        {hit ? <LinearGradient colors={['#5aff9d', '#12a85a']} style={k.ball}><Text style={[k.number, { color: '#04220f', fontSize: Math.max(11, cell * .4) }]}>{n}</Text></LinearGradient>
+          : marked ? <LinearGradient colors={['#ffe45c', '#ff9f1a']} style={k.ball}><Text style={[k.number, { color: c.goldInk, fontSize: Math.max(11, cell * .4) }]}>{n}</Text></LinearGradient>
+          : <View style={[k.ball, k.plain, out && k.out]}><Text style={[k.number, { fontSize: Math.max(11, cell * .36) }, out && { color: '#ffffff' }]}>{n}</Text></View>}
       </Tap>;
     })}
   </View>;
 
-  const controls = <>
-    <View style={k.topBar}>
-      <Tap haptic="select" disabled={busy} onPress={onClose} style={s.inlineButton}><Text style={s.link}>{busy ? 'Drawing…' : '← Lobby'}</Text></Tap>
-      <SoundToggle />
-      <Text style={[s.accent, { flex: 1, textAlign: 'right' }]} numberOfLines={1}>{wallet ? `${cash(wallet.balance)} ${wallet.currency}` : 'Refresh wallet in lobby'}</Text>
+  // Beside the board: the count, the result, quick pick and what the numbers marked pay.
+  const side = <LinearGradient colors={['#2b1456', '#130a35']} style={k.panel}>
+    <View style={k.stats}>
+      <View style={k.stat}><Text style={k.statLabel}>MARKED</Text><Text style={k.statValue}>{shownPicks.length}/{MAX_PICKS}</Text></View>
+      <View style={k.stat}><Text style={k.statLabel}>DRAWN</Text><Text style={k.statValue}>{drawn.length}/20</Text></View>
+      <View style={k.stat}><Text style={k.statLabel}>HITS</Text><Text style={[k.statValue, { color: c.win }]}>{hits}</Text></View>
     </View>
-    <LinearGradient colors={['#2b1456', '#130a35']} style={k.panel}>
-      <Text style={k.title}>✦ {game.name.toUpperCase()} ✦</Text>
-      <View style={k.stats}>
-        <View style={k.stat}><Text style={k.statLabel}>MARKED</Text><Text style={k.statValue}>{shownPicks.length}/{MAX_PICKS}</Text></View>
-        <View style={k.stat}><Text style={k.statLabel}>DRAWN</Text><Text style={k.statValue}>{drawn.length}/20</Text></View>
-        <View style={k.stat}><Text style={k.statLabel}>HITS</Text><Text style={[k.statValue, { color: c.win }]}>{hits}</Text></View>
-      </View>
-      {result && !busy && <Text style={[k.result, result.payout > 0 && { color: c.gold }]} accessibilityLiveRegion="polite">
-        {`${hits} ${hits === 1 ? 'hit' : 'hits'} · ${result.payout > 0 ? `Return ${cash(result.payout)} ${result.currency}` : 'No win this draw'}`}</Text>}
-      <WinCelebration win={win} />
-    </LinearGradient>
-    {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
-    {!!pending && !busy && <Text style={s.small}>Pending: {pending.gameCode} · {cash(pending.stake)}. {pending.gameCode !== game.code ? 'Open that game to recover the ticket.' : 'Recover resends this exact ticket, not a new bet.'}</Text>}
     <View style={k.row}>
-      <Tap haptic="select" disabled={!editable} onPress={quickPick} style={[k.small, { flex: 1 }]}><Text style={s.accent}>⚡ Quick pick</Text></Tap>
+      <Tap haptic="select" disabled={!editable} onPress={quickPick} style={[k.small, { flex: 1 }]}><Text style={s.accent} numberOfLines={1}>⚡ Quick</Text></Tap>
       <Tap haptic="select" disabled={!editable || !picks.length} onPress={() => { setPicks([]); setDrawn([]); setResult(null); setWin(null); }} style={[k.small, { flex: 1 }]}><Text style={s.accent}>Clear</Text></Tap>
     </View>
-    <BetBar value={pending ? pending.stake : Number(stake)} onChange={value => setStake(value.toFixed(2))} min={game.minStake} max={game.maxStake} disabled={!editable} />
-    <Tap haptic="heavy" disabled={busy || !ready || (!!pending && pending.gameCode !== game.code)} onPress={play} style={[s.button, k.play]}>
-      <LinearGradient colors={['#ffe45c', '#ffb01f', '#ff7a1a']} style={StyleSheet.absoluteFill} />
-      <Text style={s.buttonText}>{busy ? 'Drawing…' : pending ? 'Recover ticket' : 'PLAY'}</Text>
-    </Tap>
-    <Text style={s.kicker}>{shownPicks.length ? `PAYS FOR ${shownPicks.length} ${shownPicks.length === 1 ? 'PICK' : 'PICKS'}` : 'MARK NUMBERS TO SEE WHAT THEY PAY'}</Text>
-    {table.map(line => <View key={line.hits} style={[k.payRow, result && !busy && line.hits === hits && k.payRowOn]}>
+    <Text style={k.paysTitle}>{shownPicks.length ? `PAYS FOR ${shownPicks.length} ${shownPicks.length === 1 ? 'PICK' : 'PICKS'}` : 'MARK 1 TO 10 NUMBERS'}</Text>
+    <ScrollView style={{ flexShrink: 1 }}>{table.map(line => <View key={line.hits} style={[k.payRow, result && !busy && line.hits === hits && k.payRowOn]}>
       <Text style={s.muted}>{line.hits} {line.hits === 1 ? 'hit' : 'hits'}</Text><Text style={s.accent}>{line.pays}×</Text>
-    </View>)}
-    {game.engine?.rules?.map((rule, i) => <Text key={i} style={s.small}>• {rule}</Text>)}
-  </>;
+    </View>)}</ScrollView>
+  </LinearGradient>;
 
-  if (!landscape) return <ScrollView contentContainerStyle={[s.content, { alignItems: 'stretch' }]} keyboardShouldPersistTaps="handled">{board}{controls}</ScrollView>;
-  return <View style={k.split}>
-    <View style={k.stage}>{board}</View>
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12, gap: 8 }} keyboardShouldPersistTaps="handled">{controls}</ScrollView>
-  </View>;
+  const status = busy ? 'DRAWING…' : result ? `${hits} ${hits === 1 ? 'HIT' : 'HITS'} · ${result.payout > 0 ? `WIN ${cash(result.payout)}` : 'NO WIN THIS DRAW'}` : 'MARK YOUR NUMBERS';
+  return <GameShell game={game} balance={wallet} onBack={onClose} backDisabled={busy} status={status}
+    notice={error ? <Text accessibilityRole="alert" style={s.error}>{error}</Text>
+      : pending && !busy ? `Pending: ${pending.gameCode} · ${cash(pending.stake)}. ${pending.gameCode !== game.code ? 'Open that game to recover the ticket.' : 'PLAY resends this exact ticket, not a new bet.'}` : undefined}
+    bet={<BetBar inline value={pending ? pending.stake : Number(stake)} onChange={value => setStake(value.toFixed(2))} min={game.minStake} max={game.maxStake} disabled={!editable} />}
+    win={cash(result && !busy ? result.payout : 0)}
+    spin={{ label: busy ? '…' : pending ? 'RECOVER' : 'PLAY', accessibilityLabel: pending ? 'Recover ticket' : 'PLAY', onPress: play, disabled: busy || !ready || (!!pending && pending.gameCode !== game.code) }}
+    overlay={<WinCelebration win={win} />}
+    info={<>
+      {table.map(line => <PayRow key={line.hits} label={`${shownPicks.length} picks, ${line.hits} ${line.hits === 1 ? 'hit' : 'hits'}`} pays={`${line.pays}×`} />)}
+      <Rules rules={game.engine?.rules} />
+    </>}>
+    {stage => {
+      // The board's shape follows the space: 8 by 10 on an upright phone, 10 by 8 on a tall stage, 16 by 5 or 20 by 4 on a short sideways one,
+      // whichever gives the biggest balls. Sideways, a narrow panel beside it holds the count and the pays.
+      const wide = stage.width > stage.height * 1.3, sideWidth = wide ? Math.min(220, Math.max(150, stage.width * .2)) : 0;
+      const boardW = wide ? stage.width - sideWidth - 22 : stage.width - 16, boardH = wide ? stage.height - 16 : stage.height * .76;
+      const [columns, cell] = (wide ? [10, 16, 20] : [8, 10]).map(cols => [cols, Math.floor(Math.min((boardW - 12) / cols, (boardH - 12) / (NUMBERS / cols)))] as const)
+        .reduce((best, next) => next[1] > best[1] ? next : best);
+      return <View style={[k.split, !wide && { flexDirection: 'column' }, { width: stage.width, height: stage.height }]}>
+        {board(cell, columns)}
+        <View style={wide ? { width: sideWidth, height: Math.min(stage.height - 8, cell * (NUMBERS / columns) + 12) } : { width: '100%', flex: 1, minHeight: 0 }}>{side}</View>
+      </View>;
+    }}
+  </GameShell>;
 }
 
 const k = StyleSheet.create({
-  split: { flex: 1, flexDirection: 'row', backgroundColor: '#0b0626' },
+  split: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  paysTitle: { color: '#ff9ad6', fontSize: 11, fontWeight: '900', letterSpacing: 1.4 },
   stage: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, borderRightWidth: 1, borderRightColor: '#22e1ff44' },
   board: { flexDirection: 'row', flexWrap: 'wrap', padding: 4, borderRadius: 14, borderWidth: 2, borderColor: '#22e1ff', backgroundColor: '#0e1a3a' },
   ball: { flex: 1, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
@@ -174,10 +174,10 @@ const k = StyleSheet.create({
   out: { backgroundColor: '#3c7bff', borderColor: '#9ec0ff' },
   number: { color: '#bfd4ff', fontWeight: '900' },
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  panel: { borderRadius: 14, borderWidth: 1.5, borderColor: '#ffd23f88', padding: 10, gap: 8, overflow: 'hidden' },
+  panel: { flex: 1, borderRadius: 14, borderWidth: 1.5, borderColor: '#22e1ff88', padding: 10, gap: 8, overflow: 'hidden' },
   title: { color: c.gold, fontWeight: '900', fontStyle: 'italic', fontSize: 18, textAlign: 'center', letterSpacing: 1 },
-  stats: { flexDirection: 'row', gap: 6 },
-  stat: { flex: 1, alignItems: 'center', paddingVertical: 4, borderRadius: 10, backgroundColor: '#00000055' },
+  stats: { gap: 4 },
+  stat: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 2, paddingHorizontal: 8, borderRadius: 10, backgroundColor: '#00000055' },
   statLabel: { color: '#bfe9ff', fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
   statValue: { color: '#ffffff', fontSize: 18, fontWeight: '900' },
   result: { color: '#e6dcff', fontWeight: '800', textAlign: 'center', fontSize: 14 },

@@ -18,21 +18,25 @@ export function betSteps(min: number, max: number) {
   return [...set].sort((a, b) => a - b).map(value => value / 100);
 }
 
-export function BetBar({ value, onChange, min, max, disabled = false, label = 'BET', allowOff = false }: {
+export function BetBar({ value, onChange, min, max, disabled = false, label = 'BET', allowOff = false, inline = false }: {
   value: number; onChange: (value: number) => void; min: number; max: number; disabled?: boolean; label?: string; allowOff?: boolean;
+  /** One row, always: the game console. Below 300px the MIN and MAX buttons leave and live in the picker instead. */
+  inline?: boolean;
 }) {
   const top = Math.min(max, 1000), steps = betSteps(min, top), off = allowOff && cents(value) === 0;
-  const [open, setOpen] = useState(false), [narrow, setNarrow] = useState(false);
+  const [open, setOpen] = useState(false), [measured, setNarrow] = useState(false);
+  // In the console there is no second row: a narrow bar drops MIN and MAX (the picker has them) rather than stacking.
+  const narrow = measured && !inline, limits = !(inline && measured);
   const below = steps.filter(step => cents(step) <= cents(value)), index = below.length - 1;
   const exact = index >= 0 && cents(steps[index]) === cents(value);
   const down = () => off ? undefined : index <= 0 && exact ? (allowOff ? onChange(0) : undefined) : onChange(steps[Math.max(0, exact ? index - 1 : index)]);
   const up = () => onChange(off ? min : steps[Math.min(steps.length - 1, index + 1)]);
   const atMin = off || (!allowOff && cents(value) <= cents(min)), atMax = !off && cents(value) >= cents(top);
   return <View style={b.root}>
-    <Text style={b.label}>{label}</Text>
+    <Text style={[b.label, inline && b.labelInline]} numberOfLines={1}>{label}</Text>
     {/* Five across when there is room; in a narrow column (the app held sideways) MIN and MAX go on their own row. */}
     <View style={b.row} onLayout={event => setNarrow(event.nativeEvent.layout.width < 300)}>
-      {!narrow && <>
+      {!narrow && limits && <>
       <Tap haptic="select" accessibilityLabel="Minimum bet" disabled={disabled || (!off && cents(value) === cents(min))} onPress={() => onChange(min)} style={[b.limit, (disabled || (!off && cents(value) === cents(min))) && b.dim]}>
         <LinearGradient colors={['#1b6fd1', '#0b2f6e']} style={StyleSheet.absoluteFill} /><Text style={b.limitText}>MIN</Text>
       </Tap>
@@ -42,7 +46,7 @@ export function BetBar({ value, onChange, min, max, disabled = false, label = 'B
         <Text style={b.amountText} numberOfLines={1} adjustsFontSizeToFit>{off ? 'OFF' : value.toFixed(2)}</Text><Text style={b.caret}>▾</Text>
       </Tap>
       <Tap haptic="select" accessibilityLabel="Increase bet" disabled={disabled || atMax} onPress={up} style={[b.step, (disabled || atMax) && b.dim]}><Text style={b.stepText}>+</Text></Tap>
-      {!narrow && <>
+      {!narrow && limits && <>
       <Tap haptic="select" accessibilityLabel="Maximum bet" disabled={disabled || atMax} onPress={() => onChange(top)} style={[b.limit, (disabled || atMax) && b.dim]}>
         <LinearGradient colors={['#ff3c7a', '#a8105a']} style={StyleSheet.absoluteFill} /><Text style={b.limitText}>MAX</Text>
       </Tap>
@@ -60,6 +64,10 @@ export function BetBar({ value, onChange, min, max, disabled = false, label = 'B
       <Pressable style={b.shade} onPress={() => setOpen(false)} accessibilityLabel="Close bet picker">
         <Pressable style={b.sheet} onPress={() => undefined} accessibilityLabel="Choose your bet">
           <View style={b.sheetHead}><Text style={b.sheetTitle}>CHOOSE YOUR BET</Text><Text style={b.sheetRange}>{min.toFixed(2)} – {top.toFixed(2)}</Text></View>
+          <View style={b.row}>
+            <Tap haptic="select" accessibilityLabel="Minimum bet, from the picker" onPress={() => { onChange(min); setOpen(false); }} style={[b.limit, b.wide]}><LinearGradient colors={['#1b6fd1', '#0b2f6e']} style={StyleSheet.absoluteFill} /><Text style={b.limitText}>MIN {min.toFixed(2)}</Text></Tap>
+            <Tap haptic="select" accessibilityLabel="Maximum bet, from the picker" onPress={() => { onChange(top); setOpen(false); }} style={[b.limit, b.wide]}><LinearGradient colors={['#ff3c7a', '#a8105a']} style={StyleSheet.absoluteFill} /><Text style={b.limitText}>MAX {top.toFixed(2)}</Text></Tap>
+          </View>
           <ScrollView contentContainerStyle={b.grid}>
             {allowOff && <Tap haptic="select" accessibilityLabel="Bet off" onPress={() => { onChange(0); setOpen(false); }} style={[b.option, off && b.optionOn]}><Text style={[b.optionText, off && b.optionTextOn]}>OFF</Text></Tap>}
             {steps.map(step => {
@@ -78,6 +86,7 @@ export function BetBar({ value, onChange, min, max, disabled = false, label = 'B
 const b = StyleSheet.create({
   root: { alignItems: 'center', gap: 4 },
   label: { color: '#ffe68a', fontSize: 11, fontWeight: '900', letterSpacing: 1.8 },
+  labelInline: { fontSize: 11, letterSpacing: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'stretch', justifyContent: 'center' },
   limit: { minWidth: 48, minHeight: 44, paddingHorizontal: 8, borderRadius: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#22e1ff' },
   wide: { flex: 1 },
