@@ -22,6 +22,7 @@ import { InboxButton, PromoPopup, SoundToggle } from './Popups';
 import { NativeFishTable, supportsFishTable } from './NativeFishTable';
 import { GameLoading } from './GameLoading';
 import { NativeVideoSlot, supportsVideoSlot } from './NativeVideoSlot';
+import { VaultLobby } from './VaultLobby';
 
 type Tab = 'Discover' | 'Wallet' | 'Activity' | 'Account';
 /** The cashier's panes, in the order the web wallet uses them. */
@@ -136,7 +137,12 @@ function Main() {
       {register&&!site.registrationEnabled&&<Text style={s.error}>{site.content.signIn.registrationClosed}</Text>}
       <Button title={busy ? 'Processing…' : register ? 'Create Account' : 'Sign In'} onPress={authenticate} disabled={busy||(register&&!site.registrationEnabled)} />
       <Tap haptic="select" disabled={busy} onPress={() => { setRegister(!register); setError(''); }} style={s.inlineButton}><Text style={s.link}>{register ? 'Already registered? Sign in' : 'New here? Create an account'}</Text></Tap>
-    </AuthLook> : <>
+    </AuthLook> : landscape && tab === 'Discover' && identity ? <>
+      {/* Sideways, the lobby is the whole screen, as in the game rooms players know; wallet, history and account sit behind its icons. */}
+      <VaultLobby site={site} games={games} balance={balance} playerId={identity.userId} token={token} floor={floor} loading={busy} error={error} onRetry={load} onPlay={openGame}
+        onWallet={() => setTab('Wallet')} onHistory={() => setTab('Activity')} onAccount={() => setTab('Account')} />
+      {games.length > 0 && <PromoPopup promo={site.content.promo} email={identity.email} games={games} onPlay={openGame}/>}
+    </> : <>
       <View style={[s.header,landscape&&{paddingVertical:7}]}><Brand site={site}/><View style={{flexDirection:'row',alignItems:'center'}}><SoundToggle/><InboxButton token={token}/></View><Tap haptic="select" accessibilityLabel="Open wallet" onPress={()=>setTab('Wallet')} style={s.pill}><Text style={s.small}>{site.content.brand.creditsLabel}</Text><Text style={s.accent}>{balance ? `${money(balance.balance)} ${balance.currency}` : 'Wallet —'}</Text></Tap></View>
       <View style={{flex:1,flexDirection:landscape?'row-reverse':'column'}}><ScrollView style={{flex:1}} key={tab} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={busy} onRefresh={load} tintColor="#efd49b" />}>
         {!!error && <View style={s.card}><Text accessibilityRole="alert" style={s.error}>{error}</Text><Button title="Retry" onPress={load} disabled={busy} /></View>}
