@@ -16,6 +16,8 @@ const serif = Platform.OS === 'android' ? 'serif' : 'Georgia';
 const classic = ['7','BAR','CHERRY','LEMON','BELL','GRAPE','ORANGE','WATERMELON','STAR'];
 const fire = ['JADE_LION','RED_LANTERN','JADE_COMPASS','CRANE','KOI','FLAME_LOTUS'];
 export function SymbolArt({ symbol, size = 80 }: { symbol: string; size?: number }) {
+  // Devil Heart calls its 7 SEVEN; posters and tiles draw it with the shared 7.
+  if (symbol === 'SEVEN') symbol = '7';
   const special = fire.includes(symbol), atlas = special ? fire : classic, index = atlas.indexOf(symbol);
   if (index < 0) return <Text style={{ color: '#ffd23f', fontSize: size / 3, textAlign: 'center' }}>{symbol.replaceAll('_',' ')}</Text>;
   return <View accessibilityLabel={symbol} style={{ width: size, height: size, overflow: 'hidden' }}><Image source={special ? require('../assets/web/lucky-fire-blitz-symbols-v1.png') : require('../assets/web/slot-symbols.png')} style={{ position: 'absolute', width: size * 3, height: size * (special ? 2 : 3), left: -(index % 3) * size, top: -Math.floor(index / 3) * size }} /></View>;
