@@ -46,6 +46,10 @@ const games = [
         ['OCTOPUS', 'Octopus', 20], ['STINGRAY', 'Stingray', 30], ['SWORDFISH', 'Swordfish', 50], ['SHARK', 'Great Shark', 80], ['WHALE', 'Golden Whale', 120]].map(([code, label, multiplier]) => ({ label, multiplier, pattern: [code, 'HIT'] }))
         .concat([100, 150, 200, 300, 500].map(x => ({ label: `Tide Dragon ${x}x`, multiplier: x, pattern: ['DRAGON', `HIT${x}`] }))) },
     presentation: { glyph: '🐉', tileSubtitle: 'Fish table · Up to 500x' } },
+  { code: 'VEGAS_JACKPOT_DEVIL_HEART', name: 'Vegas Jackpot: Devil Heart', description: 'Five lines, locking wilds.', minStake: 0.1, maxStake: 50, engineType: 'CLASSIC_5L', featuredSymbol: 'SEVEN',
+    engine: { layout: 'CLASSIC_5L', symbols: ['SEVEN', 'BAR3', 'BAR2', 'BAR1', 'WILD', 'X2', 'JACKPOT', 'BLANK'], payline: [], rules: ['Three reels and five fixed lines.'], paytable: [],
+      lines: [[3, 4, 5], [0, 1, 2], [6, 7, 8], [0, 4, 8], [6, 4, 2]] },
+    presentation: { badge: 'HOT', tileSubtitle: 'JACKPOT 10X–30X' } },
   { code: 'SEVEN_STARS_DELUXE', name: 'Seven Stars Deluxe', description: 'Five reels, twenty lines, wilds and free spins.', minStake: 0.2, maxStake: 100, engineType: 'VIDEO_5X3', featuredSymbol: '7',
     engine: { layout: 'VIDEO_5X3', symbols: ['7', 'BAR', 'BELL', 'STAR', 'WATERMELON', 'GRAPE', 'ORANGE', 'LEMON', 'CHERRY', 'WILD', 'SCATTER'], payline: [],
       rules: ['Five reels, three rows and twenty fixed lines.', 'Three or more SCATTER symbols anywhere award 8 free spins. Every free-spin win pays double.'],
@@ -96,6 +100,7 @@ const fishShots = []
 const videoBets = []
 const kenoBets = []
 const slotBets = []
+const devilBets = []
 let fishBalance = 125.5
 let liveUnauthorized = 0
 let refreshed = false
@@ -174,6 +179,21 @@ await page.route('**/api/**', async route => {
       fishBalance = Math.round((fishBalance - body.stake + body.stake * multiplier) * 100) / 100
       return json({ requestId: body.requestId, betId: `f${fishShots.length}`, gameCode: 'DRAGON_TIDE', symbols: [body.selection, multiplier ? 'HIT' : 'MISS'], stake: body.stake,
         payout: Math.round(body.stake * multiplier * 100) / 100, balance: fishBalance, currency: 'USD', outcome: multiplier ? 'SMALL_WIN' : 'LOSS', multiplier, walletSequence: 100 + fishShots.length })
+    }
+    if (path === '/api/games/VEGAS_JACKPOT_DEVIL_HEART/play') {
+      devilBets.push(body)
+      // First spin: a WILD on reel 2 fills it and locks; 7 · WILD · 7 on the middle line pays 12 line bets, then the
+      // respin pays the middle line again (7 · WILD · 7) for 24 line bets in all: 4.8x the bet.
+      if (devilBets.length === 1) {
+        const base = ['BAR1', 'WILD', 'BLANK', 'SEVEN', 'WILD', 'SEVEN', 'BLANK', 'WILD', 'BAR2']
+        const respin = ['BAR3', 'WILD', 'BLANK', 'SEVEN', 'WILD', 'SEVEN', 'BLANK', 'WILD', 'BAR1']
+        return json({ requestId: body.requestId, betId: 'd1', gameCode: 'VEGAS_JACKPOT_DEVIL_HEART', symbols: [...base, ...respin], stake: body.stake,
+          payout: 0.48, balance: 125.88, currency: 'USD', outcome: 'BIG_WIN', multiplier: 4.8 })
+      }
+      // Second spin: three JACKPOTs on the top line win the 20x jackpot (a WILD reel would cross every line, so no lock here).
+      const screen = ['JACKPOT', 'JACKPOT', 'JACKPOT', 'BAR1', 'SEVEN', 'BAR2', 'BLANK', 'BAR3', 'BLANK']
+      return json({ requestId: body.requestId, betId: 'd2', gameCode: 'VEGAS_JACKPOT_DEVIL_HEART', symbols: [...screen, 'JP20'], stake: body.stake,
+        payout: 2, balance: 127.78, currency: 'USD', outcome: 'JACKPOT', multiplier: 20 })
     }
     if (path === '/api/games/GALAXY_KENO/play') {
       kenoBets.push(body)
@@ -486,6 +506,27 @@ console.log(`## video slot  (${reels.length} reels ${reels[0]?.width}x${reels[0]
 await page.getByText(/Back to lobby/).first().click()
 await page.getByText('All Games').first().waitFor({ timeout: 15000 })
 
+// Vegas Jackpot: Devil Heart: a WILD reel locks for a free respin, and three JACKPOTs win the jackpot.
+await page.getByRole('tab', { name: 'SLOTS' }).click()
+await page.getByLabel('Play Vegas Jackpot: Devil Heart').first().click()
+await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 15000 }).catch(() => findings.push('devil heart: the loading screen never left'))
+await page.getByLabel(/^Reel 3:/).waitFor({ timeout: 15000 }).catch(() => findings.push('devil heart: the reels did not show'))
+await audit('27-devil-heart')
+await page.getByRole('button', { name: 'Spin' }).click()
+await page.getByText('LOCKED').first().waitFor({ timeout: 15000 }).catch(() => findings.push('devil heart: the WILD reel did not lock'))
+await page.getByText('WILD LOCKED · FREE RESPIN!').waitFor({ timeout: 5000 }).catch(() => findings.push('devil heart: no respin announced'))
+await page.screenshot({ path: `${OUT}/27a-devil-locked.png` })
+await page.getByText('WIN 0.48').waitFor({ timeout: 20000 }).catch(() => findings.push("devil heart: the respin round never showed the server's 0.48"))
+await page.getByRole('button', { name: 'Spin' }).click()
+await page.getByText('20× BET').waitFor({ timeout: 20000 }).catch(() => findings.push('devil heart: the jackpot was not shown'))
+await page.screenshot({ path: `${OUT}/27b-devil-jackpot.png` })
+await page.getByText('WIN 2.00').waitFor({ timeout: 20000 }).catch(() => findings.push("devil heart: the jackpot round never showed the server's 2.00"))
+if (devilBets.length !== 2 || devilBets.some(bet => bet.stake !== 0.1 || !/^[0-9a-f-]{36}$/.test(bet.requestId)) || devilBets[0].requestId === devilBets[1].requestId) findings.push(`devil heart: the bets sent were ${JSON.stringify(devilBets)}`)
+await audit('28-devil-heart-played')
+console.log('## devil heart  (WILD reel locked, respin, 0.48; then a 20x jackpot, 2.00)')
+await page.getByText(/← Lobby/).first().click()
+await page.getByRole('tab', { name: 'ALL GAMES' }).click()
+
 // The lobby's dock files games by kind, as the game rooms do: keno sits under OTHER, the fish table under FISHING.
 await page.getByRole('tab', { name: 'OTHER' }).click()
 await page.getByLabel('Play Galaxy Keno').first().waitFor({ timeout: 5000 }).catch(() => findings.push('lobby: keno is not under OTHER'))
@@ -592,5 +633,5 @@ if (findings.length) {
   console.error('\nFAIL\n' + findings.map(line => '  ' + line).join('\n'))
   process.exitCode = 1
 } else {
-  console.log(`\nPASS: sign-in, lobby, slots, wallet, withdraw, history, landscape (lobby, wallet, game), the Dragon Tide fish table, the video slot with free spins, the lobby's categories, keno, welcome offer, new message, inbox, sound switch and log out fit a phone. Screenshots in ${OUT}/.`)
+  console.log(`\nPASS: sign-in, lobby, slots, wallet, withdraw, history, landscape (lobby, wallet, game), the Dragon Tide fish table, the video slot with free spins, the lobby's categories, keno, Devil Heart's locking respin and jackpot, welcome offer, new message, inbox, sound switch and log out fit a phone. Screenshots in ${OUT}/.`)
 }
