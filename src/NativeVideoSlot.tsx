@@ -12,7 +12,6 @@ import { feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
 import { sound } from './sound';
 import { SoundToggle } from './Popups';
-import { GameHistory } from './GameHistory';
 
 /**
  * The five-reel video slot (Seven Stars Deluxe and the Game builder's games), as on the website: twenty lines,
@@ -109,7 +108,7 @@ export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, 
   const [wins, setWins] = useState<LineWin[]>([]), [scatterLit, setScatterLit] = useState(false);
   const [feature, setFeature] = useState<{ spin: number; total: number; banner: boolean } | null>(null);
   const [result, setResult] = useState<PlayResult | null>(null), [meter, setMeter] = useState(0);
-  const [win, setWin] = useState<Win | null>(null), [played, setPlayed] = useState(0);
+  const [win, setWin] = useState<Win | null>(null);
   const locked = useRef(false), alive = useRef(true), fast = useRef(false);
 
   useEffect(() => {
@@ -179,7 +178,7 @@ export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, 
       setWallet(current => current ? { ...current, balance: data.balance, currency: data.currency } : current);
       feel(data.payout > 0 ? 'win' : 'tap'); sound.result(data.payout > 0 ? data.multiplier : 0);
       if (data.payout > 0) setWin({ payout: data.payout, stake: data.stake, multiplier: data.multiplier, currency: data.currency, id: data.betId });
-      setPlayed(n => n + 1); onSettled();
+      onSettled();
     } catch (e) {
       if (!alive.current) return;
       // A first-attempt validation/auth rejection did not settle. Uncertain retries stay locked.
@@ -188,7 +187,7 @@ export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, 
       }
       feel('warn');
       setError(`${e instanceof Error ? e.message : 'Unable to play'}${submitted ? ' If a bet is pending, use Recover bet with the same request ID.' : ''}`);
-      setStopped(REELS); setPlayed(n => n + 1); onSettled();
+      setStopped(REELS); onSettled();
     } finally {
       locked.current = false;
       if (alive.current) { setBusy(false); setStopped(REELS); setFeature(current => current && { ...current, banner: false }); }
@@ -201,7 +200,7 @@ export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, 
   const status = busy && feature?.banner ? `${SCATTERS_FOR_FEATURE} SCATTERS · ${FREE_SPINS} FREE SPINS!`
     : busy && feature ? `FREE SPIN ${feature.spin} / ${FREE_SPINS} · WINS ×${FREE_SPIN_FACTOR}`
     : busy ? 'SPINNING' : `${engine.lines?.length ?? 20} LINES · READY`;
-  return <LandscapeGame stageItems={2} stage={0.66} below={<GameHistory token={token} game={game} refresh={played} />}>
+  return <LandscapeGame stageItems={2} stage={0.66}>
     <View style={v.topBar}>
       <Tap haptic="select" disabled={busy} onPress={onClose} style={s.inlineButton}><Text style={s.link}>{busy ? 'Round in progress…' : '← Back to lobby'}</Text></Tap>
       <SoundToggle />
