@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { randomUUID } from 'expo-crypto';
 import { ApiError, Balance, Game, PlayResult, request } from './api';
 import { clearPending, PendingBet, readPending, savePending } from './pendingBet';
 import { s } from './styles';
 import { Tap } from './Tap';
+import { BetBar } from './BetBar';
 import { c, feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
 import { sound } from './sound';
@@ -145,10 +146,7 @@ export function NativeKeno({ game, token, userId, initialBalance, onClose, onSet
       <Tap haptic="select" disabled={!editable} onPress={quickPick} style={[k.small, { flex: 1 }]}><Text style={s.accent}>⚡ Quick pick</Text></Tap>
       <Tap haptic="select" disabled={!editable || !picks.length} onPress={() => { setPicks([]); setDrawn([]); setResult(null); setWin(null); }} style={[k.small, { flex: 1 }]}><Text style={s.accent}>Clear</Text></Tap>
     </View>
-    <TextInput accessibilityLabel="Bet" style={[s.input, { minHeight: 44, padding: 10 }]} keyboardType="decimal-pad" value={pending ? String(pending.stake) : stake} onChangeText={setStake} editable={editable} />
-    <View style={k.row}>
-      {[game.minStake, Math.min(game.maxStake, game.minStake * 5), game.maxStake].map((value, i) => <Tap key={i} haptic="select" disabled={!editable} style={k.chip} onPress={() => setStake(cash(value))}><Text style={s.accent}>{cash(value)}</Text></Tap>)}
-    </View>
+    <BetBar value={pending ? pending.stake : Number(stake)} onChange={value => setStake(value.toFixed(2))} min={game.minStake} max={game.maxStake} disabled={!editable} />
     <Tap haptic="heavy" disabled={busy || !ready || (!!pending && pending.gameCode !== game.code)} onPress={play} style={[s.button, k.play]}>
       <LinearGradient colors={['#ffe45c', '#ffb01f', '#ff7a1a']} style={StyleSheet.absoluteFill} />
       <Text style={s.buttonText}>{busy ? 'Drawing…' : pending ? 'Recover ticket' : 'PLAY'}</Text>
@@ -185,7 +183,6 @@ const k = StyleSheet.create({
   result: { color: '#e6dcff', fontWeight: '800', textAlign: 'center', fontSize: 14 },
   row: { flexDirection: 'row', gap: 6, alignItems: 'center' },
   small: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#b56cff77', backgroundColor: '#2e1660' },
-  chip: { flex: 1, minHeight: 44, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#b56cff77', backgroundColor: '#2e1660' },
   play: { minHeight: 52, justifyContent: 'center', borderWidth: 2, borderColor: c.gold },
   payRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   payRowOn: { backgroundColor: '#12a85a55', borderWidth: 1, borderColor: c.win },

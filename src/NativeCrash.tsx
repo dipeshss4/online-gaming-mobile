@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AppState, LayoutChangeEvent, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AppState, LayoutChangeEvent, Platform, StyleSheet, Text, View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { randomUUID } from 'expo-crypto';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Game, request } from './api';
 import { s } from './styles';
 import { Tap } from './Tap';
+import { BetBar } from './BetBar';
 import { c as t, feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
 import { sound } from './sound';
@@ -148,7 +149,6 @@ export function NativeCrash({ game, token, userId, onClose, onSettled }: { game:
   const measure = (e: LayoutChangeEvent) => { const { width, height } = e.nativeEvent.layout; setSize({ w: width, h: height }); };
 
   const total = stakes.map(Number).reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0);
-  const quick = [...new Set([game.minStake, 1, 2, 5].filter(v => v >= game.minStake && v <= game.maxStake))];
 
   return <LandscapeGame stage={0.62} stageItems={2}>
     <View style={x.topBar}>
@@ -200,12 +200,7 @@ export function NativeCrash({ game, token, userId, onClose, onSettled }: { game:
           {ticket && ticket.status !== 'UNUSED' && <Text style={[x.ticket, ticket.status === 'COLLECTED' && { color: t.win }, ticket.status === 'LOST' && { color: '#ef9a8c' }]}>
             {ticket.status === 'OPEN' ? `In flight · ${ticket.stake.toFixed(2)}` : ticket.status === 'COLLECTED' ? `Won ${ticket.payout.toFixed(2)} @ ${ticket.collectedAt?.toFixed(2)}×` : `Lost ${ticket.stake.toFixed(2)}`}</Text>}
         </View>
-        <TextInput accessibilityLabel={`Bet ${index + 1} stake`} keyboardType="decimal-pad" value={value} editable={editable}
-          onChangeText={v => setStakes(old => old.map((o, i) => i === index ? v : o))} style={[s.input, x.stake, !editable && { opacity: 0.6 }]} />
-        <View style={x.stakeRow}>
-          {index === 1 && <Tap haptic="select" disabled={!editable} onPress={() => setStakes(old => [old[0], '0'])} style={x.quick}><Text style={x.quickText}>Off</Text></Tap>}
-          {quick.slice(0, index === 1 ? 3 : 4).map(v => <Tap key={v} haptic="select" disabled={!editable} onPress={() => setStakes(old => old.map((o, i) => i === index ? v.toFixed(2) : o))} style={x.quick}><Text style={x.quickText}>{v.toFixed(v < 1 ? 2 : 0)}</Text></Tap>)}
-        </View>
+        <BetBar label="STAKE" allowOff={index === 1} value={Number(value) || 0} onChange={amount => setStakes(old => old.map((o, i) => i === index ? amount.toFixed(2) : o))} min={game.minStake} max={game.maxStake} disabled={!editable} />
       </View>;
     })}
 
@@ -235,10 +230,6 @@ const x = StyleSheet.create({
   panel: { gap: 8, padding: 12, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.line },
   panelHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   ticket: { color: t.gold, fontSize: 12, fontWeight: '700' },
-  stakeRow: { flexDirection: 'row', gap: 6, alignItems: 'center' },
-  stake: { minHeight: 44, paddingVertical: 8, paddingHorizontal: 12, fontSize: 16 },
-  quick: { flex: 1, minWidth: 44, minHeight: 44, paddingHorizontal: 8, borderRadius: 10, borderWidth: 1, borderColor: t.lineStrong, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2e1660' },
-  quickText: { color: t.gold, fontWeight: '800', fontSize: 13 },
   launch: { minHeight: 56, borderRadius: 14, backgroundColor: t.gold, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff0c4' },
   launchText: { color: t.goldInk, fontWeight: '900', fontSize: 16, letterSpacing: 0.5 },
 });

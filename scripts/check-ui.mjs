@@ -95,6 +95,7 @@ let winningRound = false
 const fishShots = []
 const videoBets = []
 const kenoBets = []
+const slotBets = []
 let fishBalance = 125.5
 let liveUnauthorized = 0
 let refreshed = false
@@ -189,6 +190,7 @@ await page.route('**/api/**', async route => {
       const symbols = [...base, ...bars, ...Array.from({ length: 7 }, () => quiet(blanks))].flat()
       return json({ requestId: body.requestId, betId: 'v1', gameCode: 'SEVEN_STARS_DELUXE', symbols, stake: body.stake, payout: 4, balance: 129.3, currency: 'USD', outcome: 'BIG_WIN', multiplier: 20 })
     }
+    slotBets.push(body)
     if (winningRound) return json({ requestId: body.requestId, betId: `b-win-${Date.now()}`, gameCode: 'HOT_7S', symbols: ['7', '7', '7'], stake: 1, payout: 50, balance: 174.5, currency: 'USD', outcome: 'WIN', multiplier: 50 })
     return json({ requestId: body.requestId, betId: 'b9', gameCode: 'HOT_7S', symbols: ['7', '7', 'BAR'], stake: 1, payout: 0, balance: 124.5, currency: 'USD', outcome: 'LOSS', multiplier: 0 })
   }
@@ -391,10 +393,28 @@ else {
 }
 await audit('13-landscape-game')
 
+// The bet is set with MIN, −, +, MAX and a picker of every allowed bet: nobody types a number.
+const shownBet = async () => (await page.getByLabel(/^Bet [0-9.]+, choose a bet$/).first().getAttribute('aria-label')).match(/[0-9.]+/)[0]
+await page.getByLabel('Maximum bet').first().click()
+if (await shownBet() !== '50.00') findings.push(`bet bar: MAX set ${await shownBet()}, not the game's 50.00`)
+await page.getByLabel('Minimum bet').first().click()
+if (await shownBet() !== '0.10') findings.push(`bet bar: MIN set ${await shownBet()}`)
+await page.getByLabel('Increase bet').first().click()
+if (await shownBet() !== '0.20') findings.push(`bet bar: + went to ${await shownBet()}, not the next size 0.20`)
+await page.getByLabel(/^Bet [0-9.]+, choose a bet$/).first().click()
+await page.getByLabel('Bet 1.00', { exact: true }).click()
+if (await shownBet() !== '1.00') findings.push(`bet bar: picking 1.00 set ${await shownBet()}`)
+await page.waitForTimeout(600)
+const bar = await page.evaluate(() => [...document.querySelectorAll('[aria-label="Maximum bet"],[aria-label="Minimum bet"],[aria-label="Increase bet"],[aria-label="Decrease bet"]')].map(e => { const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right), Math.round(r.width), Math.round(r.height)] }))
+if (bar.some(([left, right, w, h]) => left < 0 || right > (page.viewportSize()?.width ?? 9999) || w < 40 || h < 40)) findings.push(`bet bar: a button is cut off or small ${JSON.stringify(bar)}`)
+await audit('13b-bet-bar')
+console.log('## bet bar  (MAX 50.00, MIN 0.10, + 0.20, picker 1.00)')
+
 // Winning has to look like winning. The reels stop one at a time, so this waits for the whole round.
 winningRound = true
 await page.getByRole('button', { name: /^SPIN$/ }).click()
 await page.getByText('BIG WIN').waitFor({ timeout: 20000 })
+if (slotBets.at(-1)?.stake !== 1) findings.push(`bet bar: the spin sent stake ${slotBets.at(-1)?.stake}, not the 1.00 picked`)
 await page.getByText('50.00').first().waitFor({ timeout: 10000 })
 await audit('14-win')
 console.log('## win celebration  (BIG WIN banner and the payout, over the cabinet)')

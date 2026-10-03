@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, ImageBackground, Platform, Animated, Easing, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, ImageBackground, Platform, Animated, Easing, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { randomUUID } from 'expo-crypto';
 import { ApiError, Balance, Game, PlayResult, request } from './api';
 import { clearPending, PendingBet, readPending, savePending } from './pendingBet';
@@ -7,6 +7,7 @@ import { s } from './styles';
 import { LandscapeGame } from './LandscapeGame';
 import { SymbolArt } from './WebLook';
 import { Tap } from './Tap';
+import { BetBar } from './BetBar';
 import { feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
 import { sound } from './sound';
@@ -116,8 +117,7 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
     <View accessibilityLiveRegion="polite" style={[s.card,landscape&&{padding:10,gap:4}]}><Text style={s.kicker}>{busy ? 'SETTLING YOUR ROUND' : settled ? result.outcome.replaceAll('_', ' ') : 'YOUR NEXT ROUND'}</Text><Text style={[s.title,landscape&&{fontSize:18}]}>{settled ? `Return ${cash(result.payout)} ${result.currency}` : busy ? 'Reels in motion…' : 'Choose your stake'}</Text>{settled && <Text style={s.muted}>Stake {cash(result.stake)} · Net {cash(result.payout - result.stake)} · {result.multiplier}×</Text>}</View>
     {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
     {!!pending && !busy && <Text style={s.muted}>Pending: {pending.gameCode} · {cash(pending.stake)}. {pending.gameCode !== game.code ? 'Open that game to recover the round.' : 'Recover resends this exact bet, not a new bet.'}</Text>}
-    <Text style={s.kicker}>STAKE PER SPIN</Text><TextInput accessibilityLabel="Stake" style={[s.input,landscape&&{minHeight:44,padding:10}]} keyboardType="decimal-pad" value={pending ? String(pending.stake) : stake} onChangeText={setStake} editable={!busy && !pending} />
-    <View style={g.reels}>{[game.minStake, Math.min(game.maxStake, game.minStake * 5), Math.min(game.maxStake, game.minStake * 10)].map((value, i) => <Tap key={i} haptic="select" disabled={busy || !!pending} style={[g.chip,landscape&&{padding:10,minHeight:40}]} onPress={() => setStake(cash(value))}><Text style={s.accent}>{cash(value)}</Text></Tap>)}</View>
+    <BetBar label="BET PER SPIN" value={pending ? pending.stake : Number(stake)} onChange={value => setStake(value.toFixed(2))} min={game.minStake} max={game.maxStake} disabled={busy || !!pending} />
     <Tap haptic="heavy" disabled={busy || !ready || (!!pending && pending.gameCode !== game.code)} onPress={spin} style={[s.button, {borderRadius:landscape?12:50,width:landscape?'100%':100,height:landscape?56:100,alignSelf:'center',justifyContent:'center',borderWidth:3,borderColor:'#ffd23f'}]}><Text style={s.buttonText}>{busy ? 'Spinning…' : pending ? 'Recover bet' : 'SPIN'}</Text></Tap>
     <Text style={s.small}>Each spin debits the displayed stake. Returns include the stake. No autoplay. Outcomes and payouts are determined by your backend.</Text>
     <Text style={s.title}>Paytable & rules</Text>{game.engine?.paytable?.map((line, i) => <View key={i} style={g.balance}><Text style={[s.muted, { flex: 1 }]}>{line.label}</Text><Text style={s.accent}>{line.multiplier}×</Text></View>)}{game.engine?.rules?.map((rule, i) => <Text key={i} style={s.small}>• {rule}</Text>)}
@@ -130,5 +130,5 @@ const g = StyleSheet.create({
   cabinetTitle: { textAlign: 'center', color: '#ffd23f', fontWeight: '800', letterSpacing: -1, fontSize: 30, fontFamily: Platform.OS === 'android' ? 'serif' : 'Georgia', fontStyle: 'italic' },
   reels: { flexDirection: 'row', gap: 10 }, reel: { flex: 1, overflow: 'hidden', borderRadius: 3, backgroundColor: '#180d23', borderWidth: 1, borderColor: '#b56cff66' },
   cell: { height: 80, alignItems: 'center', justifyContent: 'center', padding: 4 }, glyph: { color: '#f0d693', fontWeight: '900', fontSize: 23, textAlign: 'center' },
-  winner: { borderColor: '#ffd23f', backgroundColor: '#3a2520' }, payGlow: { position: 'absolute' as const, left: 0, right: 0, top: 0, bottom: 0, backgroundColor: '#ffd23f' }, line: { color: '#d9c290', fontSize: 11, textAlign: 'center', letterSpacing: 1.6 }, chip: { flex: 1, alignItems: 'center', padding: 14, borderRadius: 12, backgroundColor: '#2e1660', borderWidth: 1, borderColor: '#b56cff77' },
+  winner: { borderColor: '#ffd23f', backgroundColor: '#3a2520' }, payGlow: { position: 'absolute' as const, left: 0, right: 0, top: 0, bottom: 0, backgroundColor: '#ffd23f' }, line: { color: '#d9c290', fontSize: 11, textAlign: 'center', letterSpacing: 1.6 }
 });

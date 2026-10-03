@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Image, Platform, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Image, Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { randomUUID } from 'expo-crypto';
 import { API_URL, ApiError, Balance, Game, PlayResult, request } from './api';
@@ -8,6 +8,7 @@ import { s } from './styles';
 import { LandscapeGame } from './LandscapeGame';
 import { SymbolArt } from './WebLook';
 import { Tap } from './Tap';
+import { BetBar } from './BetBar';
 import { feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
 import { sound } from './sound';
@@ -227,9 +228,7 @@ export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, 
     </View>
     {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
     {!!pending && !busy && <Text style={s.muted}>Pending: {pending.gameCode} · {cash(pending.stake)}. {pending.gameCode !== game.code ? 'Open that game to recover the round.' : 'Recover resends this exact bet, not a new bet.'}</Text>}
-    <Text style={s.kicker}>TOTAL BET PER SPIN (ALL {engine.lines?.length ?? 20} LINES)</Text>
-    <TextInput accessibilityLabel="Stake" style={[s.input, landscape && { minHeight: 44, padding: 10 }]} keyboardType="decimal-pad" value={pending ? String(pending.stake) : stake} onChangeText={setStake} editable={!busy && !pending} />
-    <View style={v.chips}>{[game.minStake, Math.min(game.maxStake, game.minStake * 5), Math.min(game.maxStake, game.minStake * 10)].map((value, i) => <Tap key={i} haptic="select" disabled={busy || !!pending} style={[v.chip, landscape && { padding: 10, minHeight: 40 }]} onPress={() => setStake(cash(value))}><Text style={s.accent}>{cash(value)}</Text></Tap>)}</View>
+    <BetBar label={`TOTAL BET · ${engine.lines?.length ?? 20} LINES`} value={pending ? pending.stake : Number(stake)} onChange={value => setStake(value.toFixed(2))} min={game.minStake} max={game.maxStake} disabled={busy || !!pending} />
     <Tap haptic="heavy" disabled={busy || !ready || (!!pending && pending.gameCode !== game.code)} onPress={spin} style={[s.button, { borderRadius: landscape ? 12 : 50, width: landscape ? '100%' : 100, height: landscape ? 56 : 100, alignSelf: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#ffd23f' }]}><Text style={s.buttonText}>{busy ? 'Spinning…' : pending ? 'Recover bet' : 'SPIN'}</Text></Tap>
     <Text style={s.small}>Each spin debits the displayed stake across all lines, free spins included. Returns include the stake. No autoplay. Outcomes and payouts are determined by the server.</Text>
     <Text style={s.title}>Paytable & rules</Text>
@@ -258,8 +257,6 @@ const v = StyleSheet.create({
   banner: { position: 'absolute', left: 20, right: 20, top: '30%', alignItems: 'center', padding: 16, borderRadius: 18, backgroundColor: '#0b4fc0ee', borderWidth: 3, borderColor: '#ffd23f' },
   bannerSmall: { color: '#e6f6ff', fontWeight: '800', letterSpacing: 2, fontSize: 12 },
   bannerBig: { color: '#ffd23f', fontWeight: '900', fontSize: 30 },
-  chips: { flexDirection: 'row', gap: 10 },
-  chip: { flex: 1, alignItems: 'center', padding: 14, borderRadius: 12, backgroundColor: '#2e1660', borderWidth: 1, borderColor: '#b56cff77' },
   special: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   pay: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
 });
