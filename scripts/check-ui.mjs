@@ -62,6 +62,13 @@ const games = [
     engine: { layout: 'KENO', symbols: Array.from({ length: 80 }, (_, i) => String(i + 1)), payline: [], rules: ['Mark 1 to 10 numbers from 1 to 80, then play.'],
       paytable: [[1, 1, 3.8], [2, 2, 15.8], [3, 2, 2.5], [3, 3, 43]].map(([picks, hits, multiplier]) => ({ label: `${picks} picks, ${hits} hits`, multiplier, pattern: [`PICK${picks}`, `HIT${hits}`] })) },
     presentation: { glyph: '🎱', badge: 'NEW · KENO', tileSubtitle: 'UP TO 10,000X' } },
+  { code: 'TRIPLE_MATCH_SCRATCH', name: 'Triple Match', description: 'Scratch ticket.', minStake: 0.1, maxStake: 5, engineType: 'SCRATCH', featuredSymbol: 'STAR',
+    engine: { layout: 'SCRATCH_MATCH3', symbols: ['P1', 'P3', 'P10', 'P30', 'P100', 'X3'], payline: [], rules: ['Find three matching amounts to win.'],
+      paytable: [['P100', 100], ['P30', 30], ['P10', 10], ['P3', 3], ['P1', 1]].map(([p, m]) => ({ label: `Three ${m}x`, multiplier: m, pattern: [p, p, p] })) },
+    presentation: { badge: 'NEW · SCRATCHER', tileSubtitle: 'WIN UP TO 300X' } },
+  { code: 'LOTERIA_SCRATCH', name: 'Lotería', description: 'Scratch ticket.', minStake: 0.1, maxStake: 15, engineType: 'SCRATCH', featuredSymbol: 'STAR',
+    engine: { layout: 'SCRATCH_LOTERIA', symbols: [], payline: [], rules: ['Called cards on your tabla are marked.'], paytable: [{ label: 'The four corners', multiplier: 2, pattern: ['CORNERS'] }] },
+    presentation: { badge: 'NEW · SCRATCHER', tileSubtitle: 'BIG X PAYS 100X' } },
   { code: 'ASCENT_CRASH', name: 'Ascent Crash', description: 'Cash out before the climb ends.', minStake: 0.1, maxStake: 50, engineType: 'CRASH', presentation: { tileSubtitle: 'Arcade · From 0.10 credits' } }
 ]
 const wallet = { balance: 125.5, currency: 'USD', held: 20, status: 'ACTIVE' }
@@ -99,6 +106,7 @@ let winningRound = false
 const fishShots = []
 const videoBets = []
 const kenoBets = []
+const scratchBets = []
 const slotBets = []
 const devilBets = []
 let fishBalance = 125.5
@@ -194,6 +202,18 @@ await page.route('**/api/**', async route => {
       const screen = ['JACKPOT', 'JACKPOT', 'JACKPOT', 'BAR1', 'SEVEN', 'BAR2', 'BLANK', 'BAR3', 'BLANK']
       return json({ requestId: body.requestId, betId: 'd2', gameCode: 'VEGAS_JACKPOT_DEVIL_HEART', symbols: [...screen, 'JP20'], stake: body.stake,
         payout: 2, balance: 127.78, currency: 'USD', outcome: 'JACKPOT', multiplier: 20 })
+    }
+    if (path === '/api/games/LOTERIA_SCRATCH/play') {
+      // The four corners of the tabla are among the calls: 2x.
+      const tabla = ['EL_GALLO', 'LA_DAMA', 'EL_SOL', 'LA_LUNA', 'LA_ESTRELLA', 'EL_CORAZON', 'LA_SIRENA', 'LA_ROSA', 'EL_PESCADO', 'LA_SANDIA', 'EL_ARBOL', 'LA_CORONA', 'EL_BARRIL', 'LA_MANO', 'EL_VALIENTE', 'EL_GORRITO']
+      const calls = ['EL_GALLO', 'LA_LUNA', 'EL_BARRIL', 'EL_GORRITO', 'LA_CALAVERA', 'EL_ALACRAN', 'LA_ROSA', 'EL_MUSICO', 'LA_ARANA', 'EL_NOPAL']
+      return json({ requestId: body.requestId, betId: 'l1', gameCode: 'LOTERIA_SCRATCH', symbols: [...tabla, ...calls], stake: body.stake, payout: .2, balance: 125.6, currency: 'USD', outcome: 'SMALL_WIN', multiplier: 2 })
+    }
+    if (path === '/api/games/TRIPLE_MATCH_SCRATCH/play') {
+      scratchBets.push(body)
+      // Three 10x spots and a 3X in the Tripler box: 30x the ticket.
+      return json({ requestId: body.requestId, betId: 's1', gameCode: 'TRIPLE_MATCH_SCRATCH', symbols: ['P10', 'P1', 'P3', 'P10', 'P30', 'P1', 'P3', 'P10', 'P100', 'X3'], stake: body.stake,
+        payout: 3, balance: 128.4, currency: 'USD', outcome: 'BIG_WIN', multiplier: 30 })
     }
     if (path === '/api/games/GALAXY_KENO/play') {
       kenoBets.push(body)
@@ -551,6 +571,33 @@ if (await page.getByLabel('Play Hot 7s').count()) findings.push('lobby: a slot s
 await audit('24-lobby-other')
 await page.getByRole('tab', { name: 'FISHING' }).click()
 await page.getByLabel('Play Dragon Tide').first().waitFor({ timeout: 5000 }).catch(() => findings.push('lobby: the fish table is not under FISHING'))
+await page.getByRole('tab', { name: 'OTHER' }).click()
+
+// Triple Match: buy a ticket, rub the silver off with a drag, reveal the rest; the win lands when it is all scratched.
+await page.getByLabel('Play Triple Match').first().click()
+await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {})
+await page.getByLabel('Buy ticket').waitFor({ timeout: 15000 })
+await page.getByLabel('Buy ticket').click()
+await page.getByText('RUB THE SILVER TO SCRATCH').waitFor({ timeout: 10000 }).catch(() => findings.push('scratch: the ticket did not arrive covered'))
+const ticketBox = await page.getByText('SCRATCH', { exact: true }).first().boundingBox()
+if (ticketBox) { await page.mouse.move(ticketBox.x - 30, ticketBox.y + 10); await page.mouse.down(); for (let i = 0; i <= 10; i++) await page.mouse.move(ticketBox.x - 30 + i * 40, ticketBox.y + 10 + (i % 2) * 30); await page.mouse.up() }
+await page.screenshot({ path: `${OUT}/30a-scratching.png` })
+await page.getByLabel('Reveal all').click({ timeout: 3000 }).catch(() => {})   // the drag may already have cleared it all
+await page.getByText('YOU WON 3.00!').waitFor({ timeout: 10000 }).catch(() => findings.push("scratch: the ticket never showed the server's 3.00"))
+if (scratchBets.length !== 1 || !/^[0-9a-f-]{36}$/.test(scratchBets[0].requestId)) findings.push(`scratch: the bets sent were ${JSON.stringify(scratchBets)}`)
+await audit('30-scratch')
+console.log('## scratch ticket  (bought, scratched by drag, revealed, three 10x tripled: 3.00)')
+await page.getByLabel('Back to lobby').first().click()
+await page.getByRole('tab', { name: 'OTHER' }).click()
+await page.getByLabel('Play Lotería').first().click()
+await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {})
+await page.getByLabel('Buy ticket').click({ timeout: 15000 })
+await page.getByLabel('Reveal all').click({ timeout: 10000 })
+await page.getByText('YOU WON 0.20!').waitFor({ timeout: 10000 }).catch(() => findings.push("lotería: the ticket never showed the server's 0.20"))
+await page.waitForTimeout(2500)
+await audit('31-loteria')
+console.log('## lotería  (tabla marked by the calls, four corners: 0.20)')
+await page.getByLabel('Back to lobby').first().click()
 await page.getByRole('tab', { name: 'OTHER' }).click()
 
 // Galaxy Keno: mark three numbers, play, watch twenty balls; the ticket sent is the numbers marked.
