@@ -25,7 +25,7 @@ const FAVORITES = 'lobby-favorites';
 
 export const sectionOf = (game: Game): Section =>
   game.engine?.layout === 'FISH' ? 'FISHING'
-    : ['REEL_3', 'GRID_3X3', 'VIDEO_5X3', 'CLASSIC_5L', 'FIRE_LINK'].includes(game.engine?.layout ?? '') ? 'SLOTS' : 'OTHER';
+    : ['REEL_3', 'GRID_3X3', 'VIDEO_5X3', 'CLASSIC_5L', 'FIRE_LINK', 'LINES_5X3'].includes(game.engine?.layout ?? '') ? 'SLOTS' : 'OTHER';
 
 /** Favourites outlive the visit: the phone's secure store, or the browser's storage in the web preview. */
 async function readFavorites(): Promise<string[]> {

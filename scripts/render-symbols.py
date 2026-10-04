@@ -160,7 +160,7 @@ def frame_all(target=2.2):
         ev.to_mesh_clear()
     span = max(hi.x - lo.x, hi.y - lo.y); centre = (lo + hi) / 2
     pivot = bpy.data.objects.new('Pivot', None); bpy.context.scene.collection.objects.link(pivot)
-    for o in objs:
+    for o in objs + [e for e in bpy.context.scene.objects if e.type == 'EMPTY' and e is not pivot]:
         if o.parent is None: o.parent = pivot
     pivot.location = (-centre.x * target / span, -centre.y * target / span, 0); pivot.scale = (target / span,) * 3
 
@@ -382,6 +382,125 @@ def fireball(dark, mid, hot):
         o.rotation_euler = (0, 0, a - math.pi / 2)
     bpy.ops.mesh.primitive_torus_add(major_radius=.98, minor_radius=.055, location=(0, 0, 0)); add(bpy.context.object, GOLD()); bpy.ops.object.shade_smooth()
 
+# ---------------------------------------------------------------- Luxury Life
+WHITE_PAINT = lambda: mat('WhitePaint', (.92, .93, .95), rough=.12, coat=1)
+GLASS_DARK = lambda: mat('DarkGlass', (.02, .03, .06), rough=.05, coat=1)
+SILVER_METAL = lambda: mat('Silver', (.92, .93, .96), metallic=1, rough=.12)
+
+def bar_ingot(loc, material, scale=1.):
+    """A trapezoid ingot: wider at its base, bevelled."""
+    w, d, h = 1.1 * scale, .52 * scale, .34 * scale
+    bm = bmesh.new()
+    base = [bm.verts.new((x, y, 0)) for x, y in ((-w / 2, -d / 2), (w / 2, -d / 2), (w / 2, d / 2), (-w / 2, d / 2))]
+    top = [bm.verts.new((x * .78, y * .7, h)) for x, y in ((-w / 2, -d / 2), (w / 2, -d / 2), (w / 2, d / 2), (-w / 2, d / 2))]
+    bm.faces.new(base[::-1]); bm.faces.new(top)
+    for i in range(4): bm.faces.new((base[i], base[(i + 1) % 4], top[(i + 1) % 4], top[i]))
+    mesh = bpy.data.meshes.new('Ingot'); bm.to_mesh(mesh); bm.free()
+    o = bpy.data.objects.new('Ingot', mesh); bpy.context.scene.collection.objects.link(o)
+    b = o.modifiers.new('Bevel', 'BEVEL'); b.width = .03 * scale; b.segments = 3
+    o.location = loc; o.rotation_euler = (math.radians(-55), 0, 0); return add(o, material)
+
+def lux_bars(material):
+    for loc in ((-.6, -.35, 0), (.6, -.35, 0), (0, .25, .1)): bar_ingot(loc, material)
+
+def lux_coin():
+    bpy.ops.mesh.primitive_cylinder_add(vertices=96, radius=1.0, depth=.18, location=(0, 0, 0)); coin = bpy.context.object
+    b = coin.modifiers.new('Bevel', 'BEVEL'); b.width = .04; b.segments = 4; bpy.ops.object.shade_smooth(); add(coin, GOLD())
+    bpy.ops.mesh.primitive_torus_add(major_radius=.86, minor_radius=.035, location=(0, 0, .1)); add(bpy.context.object, DARK_GOLD()); bpy.ops.object.shade_smooth()
+    text('$', 1.2, .06, .02, GOLD(), loc=(0, -.02, .1))
+    for x, z in ((-.5, -.2), (.45, -.35)):
+        bpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=.55, depth=.12, location=(x, -.85, z)); c = bpy.context.object
+        c.rotation_euler = (math.radians(80), 0, 0); add(c, GOLD()); bpy.ops.object.shade_smooth()
+
+def lux_ring():
+    bpy.ops.mesh.primitive_torus_add(major_radius=.78, minor_radius=.13, major_segments=96, location=(0, -.25, 0)); band = bpy.context.object
+    band.rotation_euler = (math.radians(70), 0, 0); add(band, GOLD()); bpy.ops.object.shade_smooth()
+    gem = mat('Diamond', (1, 1, 1), rough=0); gp = gem.node_tree.nodes['Principled BSDF']; gp.inputs['Transmission Weight'].default_value = 1; gp.inputs['IOR'].default_value = 2.4
+    bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=.42, radius2=.25, depth=.22, location=(0, .72, .1)); add(bpy.context.object, gem)
+    bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=.42, radius2=0, depth=.5, location=(0, .47, .1)); c = bpy.context.object; c.rotation_euler = (math.radians(180), 0, 0); add(c, gem)
+    for a in range(4):
+        x = .3 * math.cos(a * math.pi / 2 + .78); bpy.ops.mesh.primitive_cylinder_add(vertices=12, radius=.04, depth=.35, location=(x, .6, .1)); add(bpy.context.object, GOLD())
+
+def lux_watch():
+    bpy.ops.mesh.primitive_cylinder_add(vertices=96, radius=.95, depth=.3, location=(0, -.1, 0)); case = bpy.context.object
+    b = case.modifiers.new('Bevel', 'BEVEL'); b.width = .08; b.segments = 6; bpy.ops.object.shade_smooth(); add(case, GOLD())
+    bpy.ops.mesh.primitive_cylinder_add(vertices=96, radius=.8, depth=.32, location=(0, -.1, .02)); add(bpy.context.object, mat('Dial', (.95, .93, .86), rough=.25)); bpy.ops.object.shade_smooth()
+    for i in range(12):
+        a = i * math.pi / 6; bpy.ops.mesh.primitive_cube_add(size=1, location=(.66 * math.sin(a), -.1 + .66 * math.cos(a), .19))
+        o = bpy.context.object; o.scale = (.025, .09 if i % 3 == 0 else .05, .02); o.rotation_euler = (0, 0, -a); add(o, mat('Mark', (.05, .05, .08), rough=.3))
+    for length, angle, width in ((.45, -40, .04), (.62, 70, .03)):
+        bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0)); h = bpy.context.object
+        h.scale = (width, length, .02); h.location = (length / 2 * math.sin(math.radians(angle)), -.1 + length / 2 * math.cos(math.radians(angle)), .2)
+        h.rotation_euler = (0, 0, -math.radians(angle)); add(h, mat('Hand', (.03, .03, .05), metallic=.5, rough=.2))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=.12, depth=.25, location=(0, .95, 0)); c = bpy.context.object; c.rotation_euler = (math.radians(90), 0, 0); add(c, GOLD())
+    bpy.ops.mesh.primitive_torus_add(major_radius=.2, minor_radius=.045, location=(0, 1.2, 0)); add(bpy.context.object, GOLD())
+
+def yacht_parts():
+    hull = prism([(-1.35, -.1), (1.2, -.1), (1.55, .28), (-1.25, .28), (-1.4, .1)], .6, .3, WHITE_PAINT(), .05)
+    prism([(-1.38, -.02), (1.25, -.02), (1.35, .08), (-1.4, .08)], .62, .31, mat('Navy', (.02, .06, .25), rough=.2, coat=1), .02)
+    deck = mat('Teak', (.45, .25, .1), rough=.4)
+    prism([(-1.25, .28), (1.5, .28), (1.5, .31), (-1.25, .31)], .6, .3, deck)
+    prism([(-.9, .28), (.75, .28), (.42, .6), (-.78, .6)], .42, .24, WHITE_PAINT(), .04)
+    prism([(-.62, .6), (.28, .6), (.06, .84), (-.52, .84)], .3, .18, WHITE_PAINT(), .03)
+    prism([(-.84, .34), (.6, .34), (.36, .54), (-.72, .54)], .02, .25, GLASS_DARK())
+    prism([(-.54, .65), (.18, .65), (.02, .79), (-.46, .79)], .02, .19, GLASS_DARK())
+    water = mat('Wake', (.25, .6, 1), rough=.05, emission=(.3, .7, 1), strength=.6)
+    for x, s in ((-1.0, .5), (-.2, .35), (.7, .45)): sphere((x, -.2, .1), (s, .07, .35), water, 24)
+
+def lux_yacht(): tilted(yacht_parts, (14, -24, 0))
+
+def tilted(build, rot):
+    """Builds a symbol, then turns the whole of it together (an empty parent), so rotations compose."""
+    before = set(bpy.context.scene.objects)
+    build()
+    pivot = bpy.data.objects.new('Pivot', None); bpy.context.scene.collection.objects.link(pivot)
+    for o in set(bpy.context.scene.objects) - before - {pivot}:
+        if o.type in ('MESH', 'FONT') and o.parent is None: o.parent = pivot
+    pivot.rotation_euler = tuple(math.radians(a) for a in rot)
+
+def jet_parts():
+    paint = WHITE_PAINT(); trim = mat('Tail', (.85, .6, .12), metallic=1, rough=.18)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=.24, depth=2.2, location=(0, 0, 0)); body = bpy.context.object
+    body.rotation_euler = (0, math.radians(90), 0); add(body, paint); bpy.ops.object.shade_smooth()
+    sphere((1.1, 0, 0), (.42, .24, .24), paint); sphere((-1.1, .02, 0), (.3, .2, .2), paint)
+    sphere((1.32, .07, 0), (.14, .08, .13), GLASS_DARK(), 24)
+    for side in (1, -1):   # swept wings in the XZ plane, and the tailplanes
+        w = prism([(.35, 0), (-.25, 0), (-.7, 1.25 * side), (-.5, 1.25 * side)], .05, .025, paint, .015); w.rotation_euler = (math.radians(90), 0, 0); w.location = (0, -.08, 0)
+        tp = prism([(-1.0, 0), (-1.25, 0), (-1.45, .5 * side), (-1.3, .5 * side)], .04, .02, trim, .01); tp.rotation_euler = (math.radians(90), 0, 0); tp.location = (0, .55, 0)
+        bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=.11, depth=.45, location=(-.75, .2, .3 * side)); n = bpy.context.object
+        n.rotation_euler = (0, math.radians(90), 0); add(n, trim); bpy.ops.object.shade_smooth()
+    prism([(-.85, .15), (-1.15, .15), (-1.42, .62), (-1.25, .62)], .04, .02, trim, .01)   # fin
+    for x in (-.5, -.25, 0, .25, .5):
+        sphere((x, .07, .22), (.06, .05, .03), GLASS_DARK(), 16)
+    rounded_box((2.0, .04, .02), .01, trim, loc=(0, -.04, .235))
+
+def lux_jet(): tilted(jet_parts, (22, -12, 18))
+
+def lux_limo():
+    body = rounded_box((2.7, .5, .7), .18, mat('LimoPaint', (.02, .02, .025), metallic=.6, rough=.15, coat=1), loc=(0, 0, 0))
+    rounded_box((1.7, .38, .55), .16, mat('Roof', (.02, .02, .025), metallic=.6, rough=.15, coat=1), loc=(-.15, .38, 0))
+    rounded_box((1.6, .28, .57), .12, GLASS_DARK(), loc=(-.15, .38, 0))
+    for x in (-.85, .85):
+        bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=.26, depth=.12, location=(x, -.25, .3)); w = bpy.context.object; add(w, mat('Tyre', (.02, .02, .02), rough=.6)); bpy.ops.object.shade_smooth()
+        bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=.15, depth=.14, location=(x, -.25, .31)); add(bpy.context.object, SILVER_METAL()); bpy.ops.object.shade_smooth()
+    rounded_box((.12, .12, .3), .03, mat('Lamp', (1, .95, .8), emission=(1, .95, .8), strength=4), loc=(1.33, .02, .2))
+    rounded_box((2.6, .05, .02), .01, SILVER_METAL(), loc=(0, .02, .36))
+
+def lux_double():
+    """The DOUBLE wild: a pink brilliant diamond over a gold plate reading DOUBLE."""
+    gem = mat('PinkDiamond', (1, .3, .7), rough=0); gp = gem.node_tree.nodes['Principled BSDF']; gp.inputs['Transmission Weight'].default_value = 1; gp.inputs['IOR'].default_value = 2.2
+    bpy.ops.mesh.primitive_cone_add(vertices=10, radius1=.9, radius2=.55, depth=.35, location=(0, 0, 0)); crown = bpy.context.object
+    bpy.ops.mesh.primitive_cone_add(vertices=10, radius1=.9, radius2=0, depth=.9, location=(0, 0, 0)); pav = bpy.context.object
+    for o in (crown, pav): add(o, gem)
+    crown.rotation_euler = (math.radians(-90), 0, 0); crown.location = (0, .55, 0)
+    pav.rotation_euler = (math.radians(90), 0, 0); pav.location = (0, -.08, 0)
+    rounded_box((2.3, .5, .12), .08, mat('Plate', (.5, .0, .3), rough=.15, coat=1), loc=(0, -.75, .45))
+    rounded_box((2.42, .6, .08), .08, GOLD(), loc=(0, -.75, .37))
+    text('DOUBLE', .42, .06, .015, GOLD(), loc=(0, -.77, .55))
+
+LUXURY = {'YACHT': lux_yacht, 'JET': lux_jet, 'LIMO': lux_limo, 'RING': lux_ring, 'WATCH': lux_watch,
+          'GOLD': lambda: lux_bars(GOLD()), 'COIN': lux_coin, 'SILVER': lambda: lux_bars(SILVER_METAL()), 'DOUBLE': lux_double}
+
 FIREBALLS = {'FIRE': ((.25, .01, 0), (1, .22, 0), (1, .78, .25)), 'MINI': ((.0, .12, .03), (.05, .7, .15), (.75, 1, .5)),
              'MINOR': ((.0, .03, .2), (.05, .3, 1), (.6, .9, 1)), 'MAJOR': ((.12, .0, .2), (.6, .05, .9), (1, .6, 1))}
 
@@ -390,6 +509,6 @@ DEVIL = {'SEVEN': devil_seven, 'BAR1': lambda: devil_bar(1), 'BAR2': lambda: dev
 
 SYMBOLS = {'7': seven, 'BAR': bar, 'CHERRY': cherry, 'LEMON': lemon, 'BELL': bell, 'GRAPE': grape, 'ORANGE': orange, 'WATERMELON': watermelon, 'STAR': star}
 
-for name, build in list(SYMBOLS.items()) + [(f'DH_{k}', v) for k, v in DEVIL.items()] + [(f'VS_{k}', v) for k, v in VIDEO.items()] + [(f'FB_{k}', (lambda c=c: fireball(*c))) for k, c in FIREBALLS.items()]:
+for name, build in list(SYMBOLS.items()) + [(f'DH_{k}', v) for k, v in DEVIL.items()] + [(f'VS_{k}', v) for k, v in VIDEO.items()] + [(f'FB_{k}', (lambda c=c: fireball(*c))) for k, c in FIREBALLS.items()] + [(f'LX_{k}', v) for k, v in LUXURY.items()]:
     if ONLY and name not in ONLY: continue
     reset(); build(); render(name)
