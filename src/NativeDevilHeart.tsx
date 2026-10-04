@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Platform, StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { AccessibilityInfo, Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { randomUUID } from 'expo-crypto';
 import { ApiError, Balance, Game, PlayResult, request } from './api';
 import { clearPending, PendingBet, readPending, savePending } from './pendingBet';
@@ -48,33 +47,16 @@ function winningLines(screen: string[]) {
 }
 const lockedReels = (screen: string[]) => [0, 1, 2].map(reel => WILDS.includes(screen[reel]) && screen[3 + reel] === screen[reel] && screen[6 + reel] === screen[reel]);
 
-/** Devil Heart's symbols in plain views: a flaming 7, BAR plates with horns, a heart WILD, a 2X flame and the jackpot. */
+/** Devil Heart's symbols: 3D renders made for the game (scripts/render-symbols.py). */
+const DEVIL_ART: Record<string, number> = {
+  SEVEN: require('../assets/devil/SEVEN.png'), BAR1: require('../assets/devil/BAR1.png'), BAR2: require('../assets/devil/BAR2.png'),
+  BAR3: require('../assets/devil/BAR3.png'), WILD: require('../assets/devil/WILD.png'), X2: require('../assets/devil/X2.png'), JACKPOT: require('../assets/devil/JACKPOT.png'),
+};
+const DEVIL_LABEL: Record<string, string> = { SEVEN: 'flaming seven', BAR1: 'single bar', BAR2: 'double bar', BAR3: 'triple bar', WILD: 'wild', X2: 'two times wild', JACKPOT: 'jackpot' };
 export function DevilSymbol({ symbol, size }: { symbol: string; size: number }) {
-  if (symbol === 'SEVEN') return <View accessibilityLabel="flaming seven" style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-    <Text style={{ position: 'absolute', top: -size * .06, fontSize: size * .38 }}>🔥</Text>
-    <Text style={[d.seven, { fontSize: size * .82, lineHeight: size * .92 }]}>7</Text>
-  </View>;
-  if (symbol.startsWith('BAR')) {
-    const count = Number(symbol.slice(3)), tone = count === 3 ? ['#ff5ab4', '#a1135f'] : count === 2 ? ['#ffd23f', '#a46a00'] : ['#ff6a3a', '#9e1f05'];
-    return <View accessibilityLabel={`${['single', 'double', 'triple'][count - 1]} bar`} style={{ width: size * 1.3, height: size, alignItems: 'center', justifyContent: 'center', gap: size * .04 }}>
-      <Text style={[d.horns, { fontSize: Math.max(11, size * .2) }]}>▲   ▲</Text>
-      {Array.from({ length: count }, (_, i) => <LinearGradient key={i} colors={tone as [string, string]} style={[d.plate, { width: size * 1.2, height: Math.max(17, size * .22) }]}>
-        <Text style={[d.barText, { fontSize: Math.max(11, size * .16), lineHeight: Math.max(13, size * .19) }]}>BAR</Text></LinearGradient>)}
-    </View>;
-  }
-  if (symbol === 'WILD') return <View accessibilityLabel="wild" style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-    <Text style={{ fontSize: size * .8, lineHeight: size * .95 }}>❤️</Text>
-    <Text style={[d.wildText, { fontSize: Math.max(11, size * .2) }]}>WILD</Text>
-  </View>;
-  if (symbol === 'X2') return <View accessibilityLabel="two times wild" style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-    <LinearGradient colors={['#ff9a00', '#d10f1f', '#5c0010']} style={[d.circle, { width: size * .82, height: size * .82, borderRadius: size }]}>
-      <Text style={[d.x2, { fontSize: size * .34 }]}>2X</Text></LinearGradient>
-  </View>;
-  if (symbol === 'JACKPOT') return <View accessibilityLabel="jackpot" style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-    <LinearGradient colors={['#ff4a5a', '#8a0010']} style={[d.diamond, { width: size * .66, height: size * .66 }]} />
-    <Text style={[d.jp, { fontSize: Math.max(11, size * .16) }]}>JACK{'\n'}POT</Text>
-  </View>;
-  return <View accessibilityLabel="blank" style={{ width: size, height: size }} />;
+  const art = DEVIL_ART[symbol];
+  if (!art) return <View accessibilityLabel="blank" style={{ width: size, height: size }} />;
+  return <Image source={art} accessibilityLabel={DEVIL_LABEL[symbol]} style={{ width: size * 1.3, height: size * .94 }} resizeMode="contain" />;
 }
 
 export function NativeDevilHeart({ game, token, userId, initialBalance, onClose, onSettled }: { game: Game; token: string; userId: string; initialBalance: Balance | null; onClose: () => void; onSettled: () => void }) {
@@ -224,15 +206,6 @@ const d = StyleSheet.create({
   lockTag: { position: 'absolute', bottom: 4, alignSelf: 'center', paddingHorizontal: 8, borderRadius: 999, backgroundColor: c.gold, color: '#3a0005', fontSize: 11, fontWeight: '900', letterSpacing: 1.5, overflow: 'hidden' },
   cell: { alignItems: 'center', justifyContent: 'center' },
   lit: { backgroundColor: '#ffd23f33' },
-  seven: { color: '#e01020', fontWeight: '900', fontFamily: serif, textShadowColor: '#ffd23f', textShadowRadius: 4, textShadowOffset: { width: 0, height: 0 } },
-  horns: { color: '#c40f1f', fontWeight: '900', letterSpacing: 2, marginBottom: -2 },
-  plate: { borderRadius: 4, borderWidth: 2, borderColor: c.gold, alignItems: 'center', justifyContent: 'center' },
-  barText: { color: '#fff', fontWeight: '900', letterSpacing: 2 },
-  wildText: { position: 'absolute', color: '#fff', fontWeight: '900', textShadowColor: '#5c0018', textShadowRadius: 3, textShadowOffset: { width: 0, height: 1 } },
-  circle: { alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: c.gold },
-  x2: { color: '#ffe45c', fontWeight: '900' },
-  diamond: { position: 'absolute', transform: [{ rotate: '45deg' }], borderWidth: 3, borderColor: c.gold, borderRadius: 4 },
-  jp: { color: '#fff', fontWeight: '900', textAlign: 'center' },
   jackpotWin: { position: 'absolute', alignSelf: 'center', top: '35%', paddingHorizontal: 26, paddingVertical: 12, borderRadius: 18, borderWidth: 4, borderColor: c.gold, backgroundColor: '#8a0010', alignItems: 'center' },
   jackpotSmall: { color: '#fff', fontWeight: '900', letterSpacing: 3 },
   jackpotBig: { color: '#ffe45c', fontWeight: '900', fontSize: 34, fontFamily: serif },

@@ -67,8 +67,9 @@ function evaluate(screen: string[], engine: Engine) {
 function VideoSymbol({ symbol, art, size }: { symbol: string; art?: Record<string, string>; size: number }) {
   const chosen = art?.[symbol] ?? '';
   if (IMAGE_ID.test(chosen)) return <Image accessibilityLabel={symbol} source={{ uri: `${API_URL}/api/media/${chosen}` }} style={{ width: size, height: size }} resizeMode="contain" />;
-  if (symbol === WILD) return <LinearGradient accessibilityLabel="wild" colors={['#ff3cac', '#7a0bc0']} style={[v.badge, { width: size, height: size * .7 }]}><Text style={[v.wild, { fontSize: size * .26 }]}>WILD</Text></LinearGradient>;
-  if (symbol === SCATTER) return <LinearGradient accessibilityLabel="scatter" colors={['#22e1ff', '#0b4fc0']} style={[v.badge, { width: size, height: size * .82 }]}><Text style={[v.star, { fontSize: size * .34 }]}>★</Text><Text style={[v.free, { fontSize: Math.max(11, size * .2) }]}>FREE</Text></LinearGradient>;
+  // The wild and the scatter are 3D renders made for the game (scripts/render-symbols.py).
+  if (symbol === WILD) return <Image accessibilityLabel="wild" source={require('../assets/video/WILD.png')} style={{ width: size * 1.1, height: size * 1.1 }} resizeMode="contain" />;
+  if (symbol === SCATTER) return <Image accessibilityLabel="scatter" source={require('../assets/video/SCATTER.png')} style={{ width: size * 1.1, height: size * 1.1 }} resizeMode="contain" />;
   return <SymbolArt symbol={chosen || symbol} size={size} />;
 }
 
@@ -225,10 +226,6 @@ const v = StyleSheet.create({
   reels: { flexDirection: 'row', gap: 4, justifyContent: 'center', alignSelf: 'center' },
   reel: { alignSelf: 'stretch', overflow: 'hidden', borderRadius: 6, backgroundColor: '#140a24', borderWidth: 1, borderColor: '#b56cff66' },
   cell: { alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent', borderRadius: 6 },
-  badge: { alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: 2, borderColor: '#ffd23f' },
-  wild: { color: '#ffffff', fontWeight: '900', letterSpacing: .5 },
-  star: { color: '#fff6c2', fontWeight: '900' },
-  free: { color: '#ffffff', fontWeight: '900' },
   line: { color: '#d9c290', fontSize: 11, textAlign: 'center', letterSpacing: 1.6 },
   meter: { flexDirection: 'row', alignSelf: 'center', alignItems: 'baseline', gap: 8, paddingHorizontal: 16, paddingVertical: 4, borderRadius: 999, backgroundColor: 'rgba(0,0,0,.4)', borderWidth: 1, borderColor: '#ffd23f88' },
   meterLabel: { color: '#ffe68a', fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
