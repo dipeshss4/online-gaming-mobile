@@ -21,6 +21,8 @@ import { sound, Scene } from './sound';
 import { InboxButton, PromoPopup, SoundToggle } from './Popups';
 import { NativeFishTable, supportsFishTable } from './NativeFishTable';
 import { GameLoading } from './GameLoading';
+import { AppIntro } from './AppIntro';
+import * as SplashScreen from 'expo-splash-screen';
 import { NativeVideoSlot, supportsVideoSlot } from './NativeVideoSlot';
 import { VaultLobby } from './VaultLobby';
 import { NativeKeno, supportsKeno } from './NativeKeno';
@@ -37,7 +39,15 @@ function Field({ value, set, placeholder, secret = false }: { value: string; set
   return <TextInput accessibilityLabel={placeholder} placeholder={placeholder} placeholderTextColor="#8893a7" value={value} onChangeText={set} secureTextEntry={secret} autoCapitalize="none" autoCorrect={false} keyboardType={placeholder === 'Email address' ? 'email-address' : 'default'} style={s.input} />;
 }
 const sceneOf = (game: Game): Scene => game.code === 'ASCENT_CRASH' || game.engineType === 'CRASH' ? 'crash' : game.engine?.layout === 'ROULETTE' ? 'roulette' : game.engine?.layout === 'FISH' ? 'fish' : 'slots';
-export default function App() { return <SafeAreaProvider><Main /></SafeAreaProvider>; }
+// The system splash (the coin on the intro's dark stage) stays up until the intro has drawn its first frame, so
+// there is no white flash between them.
+void SplashScreen.preventAutoHideAsync().catch(() => undefined);
+
+// The app loads behind its intro (AppIntro), which plays once each time the app is opened and fades into it.
+export default function App() {
+  const [intro, setIntro] = useState(true);
+  return <SafeAreaProvider><Main />{intro && <AppIntro onStart={() => void SplashScreen.hideAsync().catch(() => undefined)} onDone={() => setIntro(false)} />}</SafeAreaProvider>;
+}
 function Main() {
   const {width,height}=useWindowDimensions();
   const landscape=width>height;

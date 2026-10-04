@@ -8,12 +8,12 @@ import type { Game } from './api';
  * stamped edge) set in a framed plaque, with a small kicker line above and gold rules and diamonds either side.
  * Known games have their own metal and plaque; any other game gets one from its kind, so none is plain text.
  */
-type Metal = { light: string; deep: string; edge: string; glow: string };
+export type Metal = { light: string; deep: string; edge: string; glow: string };
 type Logo = { kicker?: string; title: string; metal: Metal; plaque: [string, string]; frame: [string, string]; serif?: boolean };
 export type GameTheme = { background: [string, string, string]; frame: string; accent: string; reels: string };
 
 const serif = Platform.OS === 'android' ? 'serif' : 'Georgia';
-const GOLD: Metal = { light: '#fff6cc', deep: '#e3a51c', edge: '#5a3300', glow: '#ffb01f' };
+export const GOLD: Metal = { light: '#fff6cc', deep: '#e3a51c', edge: '#5a3300', glow: '#ffb01f' };
 const RUBY: Metal = { light: '#ffe2c4', deep: '#ff3b2a', edge: '#4a0005', glow: '#ff3a00' };
 const ICE: Metal = { light: '#e8fbff', deep: '#26c8ff', edge: '#03264a', glow: '#22e1ff' };
 const JADE: Metal = { light: '#eafff0', deep: '#2fd47a', edge: '#043a1c', glow: '#2ee57a' };
@@ -51,7 +51,7 @@ function logoOf(game: Game): Logo {
  * Metallic lettering: a stamped edge (the word in its dark edge colour, stepped down), the word in the deep metal,
  * and over its upper half the same word in the light metal, so it reads as polished metal catching the light.
  */
-function MetalText({ text, size, metal, serif: useSerif }: { text: string; size: number; metal: Metal; serif?: boolean }) {
+export function MetalText({ text, size, metal, serif: useSerif }: { text: string; size: number; metal: Metal; serif?: boolean }) {
   const style = { fontSize: size, lineHeight: size * 1.18, fontWeight: '900' as const, letterSpacing: size * .06, fontFamily: useSerif ? serif : undefined, fontStyle: useSerif ? 'italic' as const : 'normal' as const };
   const depth = Math.max(2, Math.round(size * .07));
   return <View style={{ paddingBottom: depth, paddingHorizontal: 2 }}>

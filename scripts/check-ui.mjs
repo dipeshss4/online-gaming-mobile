@@ -273,6 +273,16 @@ const toTheBottom = async () => {
 }
 
 await page.goto(PREVIEW, { waitUntil: 'networkidle' })
+// The app opens with its intro: the coin, LOOT 777X and the tagline, then it fades into the app by itself.
+const intro = page.getByRole('button', { name: 'Skip intro' })
+if (!await intro.waitFor({ timeout: 5000 }).then(() => true).catch(() => false)) findings.push('intro: the app did not open with its intro')
+else {
+  await page.waitForTimeout(2600)
+  await page.screenshot({ path: `${OUT}/00-intro.png` })
+  if (!await page.getByText('THE ORIGINAL COLLECTION').first().isVisible().catch(() => false)) findings.push('intro: the tagline never appeared')
+  await intro.waitFor({ state: 'detached', timeout: 6000 }).catch(() => findings.push('intro: it did not hand over to the app on its own'))
+  console.log('## intro  (plays, then fades into the app)')
+}
 await page.waitForTimeout(3000)
 await audit('01-sign-in')
 
@@ -598,6 +608,8 @@ liveUnauthorized = 1
 liveAuth.length = 0
 await page.setViewportSize({ width: 390, height: 844 })
 await page.goto(PREVIEW, { waitUntil: 'networkidle' })
+await page.getByRole('button', { name: 'Skip intro' }).click({ timeout: 5000 }).catch(() => {})
+await page.getByRole('button', { name: 'Skip intro' }).waitFor({ state: 'detached', timeout: 3000 }).catch(() => {})
 await page.waitForTimeout(3000)
 const enterAgain = page.getByRole('button', { name: /Continue quietly|Enter with sound|Skip intro/ }).first()
 if (await enterAgain.count()) { await enterAgain.click(); await page.waitForTimeout(1500) }
@@ -614,6 +626,8 @@ console.log('## session renewal  (expired token renewed, floor retried and shown
 liveMissing = true
 await page.setViewportSize({ width: 390, height: 844 })
 await page.goto(PREVIEW, { waitUntil: 'networkidle' })
+await page.getByRole('button', { name: 'Skip intro' }).click({ timeout: 5000 }).catch(() => {})
+await page.getByRole('button', { name: 'Skip intro' }).waitFor({ state: 'detached', timeout: 3000 }).catch(() => {})
 await page.waitForTimeout(3000)
 const enter = page.getByRole('button', { name: /Continue quietly|Enter with sound|Skip intro/ }).first()
 if (await enter.count()) { await enter.click(); await page.waitForTimeout(1500) }
@@ -630,6 +644,8 @@ liveMissing = false
 site.content = { ...site.content, promo: promoOn }
 inboxView = { unread: 1, messages: [{ id: 'm1', title: 'Weekend bonus is live', body: 'Every deposit this weekend gets 20% extra credits. Good luck on the floor!', createdAt: now, read: false }, ...inboxView.messages] }
 await page.goto(PREVIEW, { waitUntil: 'networkidle' })
+await page.getByRole('button', { name: 'Skip intro' }).click({ timeout: 5000 }).catch(() => {})
+await page.getByRole('button', { name: 'Skip intro' }).waitFor({ state: 'detached', timeout: 3000 }).catch(() => {})
 await page.waitForTimeout(2500)
 await page.getByPlaceholder(/email/i).fill('player@example.com').catch(() => {})
 await page.locator('input[type=password], input[secureTextEntry]').first().fill('password123').catch(() => {})
