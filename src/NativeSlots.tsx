@@ -1,55 +1,31 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, ImageBackground, Platform, Animated, Easing, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, ImageBackground, StyleSheet, Text, View } from 'react-native';
 import { randomUUID } from 'expo-crypto';
 import { ApiError, Balance, Game, PlayResult, request } from './api';
 import { clearPending, PendingBet, readPending, savePending } from './pendingBet';
 import { s } from './styles';
 import { GameShell, PayRow, Rules } from './GameShell';
 import { themeOf } from './GameLogo';
+import { SpinReel } from './fx/SpinReel';
+import { MarqueeFrame } from './fx/MarqueeFrame';
 import { SymbolArt } from './WebLook';
 import { Tap } from './Tap';
 import { BetBar } from './BetBar';
 import { feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
+import { BigWin } from './fx/BigWin';
 import { sound } from './sound';
 
 export const supportsNativeSlots = (game: Game) => ['REEL_3', 'GRID_3X3'].includes(game.engine?.layout || '');
 const glyphs: Record<string, string> = { '7': '7', CHERRY: '🍒', LEMON: '🍋', ORANGE: '🍊', BELL: '🔔', STAR: '★', BAR: 'BAR', DIAMOND: '◆', KOI: '🐟', RED_LANTERN: '🏮', JADE_LION: '🦁', JADE_COMPASS: '◈', CRANE: '🪽', FLAME_LOTUS: '🪷' };
 const cash = (n: number) => n.toFixed(2);
-function Reel({ values, spinning, index, reduced, highlight, cellHeight }: { cellHeight: number; values: string[]; spinning: boolean; index: number; reduced: boolean; highlight: boolean }) {
-  const offset = useRef(new Animated.Value(0)).current;
-  const cheer = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (!spinning || reduced) { offset.setValue(0); return; }
-    const animation = Animated.loop(Animated.timing(offset, { toValue: -values.length * cellHeight, duration: 550 + index * 100, easing: Easing.linear, useNativeDriver: true }));
-    animation.start(); return () => { animation.stop(); offset.setValue(0); };
-  }, [spinning, reduced, values.join(','), index, cellHeight]);
-  // The paying row swells twice, a beat apart per reel, so the eye is led along the payline.
-  useEffect(() => {
-    if (!highlight || reduced) { cheer.setValue(0); return; }
-    const pulse = Animated.sequence([
-      Animated.delay(index * 110),
-      Animated.loop(Animated.sequence([
-        Animated.timing(cheer, { toValue: 1, duration: 380, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.timing(cheer, { toValue: 0, duration: 380, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-      ]), { iterations: 2 }),
-    ]);
-    pulse.start(); return () => { pulse.stop(); cheer.setValue(0); };
-  }, [highlight, reduced, index]);
-  const symbols = spinning && !reduced ? [...values, ...values] : values;
-  // Index 1 is the paying row in both layouts: the centre of a three-reel window and of the 3×3 grid's column.
-  const paying = (i: number) => !spinning && highlight && i % values.length === 1;
-  return <View accessibilityLabel={spinning ? `Reel ${index + 1} spinning` : `Reel ${index + 1}: ${values.join(', ')}`} style={[g.reel, { height: values.length * cellHeight }, highlight && g.winner]}><Animated.View style={{ transform: [{ translateY: offset }] }}>{symbols.map((value, i) => <Animated.View key={i} style={[g.cell,{height:cellHeight}, paying(i) && { transform: [{ scale: cheer.interpolate({ inputRange: [0, 1], outputRange: [1, 1.11] }) }] }]}>
-    {paying(i) && <Animated.View pointerEvents="none" style={[g.payGlow, { opacity: cheer.interpolate({ inputRange: [0, 1], outputRange: [0, 0.32] }) }]} />}
-    <SymbolArt symbol={value} size={cellHeight-8}/></Animated.View>)}</Animated.View></View>;
-}
 export function NativeSlots({ game, token, userId, initialBalance, onClose, onSettled }: { game: Game; token: string; userId: string; initialBalance: Balance | null; onClose: () => void; onSettled: () => void }) {
   const [stake, setStake] = useState(String(game.minStake));
   const [wallet, setWallet] = useState(initialBalance);
   const [pending, setPending] = useState<PendingBet | null>(null);
   const [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [result, setResult] = useState<PlayResult | null>(null), [stopped, setStopped] = useState(3), [reduced, setReduced] = useState(false);
-  const [win, setWin] = useState<Win | null>(null);
+  const [win, setWin] = useState<Win | null>(null), [tease, setTease] = useState(false);
   const locked = useRef(false), alive = useRef(true);
   const grid = game.engine?.layout === 'GRID_3X3';
   const count = grid ? 9 : 3;
@@ -77,8 +53,12 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
       if (data.requestId !== bet.requestId || data.gameCode !== game.code || data.symbols.length !== count) throw new Error('Unexpected result. Keep this request for reconciliation.');
       if (!alive.current) return;
       setResult(data);
+      // The last reel teases (spins on, slower, glowing) when the first two already line up on the paying row.
+      const row = (col: number) => grid ? data.symbols[3 + col] : data.symbols[col];
+      const teasing = row(0) === row(1);
+      setTease(teasing);
       for (let reel = 1; reel <= 3; reel++) {
-        if (!reduced) await new Promise(resolve => setTimeout(resolve, reel === 1 ? 900 : 350));
+        if (!reduced) await new Promise(resolve => setTimeout(resolve, reel === 1 ? 900 : reel === 3 && teasing ? 1500 : 350));
         if (!alive.current) return;
         setStopped(reel); sound.play('reel-stop');
       }
@@ -106,8 +86,8 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
       : pending && !busy ? `Pending: ${pending.gameCode} · ${cash(pending.stake)}. ${pending.gameCode !== game.code ? 'Open that game to recover the round.' : 'SPIN resends this exact bet, not a new one.'}` : undefined}
     bet={<BetBar inline label="BET PER SPIN" value={pending ? pending.stake : Number(stake)} onChange={value => setStake(value.toFixed(2))} min={game.minStake} max={game.maxStake} disabled={busy || !!pending} />}
     win={cash(settled ? result.payout : 0)}
-    spin={{ label: busy ? '…' : pending ? 'RECOVER' : 'SPIN', accessibilityLabel: pending ? 'Recover bet' : 'Spin', onPress: spin, disabled: busy || !ready || (!!pending && pending.gameCode !== game.code) }}
-    overlay={<WinCelebration win={win} />}
+    spin={{ busy, label: busy ? 'SPIN' : pending ? 'RECOVER' : 'SPIN', accessibilityLabel: pending ? 'Recover bet' : 'Spin', onPress: spin, disabled: busy || !ready || (!!pending && pending.gameCode !== game.code) }}
+    overlay={<><WinCelebration win={win} /><BigWin win={win} /></>}
     info={<>
       {game.engine?.paytable?.map((line, i) => <PayRow key={i} label={line.label} pays={`${line.multiplier}×`} />)}
       <Text style={s.small}>Each spin debits the bet shown. Returns include the bet. Outcomes and payouts are decided by the game server.</Text>
@@ -115,20 +95,25 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
     </>}>
     {stage => {
       // Three reels, as large as the stage allows: three rows high, three reels (and the cabinet's border) wide.
-      const cellHeight = Math.max(44, Math.floor(Math.min((stage.height - 34) / 3, (stage.width - 60) / 3.9)));
-      return <ImageBackground source={grid ? require('../assets/web/lucky-fire-blitz-bg-v1.png') : undefined}
-        style={[g.cabinet, { backgroundColor: game.presentation?.skin === 'fruit' ? '#063a33' : '#3a0f5e', borderColor: themeOf(game).frame }]} imageStyle={{ borderRadius: 18, opacity: .6 }}>
-        <View style={g.reels}>{[0, 1, 2].map(col => <View key={col} style={{ width: cellHeight * 1.2 }}><Reel cellHeight={cellHeight} index={col} reduced={reduced} spinning={busy && stopped <= col} highlight={!!settled && result.payout > 0}
-          values={grid ? [display[col], display[col + 3], display[col + 6]] : [game.engine?.symbols?.[(col + 1) % (game.engine.symbols.length || 1)] || 'STAR', display[col], game.engine?.symbols?.[(col + 3) % (game.engine.symbols.length || 1)] || 'BAR']} /></View>)}</View>
-        {!grid && <View pointerEvents="none" style={[g.payline, { top: 10 + cellHeight * 1.5 }]} />}
-      </ImageBackground>;
+      const cellHeight = Math.max(44, Math.floor(Math.min((stage.height - 38) / 3, (stage.width - 84) / 3.9)));
+      const theme = themeOf(game), strip = game.engine?.symbols?.length ? game.engine.symbols : ['7', 'BAR', 'CHERRY'];
+      const paid = !!settled && result.payout > 0;
+      return <MarqueeFrame colors={grid ? ['#ffd08a', '#a8300f', '#4a0d04'] : game.presentation?.skin === 'fruit' ? ['#b4ffd0', '#0b7a5a', '#043a24'] : ['#fff1b0', '#b06a0f', '#4a1a00']} excited={paid} reduced={reduced}>
+        <ImageBackground source={grid ? require('../assets/web/lucky-fire-blitz-bg-v1.png') : undefined}
+          style={[g.cabinet, { backgroundColor: game.presentation?.skin === 'fruit' ? '#063a33' : theme.reels }]} imageStyle={{ opacity: .55 }}>
+          <View style={g.reels}>{[0, 1, 2].map(col => <SpinReel key={col} index={col} size={cellHeight} width={cellHeight * 1.2} reduced={reduced} strip={strip}
+            spinning={busy && stopped <= col} tease={busy && tease && col === 2 && stopped === 2}
+            cells={grid ? [display[col], display[col + 3], display[col + 6]] : [strip[(col + 1) % strip.length], display[col], strip[(col + 3) % strip.length]]}
+            lit={row => paid && row === 1 ? '#ffd23f' : null} dim={paid}
+            render={(symbol, size) => <SymbolArt symbol={symbol} size={size - 8} />} />)}</View>
+          {!grid && <View pointerEvents="none" style={[g.payline, { top: 8 + cellHeight * 1.5 }]} />}
+        </ImageBackground>
+      </MarqueeFrame>;
     }}
   </GameShell>;
 }
 const g = StyleSheet.create({
-  cabinet: { overflow: 'hidden', padding: 10, borderRadius: 18, borderWidth: 3, borderColor: '#ffd23f', backgroundColor: '#22104a' },
+  cabinet: { overflow: 'hidden', padding: 4, borderRadius: 10 },
   payline: { position: 'absolute', left: 4, right: 4, height: 2, backgroundColor: '#ffd23f', opacity: .7 },
-  reels: { flexDirection: 'row', gap: 10, justifyContent: 'center' }, reel: { alignSelf: 'stretch', overflow: 'hidden', borderRadius: 3, backgroundColor: '#180d23', borderWidth: 1, borderColor: '#b56cff66' },
-  cell: { height: 80, alignItems: 'center', justifyContent: 'center', padding: 4 }, glyph: { color: '#f0d693', fontWeight: '900', fontSize: 23, textAlign: 'center' },
-  winner: { borderColor: '#ffd23f', backgroundColor: '#3a2520' }, payGlow: { position: 'absolute' as const, left: 0, right: 0, top: 0, bottom: 0, backgroundColor: '#ffd23f' }, line: { color: '#d9c290', fontSize: 11, textAlign: 'center', letterSpacing: 1.6 }
+  reels: { flexDirection: 'row', gap: 10, justifyContent: 'center' },
 });

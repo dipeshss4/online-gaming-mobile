@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Platform, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { randomUUID } from 'expo-crypto';
 import { ApiError, Balance, Game, PlayResult, request } from './api';
@@ -8,8 +8,11 @@ import { s } from './styles';
 import { BetBar } from './BetBar';
 import { c, feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
+import { BigWin } from './fx/BigWin';
 import { sound } from './sound';
 import { GameShell, PayRow, Rules } from './GameShell';
+import { SpinReel } from './fx/SpinReel';
+import { MarqueeFrame } from './fx/MarqueeFrame';
 
 /**
  * Vegas Jackpot: Devil Heart in the app: three reels and five lines. A WILD or 2X fills its reel and locks it for a
@@ -70,22 +73,6 @@ export function DevilSymbol({ symbol, size }: { symbol: string; size: number }) 
     <Text style={[d.jp, { fontSize: Math.max(11, size * .16) }]}>JACK{'\n'}POT</Text>
   </View>;
   return <View accessibilityLabel="blank" style={{ width: size, height: size }} />;
-}
-
-/** One reel: a running strip while it spins, then its three symbols, with the cells the shown line paid lit. */
-function Reel({ cells, spinning, locked, lit, dim, reel, size, width, reduced }: { width: number; cells: string[]; spinning: boolean; locked: boolean; lit: Set<number>; dim: boolean; reel: number; size: number; reduced: boolean }) {
-  const offset = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (!spinning || reduced) { offset.setValue(0); return; }
-    const run = Animated.loop(Animated.timing(offset, { toValue: -BLUR.length * size, duration: 380 + reel * 60, easing: Easing.linear, useNativeDriver: true }));
-    run.start(); return () => { run.stop(); offset.setValue(0); };
-  }, [spinning, reduced, size, reel]);
-  return <View style={[d.reel, { height: size * 3, width }, locked && d.locked]} accessibilityLabel={spinning ? `Reel ${reel + 1} spinning` : `Reel ${reel + 1}: ${cells.join(', ')}`}>
-    {spinning && !reduced
-      ? <Animated.View style={{ transform: [{ translateY: offset }] }}>{[...BLUR, ...BLUR].map((symbol, i) => <View key={i} style={[d.cell, { height: size }]}><DevilSymbol symbol={symbol} size={size * .78} /></View>)}</Animated.View>
-      : cells.map((symbol, row) => { const cell = row * 3 + reel; return <View key={row} style={[d.cell, { height: size }, lit.has(cell) && d.lit, dim && !lit.has(cell) && { opacity: .35 }]}><DevilSymbol symbol={symbol} size={size * .78} /></View>; })}
-    {locked && <Text style={d.lockTag}>LOCKED</Text>}
-  </View>;
 }
 
 export function NativeDevilHeart({ game, token, userId, initialBalance, onClose, onSettled }: { game: Game; token: string; userId: string; initialBalance: Balance | null; onClose: () => void; onSettled: () => void }) {
@@ -183,10 +170,11 @@ export function NativeDevilHeart({ game, token, userId, initialBalance, onClose,
       : pending && !busy ? `Pending: ${pending.gameCode} · ${cash(pending.stake)}. ${pending.gameCode !== game.code ? 'Open that game to recover the round.' : 'SPIN resends this exact bet, not a new one.'}` : undefined}
     bet={<BetBar inline label={`TOTAL BET · ${cash(stake / 5)} × 5 LINES`} value={pending ? pending.stake : stake} onChange={setStake} min={game.minStake} max={game.maxStake} disabled={busy || !!pending} />}
     win={cash(meter)}
-    spin={{ label: busy ? '…' : pending ? 'RECOVER' : 'SPIN', accessibilityLabel: pending ? 'Recover bet' : 'Spin', onPress: spin, disabled: busy || !ready || (!!pending && pending.gameCode !== game.code) }}
+    spin={{ busy, label: busy ? 'SPIN' : pending ? 'RECOVER' : 'SPIN', accessibilityLabel: pending ? 'Recover bet' : 'Spin', onPress: spin, disabled: busy || !ready || (!!pending && pending.gameCode !== game.code) }}
     overlay={<>
       {jackpot !== null && <View style={d.jackpotWin} accessibilityRole="alert"><Text style={d.jackpotSmall}>JACKPOT!</Text><Text style={d.jackpotBig}>{jackpot}× BET</Text></View>}
       <WinCelebration win={win} />
+      <BigWin win={win} />
     </>}
     info={<>
       <PayRow label={<View style={d.payArt}>{['JACKPOT', 'JACKPOT', 'JACKPOT'].map((x, i) => <DevilSymbol key={i} symbol={x} size={34} />)}</View>} pays="10×–30× BET" />
@@ -202,11 +190,18 @@ export function NativeDevilHeart({ game, token, userId, initialBalance, onClose,
     {stage => {
       // The reels fill the stage: three rows high, or as wide as three reels and the line numbers allow.
       const narrow = stage.width < stage.height, reelWidth = narrow ? 1.25 : 1.45;
-      const size = Math.max(44, Math.floor(Math.min((stage.height - 16) / 3, (stage.width - 76) / (3 * reelWidth + .25))));
+      const size = Math.max(44, Math.floor(Math.min((stage.height - 34) / 3, (stage.width - 104) / (3 * reelWidth + .25))));
       return <View style={d.stage}>
-        <View style={[d.tags, { height: size * 3 + 10 }]}>{LINES.map((rows, line) => <Text key={line} style={[d.tag, { top: tagTop(rows[0], line, 'left', size) + 5, backgroundColor: LINE_COLORS[line], opacity: lines.includes(line) ? 1 : .55 }]}>{line + 1}</Text>)}</View>
-        <View style={d.reels}>{[0, 1, 2].map(reel => <Reel key={reel} reel={reel} size={size} width={size * reelWidth} reduced={reduced} cells={[0, 1, 2].map(row => screen[row * 3 + reel])} spinning={spinning[reel]} locked={locked[reel]} lit={lit} dim={lines.length > 0} />)}</View>
-        <View style={[d.tags, { height: size * 3 + 10 }]}>{LINES.map((rows, line) => <Text key={line} style={[d.tag, { top: tagTop(rows[2], line, 'right', size) + 5, backgroundColor: LINE_COLORS[line], opacity: lines.includes(line) ? 1 : .55 }]}>{line + 1}</Text>)}</View>
+        <View style={[d.tags, { height: size * 3 + 38 }]}>{LINES.map((rows, line) => <Text key={line} style={[d.tag, { top: tagTop(rows[0], line, 'left', size) + 19, backgroundColor: LINE_COLORS[line], opacity: lines.includes(line) ? 1 : .55 }]}>{line + 1}</Text>)}</View>
+        <MarqueeFrame colors={['#ffd08a', '#c0300f', '#4a0505']} bulb="#ffd8a0" excited={lines.length > 0 && !busy} reduced={reduced}>
+          <View style={d.reels}>{[0, 1, 2].map(reel => <SpinReel key={reel} index={reel} size={size} width={size * reelWidth} reduced={reduced} strip={BLUR}
+            cells={[0, 1, 2].map(row => screen[row * 3 + reel])} spinning={spinning[reel]} style={locked[reel] ? d.locked : d.reel}
+            lit={row => lit.has(row * 3 + reel) ? LINE_COLORS[lines.find(line => cellsOf(line).includes(row * 3 + reel)) ?? 0] : null} dim={lines.length > 0}
+            render={(symbol, cell) => <DevilSymbol symbol={symbol} size={cell * .78} />}>
+            {locked[reel] && <Text style={d.lockTag}>LOCKED</Text>}
+          </SpinReel>)}</View>
+        </MarqueeFrame>
+        <View style={[d.tags, { height: size * 3 + 38 }]}>{LINES.map((rows, line) => <Text key={line} style={[d.tag, { top: tagTop(rows[2], line, 'right', size) + 19, backgroundColor: LINE_COLORS[line], opacity: lines.includes(line) ? 1 : .55 }]}>{line + 1}</Text>)}</View>
       </View>;
     }}
   </GameShell>;

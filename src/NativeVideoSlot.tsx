@@ -1,16 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Image, Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { randomUUID } from 'expo-crypto';
 import { API_URL, ApiError, Balance, Game, PlayResult, request } from './api';
 import { clearPending, PendingBet, readPending, savePending } from './pendingBet';
 import { s } from './styles';
 import { GameShell, PayRow, Rules } from './GameShell';
+import { SpinReel } from './fx/SpinReel';
+import { MarqueeFrame } from './fx/MarqueeFrame';
 import { SymbolArt } from './WebLook';
 import { Tap } from './Tap';
 import { BetBar } from './BetBar';
 import { feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
+import { BigWin } from './fx/BigWin';
 import { sound } from './sound';
 
 /**
@@ -65,28 +68,6 @@ function VideoSymbol({ symbol, art, size }: { symbol: string; art?: Record<strin
   if (symbol === WILD) return <LinearGradient accessibilityLabel="wild" colors={['#ff3cac', '#7a0bc0']} style={[v.badge, { width: size, height: size * .7 }]}><Text style={[v.wild, { fontSize: size * .26 }]}>WILD</Text></LinearGradient>;
   if (symbol === SCATTER) return <LinearGradient accessibilityLabel="scatter" colors={['#22e1ff', '#0b4fc0']} style={[v.badge, { width: size, height: size * .82 }]}><Text style={[v.star, { fontSize: size * .34 }]}>★</Text><Text style={[v.free, { fontSize: Math.max(11, size * .2) }]}>FREE</Text></LinearGradient>;
   return <SymbolArt symbol={chosen || symbol} size={size} />;
-}
-
-/** One reel: a strip that runs while it spins, then the three symbols it landed on. */
-function VideoReel({ values, strip, spinning, index, reduced, cell, lit, dim, art }: {
-  values: string[]; strip: string[]; spinning: boolean; index: number; reduced: boolean; cell: number;
-  lit: (row: number) => string | null; dim: boolean; art?: Record<string, string>;
-}) {
-  const offset = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (!spinning || reduced) { offset.setValue(0); return; }
-    const animation = Animated.loop(Animated.timing(offset, { toValue: -strip.length * cell, duration: 420 + index * 60, easing: Easing.linear, useNativeDriver: true }));
-    animation.start(); return () => { animation.stop(); offset.setValue(0); };
-  }, [spinning, reduced, index, cell, strip.join(',')]);
-  const shown = spinning && !reduced ? [...strip, ...strip] : values;
-  return <View accessibilityLabel={spinning ? `Reel ${index + 1} spinning` : `Reel ${index + 1}: ${values.join(', ')}`} style={[v.reel, { height: ROWS * cell }]}>
-    <Animated.View style={{ transform: [{ translateY: offset }] }}>{shown.map((symbol, row) => {
-      const color = !spinning ? lit(row) : null;
-      return <View key={row} style={[v.cell, { height: cell }, color ? { borderColor: color, backgroundColor: color + '33' } : dim && !spinning ? { opacity: .35 } : null]}>
-        <VideoSymbol symbol={symbol} art={art} size={cell - 10} />
-      </View>;
-    })}</Animated.View>
-  </View>;
 }
 
 const cash = (n: number) => n.toFixed(2);
@@ -203,10 +184,11 @@ export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, 
       : pending && !busy ? `Pending: ${pending.gameCode} · ${cash(pending.stake)}. ${pending.gameCode !== game.code ? 'Open that game to recover the round.' : 'SPIN resends this exact bet, not a new one.'}` : undefined}
     bet={<BetBar inline label={`TOTAL BET · ${engine.lines?.length ?? 20} LINES`} value={pending ? pending.stake : Number(stake)} onChange={value => setStake(value.toFixed(2))} min={game.minStake} max={game.maxStake} disabled={busy || !!pending} />}
     win={cash(meter)}
-    spin={{ label: busy ? '…' : pending ? 'RECOVER' : 'SPIN', accessibilityLabel: pending ? 'Recover bet' : 'Spin', onPress: spin, disabled: busy || !ready || (!!pending && pending.gameCode !== game.code) }}
+    spin={{ busy, label: busy ? 'SPIN' : pending ? 'RECOVER' : 'SPIN', accessibilityLabel: pending ? 'Recover bet' : 'Spin', onPress: spin, disabled: busy || !ready || (!!pending && pending.gameCode !== game.code) }}
     overlay={<>
       {feature?.banner && <View style={v.banner} accessibilityRole="alert"><Text style={v.bannerSmall}>{SCATTERS_FOR_FEATURE} SCATTERS</Text><Text style={v.bannerBig}>{FREE_SPINS} FREE SPINS</Text><Text style={v.bannerSmall}>EVERY WIN PAYS ×{FREE_SPIN_FACTOR}</Text></View>}
       <WinCelebration win={win} />
+      <BigWin win={win} />
     </>}
     info={<>
       <PayRow label={<View style={v.special}><VideoSymbol symbol={WILD} art={engine.art} size={40} /><Text style={[s.small, { flexShrink: 1 }]}>Stands in for every symbol except the scatter.</Text></View>} pays="WILD" />
@@ -217,21 +199,23 @@ export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, 
     </>}>
     {stage => {
       // Five reels, three rows: as big as the stage allows either way.
-      const cell = Math.max(40, Math.floor(Math.min((stage.height - 24) / ROWS, (stage.width - 40) / (REELS * 1.12))));
-      return <LinearGradient colors={feature ? ['#0b3a6e', '#081a3a'] : ['#4a1478', '#1d0838']} style={v.cabinet}>
-        <View style={v.reels}>{Array.from({ length: REELS }, (_, col) => <View key={col} style={{ width: cell * 1.08 }}><VideoReel index={col} cell={cell} reduced={reduced} art={engine.art}
-          spinning={busy && stopped <= col} strip={reelSymbols.length ? reelSymbols : ['7']}
-          values={[0, 1, 2].map(row => screen[row * REELS + col])}
-          dim={wins.length > 0}
-          lit={row => { const index = row * REELS + col; return litBy.get(index) ?? (scatterLit && screen[index] === SCATTER ? '#22e1ff' : null); }} /></View>)}</View>
-      </LinearGradient>;
+      const cell = Math.max(40, Math.floor(Math.min((stage.height - 40) / ROWS, (stage.width - 70) / (REELS * 1.12))));
+      return <MarqueeFrame colors={feature ? ['#c8f4ff', '#1a6ab0', '#062a4a'] : ['#ffd0ec', '#c0187a', '#3a0530']} bulb={feature ? '#c8f4ff' : '#ffe0f0'} excited={!!feature || wins.length > 0} reduced={reduced}>
+        <LinearGradient colors={feature ? ['#0b3a6e', '#081a3a'] : ['#4a1478', '#1d0838']} style={v.cabinet}>
+          <View style={v.reels}>{Array.from({ length: REELS }, (_, col) => <SpinReel key={col} index={col} size={cell} width={cell * 1.08} reduced={reduced}
+            strip={reelSymbols.length ? reelSymbols : ['7']} spinning={busy && stopped <= col}
+            cells={[0, 1, 2].map(row => screen[row * REELS + col])} dim={wins.length > 0}
+            lit={row => { const index = row * REELS + col; return litBy.get(index) ?? (scatterLit && screen[index] === SCATTER ? '#22e1ff' : null); }}
+            render={(symbol, size) => <VideoSymbol symbol={symbol} art={engine.art} size={size - 10} />} />)}</View>
+        </LinearGradient>
+      </MarqueeFrame>;
     }}
   </GameShell>;
 }
 
 const v = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
-  cabinet: { overflow: 'hidden', padding: 8, borderRadius: 18, borderWidth: 3, borderColor: '#ff3cac' },
+  cabinet: { overflow: 'hidden', padding: 6, borderRadius: 10 },
   title: { textAlign: 'center', color: '#ffd23f', fontWeight: '800', fontSize: 26, fontFamily: Platform.OS === 'android' ? 'serif' : 'Georgia', fontStyle: 'italic' },
   reels: { flexDirection: 'row', gap: 4, justifyContent: 'center' },
   reel: { alignSelf: 'stretch', overflow: 'hidden', borderRadius: 6, backgroundColor: '#140a24', borderWidth: 1, borderColor: '#b56cff66' },

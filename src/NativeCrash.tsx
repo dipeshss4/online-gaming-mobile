@@ -10,6 +10,7 @@ import { Tap } from './Tap';
 import { BetBar } from './BetBar';
 import { c as t, feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
+import { BigWin } from './fx/BigWin';
 import { sound } from './sound';
 import { GameShell, PayRow, Rules } from './GameShell';
 import { useWindowDimensions } from 'react-native';
@@ -161,7 +162,7 @@ export function NativeCrash({ game, token, userId, balance = null, onClose, onSe
     notice={error ? <Text accessibilityRole="alert" style={s.error}>{error}</Text>
       : !ready ? <Tap onPress={restore} style={s.inlineButton}><Text style={s.link}>Flights did not load · Tap to reload</Text></Tap>
       : attempt ? `Unresolved launch: ${attempt.stakeOne.toFixed(2)} + ${attempt.stakeTwo.toFixed(2)}. Recover it before starting another flight.` : undefined}
-    overlay={<WinCelebration win={win} />}
+    overlay={<><WinCelebration win={win} /><BigWin win={win} /></>}
     info={<>
       <PayRow label="Cash out at any multiplier before the flight ends" pays="× STAKE" />
       <Text style={s.small}>Set BET 2 to OFF to fly with one bet. Launch debits both stakes. A cash-out pays at the multiplier when the server receives it, not the one on screen. Leaving this screen does not stop the flight.</Text>

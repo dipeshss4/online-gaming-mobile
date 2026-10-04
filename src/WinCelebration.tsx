@@ -54,7 +54,8 @@ export function WinCelebration({ win }: { win: Win | null }) {
     return () => { all.stop(); counter.removeListener(listener); };
   }, [win?.id, reduced]);
 
-  if (!shown) return null;
+  // Wins of 10x and more get the full-screen show (fx/BigWin) instead of this banner.
+  if (!shown || shown.multiplier >= 10) return null;
   const tier = tierOf(shown.multiplier);
   const scale = enter.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] });
 
