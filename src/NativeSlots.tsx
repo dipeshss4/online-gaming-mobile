@@ -128,7 +128,7 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
 const g = StyleSheet.create({
   cabinet: { overflow: 'hidden', padding: 10, borderRadius: 18, borderWidth: 3, borderColor: '#ffd23f', backgroundColor: '#22104a' },
   payline: { position: 'absolute', left: 4, right: 4, height: 2, backgroundColor: '#ffd23f', opacity: .7 },
-  reels: { flexDirection: 'row', gap: 10, justifyContent: 'center' }, reel: { flex: 1, overflow: 'hidden', borderRadius: 3, backgroundColor: '#180d23', borderWidth: 1, borderColor: '#b56cff66' },
+  reels: { flexDirection: 'row', gap: 10, justifyContent: 'center' }, reel: { alignSelf: 'stretch', overflow: 'hidden', borderRadius: 3, backgroundColor: '#180d23', borderWidth: 1, borderColor: '#b56cff66' },
   cell: { height: 80, alignItems: 'center', justifyContent: 'center', padding: 4 }, glyph: { color: '#f0d693', fontWeight: '900', fontSize: 23, textAlign: 'center' },
   winner: { borderColor: '#ffd23f', backgroundColor: '#3a2520' }, payGlow: { position: 'absolute' as const, left: 0, right: 0, top: 0, bottom: 0, backgroundColor: '#ffd23f' }, line: { color: '#d9c290', fontSize: 11, textAlign: 'center', letterSpacing: 1.6 }
 });

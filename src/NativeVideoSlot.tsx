@@ -234,7 +234,7 @@ const v = StyleSheet.create({
   cabinet: { overflow: 'hidden', padding: 8, borderRadius: 18, borderWidth: 3, borderColor: '#ff3cac' },
   title: { textAlign: 'center', color: '#ffd23f', fontWeight: '800', fontSize: 26, fontFamily: Platform.OS === 'android' ? 'serif' : 'Georgia', fontStyle: 'italic' },
   reels: { flexDirection: 'row', gap: 4, justifyContent: 'center' },
-  reel: { flex: 1, overflow: 'hidden', borderRadius: 6, backgroundColor: '#140a24', borderWidth: 1, borderColor: '#b56cff66' },
+  reel: { alignSelf: 'stretch', overflow: 'hidden', borderRadius: 6, backgroundColor: '#140a24', borderWidth: 1, borderColor: '#b56cff66' },
   cell: { alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent', borderRadius: 6 },
   badge: { alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: 2, borderColor: '#ffd23f' },
   wild: { color: '#ffffff', fontWeight: '900', letterSpacing: .5 },
