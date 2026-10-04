@@ -7,6 +7,8 @@ import { s } from './styles';
 import { GameShell, PayRow, Rules } from './GameShell';
 import { themeOf } from './GameLogo';
 import { SpinReel } from './fx/SpinReel';
+import { Paylines } from './fx/Paylines';
+
 import { MarqueeFrame } from './fx/MarqueeFrame';
 import { SymbolArt } from './WebLook';
 import { Tap } from './Tap';
@@ -58,9 +60,10 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
       const teasing = row(0) === row(1);
       setTease(teasing);
       for (let reel = 1; reel <= 3; reel++) {
+        if (reel === 3 && teasing) sound.play('tease');
         if (!reduced) await new Promise(resolve => setTimeout(resolve, reel === 1 ? 900 : reel === 3 && teasing ? 1500 : 350));
         if (!alive.current) return;
-        setStopped(reel); sound.play('reel-stop');
+        setStopped(reel); sound.play('reel-land');
       }
       await clearPending(userId); setPending(null);
       setWallet({ ...wallet, balance: data.balance, currency: data.currency });
@@ -105,7 +108,9 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
             spinning={busy && stopped <= col} tease={busy && tease && col === 2 && stopped === 2}
             cells={grid ? [display[col], display[col + 3], display[col + 6]] : [strip[(col + 1) % strip.length], display[col], strip[(col + 3) % strip.length]]}
             lit={row => paid && row === 1 ? '#ffd23f' : null} dim={paid}
-            render={(symbol, size) => <SymbolArt symbol={symbol} size={size - 8} />} />)}</View>
+            render={(symbol, size) => <SymbolArt symbol={symbol} size={size - 8} />} />)}
+            <Paylines geometry={{ left: 0, top: 0, width: cellHeight * 1.2, height: cellHeight, gap: 10 }} lines={paid ? [{ color: '#ffd23f', cells: [[0, 1], [1, 1], [2, 1]] }] : []} />
+          </View>
           {!grid && <View pointerEvents="none" style={[g.payline, { top: 8 + cellHeight * 1.5 }]} />}
         </ImageBackground>
       </MarqueeFrame>;
@@ -115,5 +120,5 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
 const g = StyleSheet.create({
   cabinet: { overflow: 'hidden', padding: 4, borderRadius: 10 },
   payline: { position: 'absolute', left: 4, right: 4, height: 2, backgroundColor: '#ffd23f', opacity: .7 },
-  reels: { flexDirection: 'row', gap: 10, justifyContent: 'center' },
+  reels: { flexDirection: 'row', gap: 10, justifyContent: 'center', alignSelf: 'center' },
 });

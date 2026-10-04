@@ -2,6 +2,7 @@ import React from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { Game } from './api';
+import type { Mood } from './fx/Ambience';
 
 /**
  * Each game's title as a casino marquee: metallic lettering (a bright upper half over a deeper lower half, on a
@@ -10,7 +11,7 @@ import type { Game } from './api';
  */
 export type Metal = { light: string; deep: string; edge: string; glow: string };
 type Logo = { kicker?: string; title: string; metal: Metal; plaque: [string, string]; frame: [string, string]; serif?: boolean };
-export type GameTheme = { background: [string, string, string]; frame: string; accent: string; reels: string };
+export type GameTheme = { background: [string, string, string]; frame: string; accent: string; reels: string; mood: Mood };
 
 const serif = Platform.OS === 'android' ? 'serif' : 'Georgia';
 export const GOLD: Metal = { light: '#fff6cc', deep: '#e3a51c', edge: '#5a3300', glow: '#ffb01f' };
@@ -96,14 +97,14 @@ export function GameLogo({ game, height = 40, maxWidth }: { game: Game; height?:
 /** The colours a game's screen is dressed in, from its kind and theme. */
 export function themeOf(game: Game): GameTheme {
   const layout = game.engine?.layout;
-  if (game.code === 'VEGAS_JACKPOT_DEVIL_HEART' || layout === 'CLASSIC_5L') return { background: ['#4a0a06', '#250404', '#120102'], frame: '#ff7a1a', accent: '#ffd23f', reels: '#1a0204' };
-  if (layout === 'GRID_3X3') return { background: ['#5a1a06', '#2a0803', '#140402'], frame: '#ffb01f', accent: '#ffd23f', reels: '#1a0703' };
-  if (layout === 'VIDEO_5X3') return { background: ['#3a1478', '#1d0838', '#0b0422'], frame: '#ff3cac', accent: '#ffd23f', reels: '#140a24' };
-  if (layout === 'KENO') return { background: ['#0b2a5a', '#0b0626', '#05031a'], frame: '#22e1ff', accent: '#22e1ff', reels: '#0e1a3a' };
-  if (layout === 'ROULETTE') return { background: ['#0b4a2a', '#06301c', '#03180e'], frame: '#e7c888', accent: '#ffe45c', reels: '#103629' };
-  if (game.engineType === 'CRASH' || game.code === 'ASCENT_CRASH') return { background: ['#1b2f8a', '#0a1030', '#05081a'], frame: '#22e1ff', accent: '#22e1ff', reels: '#0a1030' };
-  if (game.theme === 'FRUIT' || game.theme === 'CITRUS') return { background: ['#0b7a5a', '#063a33', '#03201c'], frame: '#7dff5a', accent: '#ffd23f', reels: '#062a26' };
-  return { background: ['#5a1478', '#2a0a4a', '#12062b'], frame: '#ffd23f', accent: '#ffd23f', reels: '#180d23' };
+  if (game.code === 'VEGAS_JACKPOT_DEVIL_HEART' || layout === 'CLASSIC_5L') return { background: ['#4a0a06', '#250404', '#120102'], frame: '#ff7a1a', accent: '#ffd23f', reels: '#1a0204', mood: 'embers' };
+  if (layout === 'GRID_3X3') return { background: ['#5a1a06', '#2a0803', '#140402'], frame: '#ffb01f', accent: '#ffd23f', reels: '#1a0703', mood: 'embers' };
+  if (layout === 'VIDEO_5X3') return { background: ['#3a1478', '#1d0838', '#0b0422'], frame: '#ff3cac', accent: '#ffd23f', reels: '#140a24', mood: 'bokeh' };
+  if (layout === 'KENO') return { background: ['#0b2a5a', '#0b0626', '#05031a'], frame: '#22e1ff', accent: '#22e1ff', reels: '#0e1a3a', mood: 'stars' };
+  if (layout === 'ROULETTE') return { background: ['#0b4a2a', '#06301c', '#03180e'], frame: '#e7c888', accent: '#ffe45c', reels: '#103629', mood: 'spotlights' };
+  if (game.engineType === 'CRASH' || game.code === 'ASCENT_CRASH') return { background: ['#1b2f8a', '#0a1030', '#05081a'], frame: '#22e1ff', accent: '#22e1ff', reels: '#0a1030', mood: 'stars' };
+  if (game.theme === 'FRUIT' || game.theme === 'CITRUS') return { background: ['#0b7a5a', '#063a33', '#03201c'], frame: '#7dff5a', accent: '#ffd23f', reels: '#062a26', mood: 'bokeh' };
+  return { background: ['#5a1478', '#2a0a4a', '#12062b'], frame: '#ffd23f', accent: '#ffd23f', reels: '#180d23', mood: game.code === 'HOT_7S' || game.code === 'BLAZING_HIT' ? 'embers' : 'sparkle' };
 }
 
 const l = StyleSheet.create({

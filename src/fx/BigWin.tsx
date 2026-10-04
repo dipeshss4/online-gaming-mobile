@@ -37,10 +37,12 @@ export function BigWin({ win, onClose }: { win: Win | null; onClose?: () => void
     if (!isBigWin(win)) return;
     const next = win!, tier = tierOf(next.multiplier);
     closing.current = false; setShown(next); setAmount(0);
-    feel('win'); sound.play('fanfare'); sound.play('coins');
+    feel('win'); sound.play('bigwin'); sound.play('coins');
     if (reduced) { enter.setValue(1); slam.setValue(1); setAmount(next.payout); const t = setTimeout(close, 2500); return () => clearTimeout(t); }
     [enter, slam, roll, fountain].forEach(v => v.setValue(0));
-    const id = roll.addListener(({ value }) => setAmount(value * next.payout));
+    // The count ticks as it climbs: one tick per twentieth of the way, so it speeds up and slows down with the roll.
+    let lastStep = 0;
+    const id = roll.addListener(({ value }) => { setAmount(value * next.payout); const step = Math.floor(value * 20); if (step > lastStep) { lastStep = step; sound.play('tick'); } });
     const rays = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 6000, easing: Easing.linear, useNativeDriver: true }));
     const beat = Animated.loop(Animated.sequence([Animated.timing(pulse, { toValue: 1, duration: 420, useNativeDriver: true }), Animated.timing(pulse, { toValue: 0, duration: 420, useNativeDriver: true })]));
     const show = Animated.sequence([

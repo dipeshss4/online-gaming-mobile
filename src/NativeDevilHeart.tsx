@@ -12,6 +12,8 @@ import { BigWin } from './fx/BigWin';
 import { sound } from './sound';
 import { GameShell, PayRow, Rules } from './GameShell';
 import { SpinReel } from './fx/SpinReel';
+import { Paylines } from './fx/Paylines';
+
 import { MarqueeFrame } from './fx/MarqueeFrame';
 
 /**
@@ -100,7 +102,7 @@ export function NativeDevilHeart({ game, token, userId, initialBalance, onClose,
       if (!alive.current) return;
       setScreen(previous => previous.map((symbol, cell) => cell % 3 === reel ? next[cell] : symbol));
       setSpinning(previous => previous.map((value, index) => index === reel ? false : value));
-      sound.play('reel-stop'); await wait(220);
+      sound.play('reel-land'); await wait(220);
     }
   }
   async function showLines(found: number[]) {
@@ -199,7 +201,10 @@ export function NativeDevilHeart({ game, token, userId, initialBalance, onClose,
             lit={row => lit.has(row * 3 + reel) ? LINE_COLORS[lines.find(line => cellsOf(line).includes(row * 3 + reel)) ?? 0] : null} dim={lines.length > 0}
             render={(symbol, cell) => <DevilSymbol symbol={symbol} size={cell * .78} />}>
             {locked[reel] && <Text style={d.lockTag}>LOCKED</Text>}
-          </SpinReel>)}</View>
+          </SpinReel>)}
+            <Paylines geometry={{ left: 5, top: 5, width: size * reelWidth, height: size, gap: 5 }}
+              lines={(showing === null ? lines : [showing]).map(line => ({ color: LINE_COLORS[line], cells: LINES[line].map((row, reel) => [reel, row] as [number, number]) }))} />
+          </View>
         </MarqueeFrame>
         <View style={[d.tags, { height: size * 3 + 38 }]}>{LINES.map((rows, line) => <Text key={line} style={[d.tag, { top: tagTop(rows[2], line, 'right', size) + 19, backgroundColor: LINE_COLORS[line], opacity: lines.includes(line) ? 1 : .55 }]}>{line + 1}</Text>)}</View>
       </View>;

@@ -12,7 +12,7 @@ import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 export type Scene = 'lobby' | 'slots' | 'roulette' | 'crash' | 'fish';
 export type SiteSound = { lobbyMusic: boolean; introSound: boolean; masterVolume: number };
 export type GameSound = { enabled: boolean; music: boolean; effects: boolean; musicVolume: number; effectsVolume: number };
-type Effect = 'chime' | 'spin' | 'reel-stop' | 'lose' | 'win-small' | 'win-good' | 'win-big' | 'crash' | 'cashout' | 'tap' | 'message' | 'fanfare' | 'intro' | 'shot' | 'coins';
+type Effect = 'chime' | 'spin' | 'reel-stop' | 'lose' | 'win-small' | 'win-good' | 'win-big' | 'crash' | 'cashout' | 'tap' | 'message' | 'fanfare' | 'intro' | 'shot' | 'coins' | 'reel-land' | 'tease' | 'bigwin' | 'tick';
 
 const EFFECTS: Record<Effect, number> = {
   chime: require('../assets/sounds/chime.wav'), spin: require('../assets/sounds/spin.wav'), 'reel-stop': require('../assets/sounds/reel-stop.wav'),
@@ -20,6 +20,7 @@ const EFFECTS: Record<Effect, number> = {
   'win-big': require('../assets/sounds/win-big.wav'), crash: require('../assets/sounds/crash.wav'), cashout: require('../assets/sounds/cashout.wav'),
   tap: require('../assets/sounds/tap.wav'), message: require('../assets/sounds/message.wav'), fanfare: require('../assets/sounds/fanfare.wav'),
   intro: require('../assets/sounds/intro.wav'), shot: require('../assets/sounds/shot.wav'), coins: require('../assets/sounds/coins.wav'),
+  'reel-land': require('../assets/sounds/reel-land.wav'), tease: require('../assets/sounds/tease.wav'), bigwin: require('../assets/sounds/bigwin.wav'), tick: require('../assets/sounds/tick.wav'),
 };
 const MUSIC: Record<Scene, number> = {
   lobby: require('../assets/sounds/music-lobby.wav'), slots: require('../assets/sounds/music-slots.wav'),
@@ -89,7 +90,7 @@ class SoundDirector {
     if (volume <= 0) return;
     try {
       const pool = this.effects.get(effect) ?? [];
-      const size = effect === 'reel-stop' || effect === 'tap' ? 3 : 1;
+      const size = effect === 'reel-stop' || effect === 'reel-land' || effect === 'tap' || effect === 'tick' ? 3 : 1;
       let index = this.turn.get(effect) ?? 0;
       if (!pool[index]) { pool[index] = createAudioPlayer(EFFECTS[effect]); this.effects.set(effect, pool); }
       this.turn.set(effect, (index + 1) % size);

@@ -7,6 +7,8 @@ import { clearPending, PendingBet, readPending, savePending } from './pendingBet
 import { s } from './styles';
 import { GameShell, PayRow, Rules } from './GameShell';
 import { SpinReel } from './fx/SpinReel';
+import { Paylines } from './fx/Paylines';
+
 import { MarqueeFrame } from './fx/MarqueeFrame';
 import { SymbolArt } from './WebLook';
 import { Tap } from './Tap';
@@ -104,7 +106,7 @@ export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, 
     for (let reel = 1; reel <= REELS; reel++) {
       if (!fast.current) await pause(140);
       if (!alive.current) return;
-      setStopped(reel); sound.play('reel-stop');
+      setStopped(reel); sound.play('reel-land');
     }
   }
 
@@ -206,7 +208,10 @@ export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, 
             strip={reelSymbols.length ? reelSymbols : ['7']} spinning={busy && stopped <= col}
             cells={[0, 1, 2].map(row => screen[row * REELS + col])} dim={wins.length > 0}
             lit={row => { const index = row * REELS + col; return litBy.get(index) ?? (scatterLit && screen[index] === SCATTER ? '#22e1ff' : null); }}
-            render={(symbol, size) => <VideoSymbol symbol={symbol} art={engine.art} size={size - 10} />} />)}</View>
+            render={(symbol, size) => <VideoSymbol symbol={symbol} art={engine.art} size={size - 10} />} />)}
+            <Paylines geometry={{ left: 0, top: 0, width: cell * 1.08, height: cell, gap: 4 }}
+              lines={busy && !wins.length ? [] : wins.map(found => ({ color: LINE_COLORS[found.line % LINE_COLORS.length], cells: found.cells.map(index => [index % REELS, Math.floor(index / REELS)] as [number, number]) }))} />
+          </View>
         </LinearGradient>
       </MarqueeFrame>;
     }}
@@ -217,7 +222,7 @@ const v = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
   cabinet: { overflow: 'hidden', padding: 6, borderRadius: 10 },
   title: { textAlign: 'center', color: '#ffd23f', fontWeight: '800', fontSize: 26, fontFamily: Platform.OS === 'android' ? 'serif' : 'Georgia', fontStyle: 'italic' },
-  reels: { flexDirection: 'row', gap: 4, justifyContent: 'center' },
+  reels: { flexDirection: 'row', gap: 4, justifyContent: 'center', alignSelf: 'center' },
   reel: { alignSelf: 'stretch', overflow: 'hidden', borderRadius: 6, backgroundColor: '#140a24', borderWidth: 1, borderColor: '#b56cff66' },
   cell: { alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent', borderRadius: 6 },
   badge: { alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: 2, borderColor: '#ffd23f' },

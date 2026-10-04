@@ -7,6 +7,7 @@ import { SoundToggle } from './Popups';
 import { c } from './theme';
 import { GameLogo, themeOf } from './GameLogo';
 import { SpinButton } from './fx/SpinButton';
+import { Ambience } from './fx/Ambience';
 
 /**
  * The frame every game is played in, laid out the way the game rooms do it: the game fills the screen, with a slim
@@ -39,6 +40,7 @@ export function GameShell({ game, balance, onBack, backDisabled, status, notice,
   const spinSize = compact ? 58 : 84;
   const upright = !landscape && width < 600;
   return <LinearGradient colors={theme.background} style={g.root}>
+    <Ambience mood={theme.mood} tint={theme.frame} />
     <View style={[g.top, compact && { height: 50 }]}>
       <Tap haptic="select" accessibilityLabel="Back to lobby" disabled={backDisabled} onPress={onBack} style={[g.round, { borderColor: theme.frame }, backDisabled && { opacity: .4 }]}><Text style={g.roundText}>⌂</Text></Tap>
       {/* An upright phone has no room beside the buttons: the logo gets its own row below. */}
