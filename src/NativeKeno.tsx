@@ -9,6 +9,7 @@ import { Tap } from './Tap';
 import { BetBar } from './BetBar';
 import { c, feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
+import { BigWin } from './fx/BigWin';
 import { sound } from './sound';
 import { GameShell, PayRow, Rules } from './GameShell';
 
@@ -143,8 +144,8 @@ export function NativeKeno({ game, token, userId, initialBalance, onClose, onSet
       : pending && !busy ? `Pending: ${pending.gameCode} · ${cash(pending.stake)}. ${pending.gameCode !== game.code ? 'Open that game to recover the ticket.' : 'PLAY resends this exact ticket, not a new bet.'}` : undefined}
     bet={<BetBar inline value={pending ? pending.stake : Number(stake)} onChange={value => setStake(value.toFixed(2))} min={game.minStake} max={game.maxStake} disabled={!editable} />}
     win={cash(result && !busy ? result.payout : 0)}
-    spin={{ label: busy ? '…' : pending ? 'RECOVER' : 'PLAY', accessibilityLabel: pending ? 'Recover ticket' : 'PLAY', onPress: play, disabled: busy || !ready || (!!pending && pending.gameCode !== game.code) }}
-    overlay={<WinCelebration win={win} />}
+    spin={{ busy, label: busy ? 'PLAY' : pending ? 'RECOVER' : 'PLAY', accessibilityLabel: pending ? 'Recover ticket' : 'PLAY', onPress: play, disabled: busy || !ready || (!!pending && pending.gameCode !== game.code) }}
+    overlay={<><WinCelebration win={win} /><BigWin win={win} /></>}
     info={<>
       {table.map(line => <PayRow key={line.hits} label={`${shownPicks.length} picks, ${line.hits} ${line.hits === 1 ? 'hit' : 'hits'}`} pays={`${line.pays}×`} />)}
       <Rules rules={game.engine?.rules} />

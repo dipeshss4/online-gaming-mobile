@@ -6,6 +6,8 @@ import { Tap } from './Tap';
 import { SoundToggle } from './Popups';
 import { c } from './theme';
 import { GameLogo, themeOf } from './GameLogo';
+import { SpinButton } from './fx/SpinButton';
+import { Ambience } from './fx/Ambience';
 
 /**
  * The frame every game is played in, laid out the way the game rooms do it: the game fills the screen, with a slim
@@ -25,7 +27,7 @@ export function GameShell({ game, balance, onBack, backDisabled, status, notice,
   /** The paytable and rules, shown when the info button is pressed. */
   info: React.ReactNode;
   bet?: React.ReactNode; win?: string;
-  spin?: { label: string; onPress: () => void; disabled?: boolean; accessibilityLabel?: string };
+  spin?: { label: string; onPress: () => void; disabled?: boolean; busy?: boolean; accessibilityLabel?: string };
   /** Replaces bet, WIN and SPIN, for games with their own controls (crash, roulette). */
   controls?: React.ReactNode;
   /** Drawn over the whole game: banners and celebrations. */
@@ -35,9 +37,10 @@ export function GameShell({ game, balance, onBack, backDisabled, status, notice,
   const theme = themeOf(game), { width, height } = useWindowDimensions(), landscape = width > height, compact = height < 500 || width < 500;
   const [stage, setStage] = useState<Stage>({ width: 0, height: 0 }), [open, setOpen] = useState(false);
   const measure = (event: LayoutChangeEvent) => { const { width: w, height: h } = event.nativeEvent.layout; if (Math.abs(w - stage.width) > 1 || Math.abs(h - stage.height) > 1) setStage({ width: w, height: h }); };
-  const spinSize = compact ? 64 : 84;
+  const spinSize = compact ? 58 : 84;
   const upright = !landscape && width < 600;
   return <LinearGradient colors={theme.background} style={g.root}>
+    <Ambience mood={theme.mood} tint={theme.frame} />
     <View style={[g.top, compact && { height: 50 }]}>
       <Tap haptic="select" accessibilityLabel="Back to lobby" disabled={backDisabled} onPress={onBack} style={[g.round, { borderColor: theme.frame }, backDisabled && { opacity: .4 }]}><Text style={g.roundText}>⌂</Text></Tap>
       {/* An upright phone has no room beside the buttons: the logo gets its own row below. */}
@@ -54,11 +57,8 @@ export function GameShell({ game, balance, onBack, backDisabled, status, notice,
       {controls ?? <>
         <View style={[g.bet, !landscape && width < 600 && g.betStacked]}>{bet}</View>
         {win !== undefined && <View style={g.win}><Text style={g.winLabel}>WIN</Text><Text style={[g.winValue, { color: theme.accent }]} numberOfLines={1} adjustsFontSizeToFit>{win}</Text></View>}
-        {spin && <Tap haptic="heavy" accessibilityLabel={spin.accessibilityLabel ?? spin.label} disabled={spin.disabled} onPress={spin.onPress}
-          style={[g.spin, { width: spinSize, height: spinSize, borderRadius: spinSize, borderColor: theme.accent }, spin.disabled && { opacity: .55 }]}>
-          <LinearGradient colors={['#ffe45c', '#ff9f1a', '#d1480f']} style={StyleSheet.absoluteFill} />
-          <Text style={[g.spinText, { fontSize: spin.label.length > 5 ? 13 : compact ? 18 : 22 }]} numberOfLines={1} adjustsFontSizeToFit>{spin.label}</Text>
-        </Tap>}
+        {spin && <View style={{ marginRight: 4 }}><SpinButton label={spin.label} size={spinSize} ring={theme.accent} busy={spin.busy} disabled={spin.disabled}
+          accessibilityLabel={spin.accessibilityLabel ?? spin.label} onPress={spin.onPress} /></View>}
       </>}
     </View>
     {overlay}
@@ -97,7 +97,7 @@ const g = StyleSheet.create({
   status: { textAlign: 'center', fontWeight: '900', fontSize: 14, letterSpacing: 2.5, paddingVertical: 2, textShadowColor: '#000', textShadowRadius: 6, textShadowOffset: { width: 0, height: 1 } },
   notice: { marginHorizontal: 10, marginBottom: 4, padding: 6, borderRadius: 10, backgroundColor: '#5a0d1ecc', borderWidth: 1, borderColor: c.bad },
   noticeText: { color: c.bad, fontSize: 12, textAlign: 'center' },
-  console: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 8, marginBottom: 8, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 18, borderWidth: 2, backgroundColor: '#000000aa' },
+  console: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 8, marginBottom: 8, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 18, borderWidth: 2, backgroundColor: '#000000aa' },
   consoleStacked: { flexWrap: 'wrap', justifyContent: 'space-between' },
   bet: { flex: 1, minWidth: 0 },
   betStacked: { flexBasis: '100%', order: 3 } as object,

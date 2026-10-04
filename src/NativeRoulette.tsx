@@ -8,6 +8,7 @@ import { s } from './styles';
 import { Tap } from './Tap';
 import { feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
+import { BigWin } from './fx/BigWin';
 import { sound } from './sound';
 import { GameShell, PayRow, Rules } from './GameShell';
 
@@ -65,7 +66,7 @@ export function NativeRoulette({game,token,userId,initialBalance,onClose,onSettl
   const status=busy?'NO MORE BETS · WHEEL SPINNING':result?`${number} ${number===0?'GREEN':red.has(number!)?'RED':'BLACK'} · ${result.payout>0?`WIN ${result.payout.toFixed(2)}`:'NO WIN'}`:total?`TICKET ${(total/100).toFixed(2)} · ${Object.keys(ticket).length} BETS`:'TAP THE TABLE TO PLACE CHIPS';
   return <GameShell game={game} balance={wallet} onBack={onClose} backDisabled={busy} status={status}
     notice={error?<Text accessibilityRole="alert" style={s.error}>{error}</Text>:pending&&!busy?`Pending ticket: ${pending.gameCode} · ${pending.stake.toFixed(2)}.${pending.gameCode!==game.code?' Open that game to recover it.':' SPIN resends this exact ticket.'}`:undefined}
-    overlay={<WinCelebration win={win}/>}
+    overlay={<><WinCelebration win={win}/><BigWin win={win}/></>}
     info={<>{game.engine?.paytable?.map((p,i)=><PayRow key={i} label={p.label} pays={`${p.multiplier}×`}/>)}<Text style={s.small}>One spin settles every chip together. Returns include stakes. Zero loses every outside bet.</Text><Rules rules={game.engine?.rules}/></>}
     controls={<>
       <View style={[r.chips, upright && { flexBasis: '100%', justifyContent: 'center', flexWrap: 'nowrap' }]} accessibilityLabel="Chip value">{chips.map((n,i)=><Tap key={n} accessibilityRole="button" accessibilityLabel={`Chip ${n}`} accessibilityState={{selected:chip===Math.round(n*100)}} disabled={busy||!!pending} onPress={()=>setChip(Math.round(n*100))}

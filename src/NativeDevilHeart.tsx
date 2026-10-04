@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { AccessibilityInfo, Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { randomUUID } from 'expo-crypto';
 import { ApiError, Balance, Game, PlayResult, request } from './api';
 import { clearPending, PendingBet, readPending, savePending } from './pendingBet';
@@ -8,8 +7,13 @@ import { s } from './styles';
 import { BetBar } from './BetBar';
 import { c, feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
+import { BigWin } from './fx/BigWin';
 import { sound } from './sound';
 import { GameShell, PayRow, Rules } from './GameShell';
+import { SpinReel } from './fx/SpinReel';
+import { Paylines } from './fx/Paylines';
+
+import { MarqueeFrame } from './fx/MarqueeFrame';
 
 /**
  * Vegas Jackpot: Devil Heart in the app: three reels and five lines. A WILD or 2X fills its reel and locks it for a
@@ -43,49 +47,16 @@ function winningLines(screen: string[]) {
 }
 const lockedReels = (screen: string[]) => [0, 1, 2].map(reel => WILDS.includes(screen[reel]) && screen[3 + reel] === screen[reel] && screen[6 + reel] === screen[reel]);
 
-/** Devil Heart's symbols in plain views: a flaming 7, BAR plates with horns, a heart WILD, a 2X flame and the jackpot. */
+/** Devil Heart's symbols: 3D renders made for the game (scripts/render-symbols.py). */
+const DEVIL_ART: Record<string, number> = {
+  SEVEN: require('../assets/devil/SEVEN.png'), BAR1: require('../assets/devil/BAR1.png'), BAR2: require('../assets/devil/BAR2.png'),
+  BAR3: require('../assets/devil/BAR3.png'), WILD: require('../assets/devil/WILD.png'), X2: require('../assets/devil/X2.png'), JACKPOT: require('../assets/devil/JACKPOT.png'),
+};
+const DEVIL_LABEL: Record<string, string> = { SEVEN: 'flaming seven', BAR1: 'single bar', BAR2: 'double bar', BAR3: 'triple bar', WILD: 'wild', X2: 'two times wild', JACKPOT: 'jackpot' };
 export function DevilSymbol({ symbol, size }: { symbol: string; size: number }) {
-  if (symbol === 'SEVEN') return <View accessibilityLabel="flaming seven" style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-    <Text style={{ position: 'absolute', top: -size * .06, fontSize: size * .38 }}>🔥</Text>
-    <Text style={[d.seven, { fontSize: size * .82, lineHeight: size * .92 }]}>7</Text>
-  </View>;
-  if (symbol.startsWith('BAR')) {
-    const count = Number(symbol.slice(3)), tone = count === 3 ? ['#ff5ab4', '#a1135f'] : count === 2 ? ['#ffd23f', '#a46a00'] : ['#ff6a3a', '#9e1f05'];
-    return <View accessibilityLabel={`${['single', 'double', 'triple'][count - 1]} bar`} style={{ width: size * 1.3, height: size, alignItems: 'center', justifyContent: 'center', gap: size * .04 }}>
-      <Text style={[d.horns, { fontSize: Math.max(11, size * .2) }]}>▲   ▲</Text>
-      {Array.from({ length: count }, (_, i) => <LinearGradient key={i} colors={tone as [string, string]} style={[d.plate, { width: size * 1.2, height: Math.max(17, size * .22) }]}>
-        <Text style={[d.barText, { fontSize: Math.max(11, size * .16), lineHeight: Math.max(13, size * .19) }]}>BAR</Text></LinearGradient>)}
-    </View>;
-  }
-  if (symbol === 'WILD') return <View accessibilityLabel="wild" style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-    <Text style={{ fontSize: size * .8, lineHeight: size * .95 }}>❤️</Text>
-    <Text style={[d.wildText, { fontSize: Math.max(11, size * .2) }]}>WILD</Text>
-  </View>;
-  if (symbol === 'X2') return <View accessibilityLabel="two times wild" style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-    <LinearGradient colors={['#ff9a00', '#d10f1f', '#5c0010']} style={[d.circle, { width: size * .82, height: size * .82, borderRadius: size }]}>
-      <Text style={[d.x2, { fontSize: size * .34 }]}>2X</Text></LinearGradient>
-  </View>;
-  if (symbol === 'JACKPOT') return <View accessibilityLabel="jackpot" style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-    <LinearGradient colors={['#ff4a5a', '#8a0010']} style={[d.diamond, { width: size * .66, height: size * .66 }]} />
-    <Text style={[d.jp, { fontSize: Math.max(11, size * .16) }]}>JACK{'\n'}POT</Text>
-  </View>;
-  return <View accessibilityLabel="blank" style={{ width: size, height: size }} />;
-}
-
-/** One reel: a running strip while it spins, then its three symbols, with the cells the shown line paid lit. */
-function Reel({ cells, spinning, locked, lit, dim, reel, size, width, reduced }: { width: number; cells: string[]; spinning: boolean; locked: boolean; lit: Set<number>; dim: boolean; reel: number; size: number; reduced: boolean }) {
-  const offset = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    if (!spinning || reduced) { offset.setValue(0); return; }
-    const run = Animated.loop(Animated.timing(offset, { toValue: -BLUR.length * size, duration: 380 + reel * 60, easing: Easing.linear, useNativeDriver: true }));
-    run.start(); return () => { run.stop(); offset.setValue(0); };
-  }, [spinning, reduced, size, reel]);
-  return <View style={[d.reel, { height: size * 3, width }, locked && d.locked]} accessibilityLabel={spinning ? `Reel ${reel + 1} spinning` : `Reel ${reel + 1}: ${cells.join(', ')}`}>
-    {spinning && !reduced
-      ? <Animated.View style={{ transform: [{ translateY: offset }] }}>{[...BLUR, ...BLUR].map((symbol, i) => <View key={i} style={[d.cell, { height: size }]}><DevilSymbol symbol={symbol} size={size * .78} /></View>)}</Animated.View>
-      : cells.map((symbol, row) => { const cell = row * 3 + reel; return <View key={row} style={[d.cell, { height: size }, lit.has(cell) && d.lit, dim && !lit.has(cell) && { opacity: .35 }]}><DevilSymbol symbol={symbol} size={size * .78} /></View>; })}
-    {locked && <Text style={d.lockTag}>LOCKED</Text>}
-  </View>;
+  const art = DEVIL_ART[symbol];
+  if (!art) return <View accessibilityLabel="blank" style={{ width: size, height: size }} />;
+  return <Image source={art} accessibilityLabel={DEVIL_LABEL[symbol]} style={{ width: size * 1.3, height: size * .94 }} resizeMode="contain" />;
 }
 
 export function NativeDevilHeart({ game, token, userId, initialBalance, onClose, onSettled }: { game: Game; token: string; userId: string; initialBalance: Balance | null; onClose: () => void; onSettled: () => void }) {
@@ -113,7 +84,7 @@ export function NativeDevilHeart({ game, token, userId, initialBalance, onClose,
       if (!alive.current) return;
       setScreen(previous => previous.map((symbol, cell) => cell % 3 === reel ? next[cell] : symbol));
       setSpinning(previous => previous.map((value, index) => index === reel ? false : value));
-      sound.play('reel-stop'); await wait(220);
+      sound.play('reel-land'); await wait(220);
     }
   }
   async function showLines(found: number[]) {
@@ -183,10 +154,11 @@ export function NativeDevilHeart({ game, token, userId, initialBalance, onClose,
       : pending && !busy ? `Pending: ${pending.gameCode} · ${cash(pending.stake)}. ${pending.gameCode !== game.code ? 'Open that game to recover the round.' : 'SPIN resends this exact bet, not a new one.'}` : undefined}
     bet={<BetBar inline label={`TOTAL BET · ${cash(stake / 5)} × 5 LINES`} value={pending ? pending.stake : stake} onChange={setStake} min={game.minStake} max={game.maxStake} disabled={busy || !!pending} />}
     win={cash(meter)}
-    spin={{ label: busy ? '…' : pending ? 'RECOVER' : 'SPIN', accessibilityLabel: pending ? 'Recover bet' : 'Spin', onPress: spin, disabled: busy || !ready || (!!pending && pending.gameCode !== game.code) }}
+    spin={{ busy, label: busy ? 'SPIN' : pending ? 'RECOVER' : 'SPIN', accessibilityLabel: pending ? 'Recover bet' : 'Spin', onPress: spin, disabled: busy || !ready || (!!pending && pending.gameCode !== game.code) }}
     overlay={<>
       {jackpot !== null && <View style={d.jackpotWin} accessibilityRole="alert"><Text style={d.jackpotSmall}>JACKPOT!</Text><Text style={d.jackpotBig}>{jackpot}× BET</Text></View>}
       <WinCelebration win={win} />
+      <BigWin win={win} />
     </>}
     info={<>
       <PayRow label={<View style={d.payArt}>{['JACKPOT', 'JACKPOT', 'JACKPOT'].map((x, i) => <DevilSymbol key={i} symbol={x} size={34} />)}</View>} pays="10×–30× BET" />
@@ -202,11 +174,21 @@ export function NativeDevilHeart({ game, token, userId, initialBalance, onClose,
     {stage => {
       // The reels fill the stage: three rows high, or as wide as three reels and the line numbers allow.
       const narrow = stage.width < stage.height, reelWidth = narrow ? 1.25 : 1.45;
-      const size = Math.max(44, Math.floor(Math.min((stage.height - 16) / 3, (stage.width - 76) / (3 * reelWidth + .25))));
+      const size = Math.max(44, Math.floor(Math.min((stage.height - 34) / 3, (stage.width - 104) / (3 * reelWidth + .25))));
       return <View style={d.stage}>
-        <View style={[d.tags, { height: size * 3 + 10 }]}>{LINES.map((rows, line) => <Text key={line} style={[d.tag, { top: tagTop(rows[0], line, 'left', size) + 5, backgroundColor: LINE_COLORS[line], opacity: lines.includes(line) ? 1 : .55 }]}>{line + 1}</Text>)}</View>
-        <View style={d.reels}>{[0, 1, 2].map(reel => <Reel key={reel} reel={reel} size={size} width={size * reelWidth} reduced={reduced} cells={[0, 1, 2].map(row => screen[row * 3 + reel])} spinning={spinning[reel]} locked={locked[reel]} lit={lit} dim={lines.length > 0} />)}</View>
-        <View style={[d.tags, { height: size * 3 + 10 }]}>{LINES.map((rows, line) => <Text key={line} style={[d.tag, { top: tagTop(rows[2], line, 'right', size) + 5, backgroundColor: LINE_COLORS[line], opacity: lines.includes(line) ? 1 : .55 }]}>{line + 1}</Text>)}</View>
+        <View style={[d.tags, { height: size * 3 + 38 }]}>{LINES.map((rows, line) => <Text key={line} style={[d.tag, { top: tagTop(rows[0], line, 'left', size) + 19, backgroundColor: LINE_COLORS[line], opacity: lines.includes(line) ? 1 : .55 }]}>{line + 1}</Text>)}</View>
+        <MarqueeFrame colors={['#ffd08a', '#c0300f', '#4a0505']} bulb="#ffd8a0" excited={lines.length > 0 && !busy} reduced={reduced}>
+          <View style={d.reels}>{[0, 1, 2].map(reel => <SpinReel key={reel} index={reel} size={size} width={size * reelWidth} reduced={reduced} strip={BLUR}
+            cells={[0, 1, 2].map(row => screen[row * 3 + reel])} spinning={spinning[reel]} style={locked[reel] ? d.locked : d.reel}
+            lit={row => lit.has(row * 3 + reel) ? LINE_COLORS[lines.find(line => cellsOf(line).includes(row * 3 + reel)) ?? 0] : null} dim={lines.length > 0}
+            render={(symbol, cell) => <DevilSymbol symbol={symbol} size={cell * .78} />}>
+            {locked[reel] && <Text style={d.lockTag}>LOCKED</Text>}
+          </SpinReel>)}
+            <Paylines geometry={{ left: 5, top: 5, width: size * reelWidth, height: size, gap: 5 }}
+              lines={(showing === null ? lines : [showing]).map(line => ({ color: LINE_COLORS[line], cells: LINES[line].map((row, reel) => [reel, row] as [number, number]) }))} />
+          </View>
+        </MarqueeFrame>
+        <View style={[d.tags, { height: size * 3 + 38 }]}>{LINES.map((rows, line) => <Text key={line} style={[d.tag, { top: tagTop(rows[2], line, 'right', size) + 19, backgroundColor: LINE_COLORS[line], opacity: lines.includes(line) ? 1 : .55 }]}>{line + 1}</Text>)}</View>
       </View>;
     }}
   </GameShell>;
@@ -224,15 +206,6 @@ const d = StyleSheet.create({
   lockTag: { position: 'absolute', bottom: 4, alignSelf: 'center', paddingHorizontal: 8, borderRadius: 999, backgroundColor: c.gold, color: '#3a0005', fontSize: 11, fontWeight: '900', letterSpacing: 1.5, overflow: 'hidden' },
   cell: { alignItems: 'center', justifyContent: 'center' },
   lit: { backgroundColor: '#ffd23f33' },
-  seven: { color: '#e01020', fontWeight: '900', fontFamily: serif, textShadowColor: '#ffd23f', textShadowRadius: 4, textShadowOffset: { width: 0, height: 0 } },
-  horns: { color: '#c40f1f', fontWeight: '900', letterSpacing: 2, marginBottom: -2 },
-  plate: { borderRadius: 4, borderWidth: 2, borderColor: c.gold, alignItems: 'center', justifyContent: 'center' },
-  barText: { color: '#fff', fontWeight: '900', letterSpacing: 2 },
-  wildText: { position: 'absolute', color: '#fff', fontWeight: '900', textShadowColor: '#5c0018', textShadowRadius: 3, textShadowOffset: { width: 0, height: 1 } },
-  circle: { alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: c.gold },
-  x2: { color: '#ffe45c', fontWeight: '900' },
-  diamond: { position: 'absolute', transform: [{ rotate: '45deg' }], borderWidth: 3, borderColor: c.gold, borderRadius: 4 },
-  jp: { color: '#fff', fontWeight: '900', textAlign: 'center' },
   jackpotWin: { position: 'absolute', alignSelf: 'center', top: '35%', paddingHorizontal: 26, paddingVertical: 12, borderRadius: 18, borderWidth: 4, borderColor: c.gold, backgroundColor: '#8a0010', alignItems: 'center' },
   jackpotSmall: { color: '#fff', fontWeight: '900', letterSpacing: 3 },
   jackpotBig: { color: '#ffe45c', fontWeight: '900', fontSize: 34, fontFamily: serif },

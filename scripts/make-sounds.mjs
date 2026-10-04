@@ -134,3 +134,22 @@ for (const [name, { notes, pace, wave: kind }] of Object.entries(scenes)) {
   murmur(b, .05)
   write(`music-${name}`, b, .5)
 }
+
+// ---- the game-room show (src/fx)
+// A reel landing: a low thud under a short click, so each reel is felt as well as heard.
+{ const b = buffer(.32); tone(b, 70, 0, .2, 'sine', .5); burst(b, 0, .05, .5, 2500); tone(b, 420, .005, .07, 'square', .08); write('reel-land', b, .7) }
+// The tease: a whirr that keeps climbing while the deciding reel spins on.
+{ const b = buffer(1.6); sweep(b, 140, 620, 0, 1.55, 'sawtooth', .12, 600, 2600); for (let i = 0; i < 12; i++) tone(b, 880 + i * 60, i * .12, .06, 'square', .025); write('tease', b, .6) }
+// The big-win show: a brass-like fanfare over a driving beat, about four seconds, ending on a held chord.
+{
+  const b = buffer(4.4), beat = .2
+  for (let i = 0; i < 18; i++) { tone(b, 55, i * beat, .16, 'sine', .4); if (i % 2) burst(b, i * beat, .06, .25, 6000) }
+  ;[[392, 0], [523, .2], [659, .4], [784, .6], [659, 1], [784, 1.2], [1047, 1.4], [784, 2], [1047, 2.2], [1319, 2.4]].forEach(([note, at]) => {
+    tone(b, note, at, .34, 'sawtooth', .07); tone(b, note, at, .34, 'triangle', .1); tone(b, note * 2, at, .2, 'sine', .03)
+  })
+  for (const note of [523, 659, 784, 1047]) tone(b, note, 2.8, 1.5, 'triangle', .1)
+  for (let i = 0; i < 20; i++) tone(b, 2000 + (i * 419) % 1800, 2.8 + i * .06, .15, 'sine', .04)
+  write('bigwin', b, .85)
+}
+// The amount rolling up: one bright tick, played on every step of the count.
+{ const b = buffer(.06); tone(b, 2400, 0, .03, 'sine', .2); tone(b, 3600, 0, .02, 'square', .03); write('tick', b, .4) }

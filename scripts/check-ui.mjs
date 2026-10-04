@@ -444,14 +444,20 @@ console.log('## bet bar  (MAX 50.00, MIN 0.10, + 0.20, picker 1.00)')
 // Winning has to look like winning. The reels stop one at a time, so this waits for the whole round.
 winningRound = true
 await page.getByRole('button', { name: 'Spin', exact: true }).click()
-await page.getByText('BIG WIN').waitFor({ timeout: 20000 })
+// The tease: 7 · 7 on the first two reels, so the last reel spins on, glowing, before it lands.
+await page.waitForTimeout(1600)
+await page.screenshot({ path: `${OUT}/14a-tease.png` })
+// 50x the bet is an EPIC WIN: the full-screen show, the amount rolling up to the server's payout, tap to collect.
+await page.getByText('EPIC WIN').first().waitFor({ timeout: 20000 })
 if (slotBets.at(-1)?.stake !== 1) findings.push(`bet bar: the spin sent stake ${slotBets.at(-1)?.stake}, not the 1.00 picked`)
+await page.waitForTimeout(1200)
+await page.screenshot({ path: `${OUT}/14b-epic-win.png` })
 await page.getByText('50.00').first().waitFor({ timeout: 10000 })
 await audit('14-win')
-console.log('## win celebration  (BIG WIN banner and the payout, over the cabinet)')
-// It gets out of the way on its own rather than needing a tap.
-await page.getByText('BIG WIN').waitFor({ state: 'hidden', timeout: 20000 })
-console.log('## win celebration clears  (banner leaves by itself)')
+console.log('## win celebration  (EPIC WIN show, amount rolls up to 50.00)')
+await page.getByRole('button', { name: /EPIC WIN: 50.00. Tap to collect/ }).click()
+await page.getByText('EPIC WIN').first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => findings.push('big win: tapping did not collect'))
+console.log('## win celebration clears  (tap to collect)')
 winningRound = false
 
 // Dragon Tide, the fish table, drawn with Skia: it fills the sideways screen, and firing at a creature is a bet on it.
