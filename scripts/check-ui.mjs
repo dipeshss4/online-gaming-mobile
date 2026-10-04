@@ -69,6 +69,9 @@ const games = [
   { code: 'LOTERIA_SCRATCH', name: 'Lotería', description: 'Scratch ticket.', minStake: 0.1, maxStake: 15, engineType: 'SCRATCH', featuredSymbol: 'STAR',
     engine: { layout: 'SCRATCH_LOTERIA', symbols: [], payline: [], rules: ['Called cards on your tabla are marked.'], paytable: [{ label: 'The four corners', multiplier: 2, pattern: ['CORNERS'] }] },
     presentation: { badge: 'NEW · SCRATCHER', tileSubtitle: 'BIG X PAYS 100X' } },
+  { code: 'BREAK_THE_BANK', name: 'Break the Bank', description: 'Fire Link.', minStake: 0.2, maxStake: 10, engineType: 'FIRE_LINK', featuredSymbol: '7',
+    engine: { layout: 'FIRE_LINK', symbols: ['SEVEN', 'BAR', 'BELL', 'STAR', 'ORANGE', 'CHERRY', 'WILD', 'F1', 'F2', 'MINI'], payline: [], rules: ['Six fireballs start the Fire Link.'], paytable: [] },
+    presentation: { badge: 'NEW · FIRE LINK', tileSubtitle: 'GRAND 1,000X' } },
   { code: 'ASCENT_CRASH', name: 'Ascent Crash', description: 'Cash out before the climb ends.', minStake: 0.1, maxStake: 50, engineType: 'CRASH', presentation: { tileSubtitle: 'Arcade · From 0.10 credits' } }
 ]
 const wallet = { balance: 125.5, currency: 'USD', held: 20, status: 'ACTIVE' }
@@ -202,6 +205,12 @@ await page.route('**/api/**', async route => {
       const screen = ['JACKPOT', 'JACKPOT', 'JACKPOT', 'BAR1', 'SEVEN', 'BAR2', 'BLANK', 'BAR3', 'BLANK']
       return json({ requestId: body.requestId, betId: 'd2', gameCode: 'VEGAS_JACKPOT_DEVIL_HEART', symbols: [...screen, 'JP20'], stake: body.stake,
         payout: 2, balance: 127.78, currency: 'USD', outcome: 'JACKPOT', multiplier: 20 })
+    }
+    if (path === '/api/games/BREAK_THE_BANK/play') {
+      // Seven fireballs start the Fire Link; one respin lands two more (a MAJOR among them), then three blanks.
+      const base = ['F2', 'BELL', 'F5', 'CHERRY', 'MINI', 'ORANGE', 'F1', 'STAR', 'F3', 'BAR', 'CHERRY', 'F10', 'BELL', 'SEVEN', 'ORANGE', 'STAR', 'BAR', 'F8', 'CHERRY', 'BELL']
+      return json({ requestId: body.requestId, betId: 'fl1', gameCode: 'BREAK_THE_BANK', symbols: [...base, 'LINK', 'R', '13:MAJOR', '1:F5', 'R', 'R', 'R'], stake: body.stake,
+        payout: 41.8, balance: 167.1, currency: 'USD', outcome: 'JACKPOT', multiplier: 209 })
     }
     if (path === '/api/games/LOTERIA_SCRATCH/play') {
       // The four corners of the tabla are among the calls: 2x.
@@ -571,6 +580,24 @@ if (await page.getByLabel('Play Hot 7s').count()) findings.push('lobby: a slot s
 await audit('24-lobby-other')
 await page.getByRole('tab', { name: 'FISHING' }).click()
 await page.getByLabel('Play Dragon Tide').first().waitFor({ timeout: 5000 }).catch(() => findings.push('lobby: the fish table is not under FISHING'))
+await page.getByRole('tab', { name: 'OTHER' }).click()
+
+// Break the Bank: seven fireballs start the Fire Link, a MAJOR drops in, the respins run out, and the total pays.
+await page.getByRole('tab', { name: 'SLOTS' }).click()
+await page.getByLabel('Play Break the Bank').first().click()
+await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {})
+await page.getByLabel(/^Reel 5:/).waitFor({ timeout: 15000 }).catch(() => findings.push('fire link: the five reels did not show'))
+await audit('32-fire-link')
+await page.getByRole('button', { name: 'Spin', exact: true }).click()
+await page.getByText('FIRE LINK!').waitFor({ timeout: 15000 }).catch(() => findings.push('fire link: no FIRE LINK banner'))
+await page.getByText(/RESPINS LEFT/).waitFor({ timeout: 10000 }).catch(() => findings.push('fire link: the respins did not start'))
+await page.getByLabel('MAJOR jackpot').first().waitFor({ timeout: 10000 }).catch(() => findings.push('fire link: the MAJOR never dropped in'))
+await page.screenshot({ path: `${OUT}/32a-fire-link-feature.png` })
+await page.getByText('WIN 41.80').waitFor({ timeout: 20000 }).catch(() => findings.push("fire link: the round never showed the server's 41.80"))
+await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
+await audit('33-fire-link-done')
+console.log('## fire link  (seven fireballs, a MAJOR drops in, respins run out, 41.80)')
+await page.getByLabel('Back to lobby').first().click()
 await page.getByRole('tab', { name: 'OTHER' }).click()
 
 // Triple Match: buy a ticket, rub the silver off with a drag, reveal the rest; the win lands when it is all scratched.

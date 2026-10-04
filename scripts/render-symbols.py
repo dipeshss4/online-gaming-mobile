@@ -354,11 +354,42 @@ def video_scatter():
 
 VIDEO = {'WILD': video_wild, 'SCATTER': video_scatter}
 
+# ---------------------------------------------------------------- Break the Bank's fireballs
+def swirl(name, dark, mid, hot, strength):
+    """Turbulent fire: distorted noise through a dark-to-hot ramp, glowing."""
+    m = bpy.data.materials.new(name); m.use_nodes = True; nt = m.node_tree
+    p = nt.nodes['Principled BSDF']; p.inputs['Base Color'].default_value = (*dark, 1); p.inputs['Roughness'].default_value = .3
+    noise = nt.nodes.new('ShaderNodeTexNoise'); noise.inputs['Scale'].default_value = 3.2; noise.inputs['Detail'].default_value = 9; noise.inputs['Distortion'].default_value = 2.4
+    ramp = nt.nodes.new('ShaderNodeValToRGB'); els = ramp.color_ramp.elements
+    els[0].position = .38; els[0].color = (*dark, 1); els[1].position = .72; els[1].color = (*hot, 1)
+    mid_el = els.new(.55); mid_el.color = (*mid, 1)
+    nt.links.new(noise.outputs['Fac'], ramp.inputs['Fac'])
+    nt.links.new(ramp.outputs['Color'], p.inputs['Emission Color']); p.inputs['Emission Strength'].default_value = strength
+    nt.links.new(ramp.outputs['Color'], p.inputs['Base Color'])
+    return m
+
+def fireball(dark, mid, hot):
+    """A molten orb: swirling fire inside a thin glass shell, ragged tongues of flame round it, a gold rim."""
+    sphere((0, 0, 0), (.9, .9, .9), swirl('Fire', dark, mid, hot, 2.1), 64)
+    glass = mat('Glass', (1, 1, 1), rough=.02)
+    g = glass.node_tree.nodes['Principled BSDF']; g.inputs['Transmission Weight'].default_value = 1; g.inputs['IOR'].default_value = 1.45
+    sphere((0, 0, .02), (.97, .97, .97), glass, 64)
+    flame = swirl('Lick', dark, mid, hot, 1.7)
+    for i in range(14):
+        a = i / 14 * math.pi * 2 + (i % 3) * .08; size = .7 + ((i * 37) % 10) / 20; lean = .25 if i % 2 else -.2
+        pts = [(px, py) for px, py in flame_shape(.2 * size, .62 * size, lean)]
+        o = prism([(x, y + .95) for x, y in pts], .05, -.45, flame, .015)
+        o.rotation_euler = (0, 0, a - math.pi / 2)
+    bpy.ops.mesh.primitive_torus_add(major_radius=.98, minor_radius=.055, location=(0, 0, 0)); add(bpy.context.object, GOLD()); bpy.ops.object.shade_smooth()
+
+FIREBALLS = {'FIRE': ((.25, .01, 0), (1, .22, 0), (1, .78, .25)), 'MINI': ((.0, .12, .03), (.05, .7, .15), (.75, 1, .5)),
+             'MINOR': ((.0, .03, .2), (.05, .3, 1), (.6, .9, 1)), 'MAJOR': ((.12, .0, .2), (.6, .05, .9), (1, .6, 1))}
+
 DEVIL = {'SEVEN': devil_seven, 'BAR1': lambda: devil_bar(1), 'BAR2': lambda: devil_bar(2), 'BAR3': lambda: devil_bar(3),
          'WILD': devil_wild, 'X2': devil_x2, 'JACKPOT': devil_jackpot}
 
 SYMBOLS = {'7': seven, 'BAR': bar, 'CHERRY': cherry, 'LEMON': lemon, 'BELL': bell, 'GRAPE': grape, 'ORANGE': orange, 'WATERMELON': watermelon, 'STAR': star}
 
-for name, build in list(SYMBOLS.items()) + [(f'DH_{k}', v) for k, v in DEVIL.items()] + [(f'VS_{k}', v) for k, v in VIDEO.items()]:
+for name, build in list(SYMBOLS.items()) + [(f'DH_{k}', v) for k, v in DEVIL.items()] + [(f'VS_{k}', v) for k, v in VIDEO.items()] + [(f'FB_{k}', (lambda c=c: fireball(*c))) for k, c in FIREBALLS.items()]:
     if ONLY and name not in ONLY: continue
     reset(); build(); render(name)
