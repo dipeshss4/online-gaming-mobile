@@ -4,98 +4,92 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { Game } from './api';
 
 /**
- * Each game's own title, drawn as a game-room logo rather than plain text: outlined, glowing words in the game's
- * colours, with its ornament. Known games have a design of their own; any other game gets one built from its name
- * and kind, so a new game is never a plain line of text.
+ * Each game's title as a casino marquee: metallic lettering (a bright upper half over a deeper lower half, on a
+ * stamped edge) set in a framed plaque, with a small kicker line above and gold rules and diamonds either side.
+ * Known games have their own metal and plaque; any other game gets one from its kind, so none is plain text.
  */
-type Word = { text: string; fill: string; outline: string; glow?: string; scale?: number; italic?: boolean; serif?: boolean };
-type Logo = { top?: string; topColor?: string; words: Word[]; ornament?: string; plaque?: [string, string]; stacked?: boolean };
+type Metal = { light: string; deep: string; edge: string; glow: string };
+type Logo = { kicker?: string; title: string; metal: Metal; plaque: [string, string]; frame: [string, string]; serif?: boolean };
 export type GameTheme = { background: [string, string, string]; frame: string; accent: string; reels: string };
 
 const serif = Platform.OS === 'android' ? 'serif' : 'Georgia';
+const GOLD: Metal = { light: '#fff6cc', deep: '#e3a51c', edge: '#5a3300', glow: '#ffb01f' };
+const RUBY: Metal = { light: '#ffe2c4', deep: '#ff3b2a', edge: '#4a0005', glow: '#ff3a00' };
+const ICE: Metal = { light: '#e8fbff', deep: '#26c8ff', edge: '#03264a', glow: '#22e1ff' };
+const JADE: Metal = { light: '#eafff0', deep: '#2fd47a', edge: '#043a1c', glow: '#2ee57a' };
+const ROSE: Metal = { light: '#ffe6f4', deep: '#ff4fb0', edge: '#4a0530', glow: '#ff3cac' };
+const FRAME_GOLD: [string, string] = ['#fff1b0', '#a8700f'];
+const FRAME_ICE: [string, string] = ['#c8f4ff', '#1a6ab0'];
+const FRAME_FIRE: [string, string] = ['#ffd08a', '#a8300f'];
+
 const LOGOS: Record<string, Logo> = {
-  VEGAS_JACKPOT_DEVIL_HEART: { top: 'VEGAS JACKPOT', topColor: '#ffd23f', ornament: '😈', words: [
-    { text: 'DEVIL', fill: '#ff2a3a', outline: '#3a0005', glow: '#ff6a00', italic: true },
-    { text: '♥', fill: '#ff3c7a', outline: '#ffd23f', glow: '#ff0040', scale: 1.15 },
-    { text: 'HEART', fill: '#ffe45c', outline: '#7a0010', glow: '#ff3a00', italic: true }] },
-  HOT_7S: { ornament: '🔥', words: [
-    { text: 'HOT', fill: '#ff7a1a', outline: '#3a0a00', glow: '#ff3a00', italic: true },
-    { text: '7s', fill: '#ffd23f', outline: '#8a1000', glow: '#ff9a00', scale: 1.35, serif: true, italic: true }] },
-  FRUIT_RUSH: { ornament: '🍒', words: [
-    { text: 'FRUIT', fill: '#7dff5a', outline: '#0b4a1a', glow: '#2ee57a' },
-    { text: 'RUSH', fill: '#ffb01f', outline: '#5a2000', glow: '#ff7a1a', italic: true }] },
-  LUCKY_FIRE_BLITZ: { top: 'LUCKY', topColor: '#ffe45c', ornament: '🏮', words: [
-    { text: 'FIRE', fill: '#ff4a1a', outline: '#3a0500', glow: '#ff9a00', italic: true },
-    { text: 'BLITZ', fill: '#ffd23f', outline: '#7a1a00', glow: '#ff5a00', italic: true }] },
-  SEVEN_STARS_DELUXE: { ornament: '★', plaque: ['#ff3cac', '#7a0b5a'], words: [
-    { text: 'SEVEN STARS', fill: '#ffe45c', outline: '#4a1a00', glow: '#ffb01f', serif: true, italic: true },
-    { text: 'DELUXE', fill: '#ffffff', outline: '#7a0b5a' }] },
-  GALAXY_KENO: { ornament: '🎱', words: [
-    { text: 'GALAXY', fill: '#22e1ff', outline: '#04223a', glow: '#22e1ff' },
-    { text: 'KENO', fill: '#ffd23f', outline: '#3a1a00', glow: '#ff9a00', scale: 1.15 }] },
-  ROULETTE: { ornament: '🎡', plaque: ['#13a95a', '#06301c'], words: [{ text: 'ROULETTE', fill: '#ffe45c', outline: '#2a1a00', glow: '#ffd23f', serif: true }] },
-  ASCENT_CRASH: { ornament: '✈', words: [
-    { text: 'ASCENT', fill: '#ffffff', outline: '#0a1a4a', glow: '#3c7bff', italic: true },
-    { text: 'CRASH', fill: '#22e1ff', outline: '#04223a', glow: '#22e1ff', italic: true }] },
-  DRAGON_TIDE: { ornament: '🐉', words: [
-    { text: 'DRAGON', fill: '#ffd23f', outline: '#04223a', glow: '#22e1ff' },
-    { text: 'TIDE', fill: '#22e1ff', outline: '#04223a', glow: '#3c7bff', italic: true }] },
-  QUICK_HIT: { ornament: '⚡', words: [
-    { text: 'QUICK', fill: '#22e1ff', outline: '#04123a', glow: '#3c7bff', italic: true },
-    { text: 'HIT', fill: '#ffe45c', outline: '#3a1a00', glow: '#ffb01f', italic: true }] },
-  TEN_X_TRIPLE: { ornament: '💎', words: [
-    { text: '10×', fill: '#ffd23f', outline: '#5a0000', glow: '#ff3a00', scale: 1.4, serif: true },
-    { text: 'TRIPLE', fill: '#ff3c3c', outline: '#2a0000', glow: '#ff6a00' }] },
-  WILD_BUFFALO: { ornament: '🦬', words: [
-    { text: 'WILD', fill: '#ffb01f', outline: '#3a1a00', glow: '#ff7a1a', italic: true },
-    { text: 'BUFFALO', fill: '#fff1d5', outline: '#5a2a00', glow: '#ffb01f' }] },
-  SIMPLE_DOLLAR: { ornament: '💵', plaque: ['#1b8a4a', '#062a16'], words: [
-    { text: 'SIMPLE', fill: '#d9ffd9', outline: '#062a16', scale: .7 },
-    { text: '$ DOLLAR', fill: '#7dff5a', outline: '#062a16', glow: '#2ee57a', serif: true }] },
-  BLAZING_HIT: { ornament: '🔥', words: [
-    { text: 'BLAZING', fill: '#ff5a1a', outline: '#3a0500', glow: '#ff9a00', italic: true },
-    { text: 'HIT', fill: '#ffe45c', outline: '#7a1a00', glow: '#ff5a00', scale: 1.2, italic: true }] },
+  VEGAS_JACKPOT_DEVIL_HEART: { kicker: 'VEGAS JACKPOT', title: 'DEVIL ♥ HEART', metal: RUBY, plaque: ['#3a0306', '#120001'], frame: FRAME_GOLD, serif: true },
+  HOT_7S: { kicker: 'CLASSIC', title: 'HOT 7s', metal: RUBY, plaque: ['#3a0806', '#140201'], frame: FRAME_GOLD, serif: true },
+  FRUIT_RUSH: { kicker: 'ORIGINAL', title: 'FRUIT RUSH', metal: JADE, plaque: ['#063a24', '#021a10'], frame: FRAME_GOLD },
+  LUCKY_FIRE_BLITZ: { kicker: 'LUCKY', title: 'FIRE BLITZ', metal: GOLD, plaque: ['#4a0d04', '#1a0401'], frame: FRAME_FIRE },
+  SEVEN_STARS_DELUXE: { kicker: 'DELUXE', title: 'SEVEN STARS', metal: GOLD, plaque: ['#3a0b4a', '#14031c'], frame: FRAME_GOLD, serif: true },
+  GALAXY_KENO: { kicker: 'KENO', title: 'GALAXY', metal: ICE, plaque: ['#062a4a', '#020c1c'], frame: FRAME_ICE },
+  ROULETTE: { kicker: 'EUROPEAN', title: 'ROULETTE', metal: GOLD, plaque: ['#0b3a22', '#031a0e'], frame: FRAME_GOLD, serif: true },
+  ASCENT_CRASH: { kicker: 'ARCADE', title: 'ASCENT CRASH', metal: ICE, plaque: ['#0a1a4a', '#030818'], frame: FRAME_ICE },
+  DRAGON_TIDE: { kicker: 'FISH TABLE', title: 'DRAGON TIDE', metal: GOLD, plaque: ['#04304a', '#010f1c'], frame: FRAME_ICE },
+  QUICK_HIT: { kicker: 'LIGHTNING', title: 'QUICK HIT', metal: ICE, plaque: ['#0a1a4a', '#030818'], frame: FRAME_GOLD },
+  TEN_X_TRIPLE: { kicker: 'TRIPLE PAY', title: '10× TRIPLE', metal: GOLD, plaque: ['#4a0606', '#1a0101'], frame: FRAME_GOLD, serif: true },
+  WILD_BUFFALO: { kicker: 'FRONTIER', title: 'WILD BUFFALO', metal: GOLD, plaque: ['#3a1e06', '#140a01'], frame: FRAME_GOLD },
+  SIMPLE_DOLLAR: { kicker: 'SIMPLE', title: '$ DOLLAR', metal: JADE, plaque: ['#063a24', '#021a10'], frame: FRAME_GOLD, serif: true },
+  BLAZING_HIT: { kicker: 'HOT HITS', title: 'BLAZING HIT', metal: RUBY, plaque: ['#4a0d04', '#1a0401'], frame: FRAME_FIRE },
 };
-const PALETTES: Array<[string, string, string]> = [['#ff3cac', '#3a0730', '#ff9ad6'], ['#22e1ff', '#04223a', '#3c7bff'], ['#ffd23f', '#3a1a00', '#ff9a00'], ['#7dff5a', '#0b4a1a', '#2ee57a']];
 
 function logoOf(game: Game): Logo {
   if (LOGOS[game.code]) return LOGOS[game.code];
-  // Anything else: its name in two coloured halves, in a palette picked from its code so it stays the same.
-  const hash = [...game.code].reduce((sum, ch) => sum + ch.charCodeAt(0), 0), [fill, outline, glow] = PALETTES[hash % PALETTES.length];
-  const words = game.name.toUpperCase().replace(/[^A-Z0-9 ×:']/g, '').split(/[ :]+/).filter(Boolean);
-  const half = Math.ceil(words.length / 2);
-  return { ornament: game.presentation?.glyph || '✦', words: [
-    { text: words.slice(0, half).join(' '), fill, outline, glow, italic: true },
-    ...(words.length > 1 ? [{ text: words.slice(half).join(' '), fill: '#ffe45c', outline: '#3a1a00', glow: '#ffb01f', italic: true }] : [])] };
+  const layout = game.engine?.layout;
+  const metal = layout === 'KENO' || game.engineType === 'CRASH' ? ICE : game.theme === 'FRUIT' || game.theme === 'CITRUS' ? JADE : layout === 'VIDEO_5X3' ? ROSE : GOLD;
+  const kicker = layout === 'VIDEO_5X3' ? 'VIDEO SLOT' : layout === 'FISH' ? 'FISH TABLE' : layout === 'KENO' ? 'KENO' : layout === 'ROULETTE' ? 'TABLE GAME' : 'ORIGINAL';
+  return { kicker, title: game.name.toUpperCase().replace(/^[^:]*:\s*/, ''), metal, plaque: ['#2a0a4a', '#0c0218'], frame: FRAME_GOLD };
 }
 
-/** A word with a hard outline: the text drawn eight times around, in the outline colour, then the fill on top. */
-function Outlined({ word, size }: { word: Word; size: number }) {
-  const font = size * (word.scale ?? 1), o = Math.max(1.5, font * .07);
-  const style = { fontSize: font, lineHeight: font * 1.12, fontWeight: '900' as const, fontStyle: word.italic ? 'italic' as const : 'normal' as const, fontFamily: word.serif ? serif : undefined, letterSpacing: font * .02 };
-  const offsets = [[-o, 0], [o, 0], [0, -o], [0, o], [-o, -o], [o, o], [-o, o], [o, -o]];
-  // The outline copies sit inside a margin of the outline's width, so nothing is drawn outside the word's own box.
-  return <View style={{ padding: Math.ceil(o) }}>
-    {offsets.map(([x, y], i) => <Text key={i} numberOfLines={1} style={[style, { position: 'absolute', left: Math.ceil(o) + x, top: Math.ceil(o) + y, color: word.outline }]} importantForAccessibility="no">{word.text}</Text>)}
-    <Text numberOfLines={1} style={[style, { color: word.fill, textShadowColor: word.glow ?? 'transparent', textShadowRadius: word.glow ? font * .35 : 0, textShadowOffset: { width: 0, height: 0 } }]}>{word.text}</Text>
+/**
+ * Metallic lettering: a stamped edge (the word in its dark edge colour, stepped down), the word in the deep metal,
+ * and over its upper half the same word in the light metal, so it reads as polished metal catching the light.
+ */
+function MetalText({ text, size, metal, serif: useSerif }: { text: string; size: number; metal: Metal; serif?: boolean }) {
+  const style = { fontSize: size, lineHeight: size * 1.18, fontWeight: '900' as const, letterSpacing: size * .06, fontFamily: useSerif ? serif : undefined, fontStyle: useSerif ? 'italic' as const : 'normal' as const };
+  const depth = Math.max(2, Math.round(size * .07));
+  return <View style={{ paddingBottom: depth, paddingHorizontal: 2 }}>
+    {Array.from({ length: depth }, (_, i) => <Text key={i} numberOfLines={1} importantForAccessibility="no"
+      style={[style, { position: 'absolute', left: 2, top: i + 1, color: metal.edge }]}>{text}</Text>)}
+    <Text numberOfLines={1} style={[style, { color: metal.deep, textShadowColor: metal.glow, textShadowRadius: size * .45, textShadowOffset: { width: 0, height: 0 } }]}>{text}</Text>
+    <View pointerEvents="none" style={{ position: 'absolute', left: 2, right: 0, top: 0, height: size * .62, overflow: 'hidden' }}>
+      <Text numberOfLines={1} importantForAccessibility="no" style={[style, { color: metal.light }]}>{text}</Text>
+    </View>
+  </View>;
+}
+
+/** A small diamond in the frame's metal: the marquee's punctuation. */
+function Diamond({ size, colors }: { size: number; colors: [string, string] }) {
+  // Turned 45°, a square needs √2 its side to stay inside its own box.
+  return <View style={{ width: size * 1.42, height: size * 1.42, alignItems: 'center', justifyContent: 'center' }}>
+    <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ width: size, height: size, transform: [{ rotate: '45deg' }], borderRadius: 1 }} />
   </View>;
 }
 
 export function GameLogo({ game, height = 40, maxWidth }: { game: Game; height?: number; maxWidth?: number }) {
   const logo = logoOf(game);
-  // A narrow bar drops the ornaments and shrinks the words until the logo fits (about 0.78em a heavy letter, as drawn).
-  const letters = logo.words.reduce((sum, word) => sum + word.text.length * (word.scale ?? 1), 0) + logo.words.length;
-  const fit = maxWidth ? Math.min(1, maxWidth / (letters * height * .78 * (logo.top ? .62 : .78) + (logo.plaque ? 32 : 0))) : 1;
-  const ornaments = !maxWidth || fit >= 1 && maxWidth > letters * height * .5 + height * 1.6;
-  const size = height * (logo.top ? .62 : .78) * Math.max(.55, fit);
-  const words = <View style={[l.row, logo.stacked && { flexDirection: 'column', gap: 0 }]}>{logo.words.map((word, i) => <Outlined key={i} word={word} size={logo.stacked ? size * .8 : size} />)}</View>;
+  // Sized so the title fits: about 0.8em a heavy capital, plus the plaque's padding and, with room, the flourishes.
+  const flourish = !maxWidth || maxWidth > 360;
+  const room = (maxWidth ?? 9999) - (flourish ? height * 2.4 : 0) - 34;
+  const size = Math.max(14, Math.min(height * .58, room / (logo.title.length * .8)));
+  const kicker = Math.max(11, Math.round(size * .36));
   return <View accessible accessibilityRole="header" accessibilityLabel={game.name} style={l.root}>
-    {!!logo.top && <Text style={[l.top, { color: logo.topColor, fontSize: Math.max(11, height * .24) }]}>{logo.top}</Text>}
-    <View style={l.row}>
-      {ornaments && !!logo.ornament && <Text style={{ fontSize: size * .8 }}>{logo.ornament}</Text>}
-      {logo.plaque ? <LinearGradient colors={logo.plaque} style={l.plaque}>{words}</LinearGradient> : words}
-      {ornaments && !!logo.ornament && <Text style={{ fontSize: size * .8, transform: [{ scaleX: -1 }] }}>{logo.ornament}</Text>}
-    </View>
+    {flourish && <View style={l.flourish}><LinearGradient colors={['transparent', logo.frame[0]]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[l.rule, { width: height * .8 }]} /><Diamond size={height * .2} colors={logo.frame} /></View>}
+    <LinearGradient colors={logo.frame} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={l.frame}>
+      <LinearGradient colors={logo.plaque} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={[l.plaque, { paddingHorizontal: size * .55 }]}>
+        {/* A sheen along the top of the plaque, as on lacquered signage. */}
+        <LinearGradient colors={['#ffffff22', '#ffffff00']} style={l.sheen} pointerEvents="none" />
+        {!!logo.kicker && <Text style={[l.kicker, { fontSize: kicker, letterSpacing: kicker * .4, color: logo.frame[0] }]} numberOfLines={1}>{logo.kicker}</Text>}
+        <MetalText text={logo.title} size={size} metal={logo.metal} serif={logo.serif} />
+      </LinearGradient>
+    </LinearGradient>
+    {flourish && <View style={l.flourish}><Diamond size={height * .2} colors={logo.frame} /><LinearGradient colors={[logo.frame[0], 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[l.rule, { width: height * .8 }]} /></View>}
   </View>;
 }
 
@@ -113,8 +107,11 @@ export function themeOf(game: Game): GameTheme {
 }
 
 const l = StyleSheet.create({
-  root: { alignItems: 'center', justifyContent: 'center' },
-  top: { fontWeight: '900', letterSpacing: 3, marginBottom: -2 },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 },
-  plaque: { paddingHorizontal: 12, paddingVertical: 2, borderRadius: 10, borderWidth: 2, borderColor: '#ffd23f' },
+  root: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  flourish: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  rule: { height: 2, borderRadius: 1 },
+  frame: { padding: 2, borderRadius: 10, shadowColor: '#000', shadowOpacity: .6, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 6 },
+  plaque: { borderRadius: 8, paddingVertical: 1, alignItems: 'center', overflow: 'hidden' },
+  sheen: { position: 'absolute', left: 0, right: 0, top: 0, height: '45%' },
+  kicker: { fontWeight: '800', marginBottom: -3, marginTop: 1 },
 });
