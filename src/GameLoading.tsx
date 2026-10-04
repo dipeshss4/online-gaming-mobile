@@ -16,10 +16,11 @@ const BY_KIND: Record<string, string[]> = {
   CRASH: ['Cash out before the flight ends.'],
   ROULETTE: ['Tap chips onto the table, then spin.'],
   CLASSIC_5L: ['A WILD or 2X fills its reel and locks it for a free respin.', 'Three JACKPOTs on a line pay 10x to 30x your bet.'],
+  LINES_5X3: ['Fifteen lines pay left to right from the first reel.', 'Every DOUBLE wild in a win doubles it: two make it 4x.'],
   FIRE_LINK: ['Six or more fireballs start the Fire Link.', 'Fill all twenty cells for the GRAND: 1,000x your bet.'],
   KENO: ['Mark up to 10 numbers. Quick pick chooses for you.', 'More numbers marked: rarer, bigger wins, up to 10,000x.'],
 };
-const THEMES: Record<string, [string, string]> = { FISH: ['#1fa6d6', '#041630'], CRASH: ['#2f7dff', '#0a1030'], ROULETTE: ['#1fae6a', '#06180f'], GRID_3X3: ['#ff6a1a', '#1a0602'], FIRE_LINK: ['#ff5a1a', '#1a0402'], KENO: ['#22e1ff', '#0b0626'], CLASSIC_5L: ['#ff3a00', '#1a0204'] };
+const THEMES: Record<string, [string, string]> = { FISH: ['#1fa6d6', '#041630'], CRASH: ['#2f7dff', '#0a1030'], ROULETTE: ['#1fae6a', '#06180f'], GRID_3X3: ['#ff6a1a', '#1a0602'], FIRE_LINK: ['#ff5a1a', '#1a0402'], LINES_5X3: ['#e8c45a', '#14041c'], KENO: ['#22e1ff', '#0b0626'], CLASSIC_5L: ['#ff3a00', '#1a0204'] };
 const kindOf = (game: Game) => game.engineType === 'CRASH' || game.code === 'ASCENT_CRASH' ? 'CRASH' : game.engine?.layout ?? 'REEL_3';
 
 export function GameLoading({ game, legal, onDone }: { game: Game; legal?: string; onDone: () => void }) {

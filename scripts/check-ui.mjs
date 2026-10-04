@@ -72,6 +72,11 @@ const games = [
   { code: 'BREAK_THE_BANK', name: 'Break the Bank', description: 'Fire Link.', minStake: 0.2, maxStake: 10, engineType: 'FIRE_LINK', featuredSymbol: '7',
     engine: { layout: 'FIRE_LINK', symbols: ['SEVEN', 'BAR', 'BELL', 'STAR', 'ORANGE', 'CHERRY', 'WILD', 'F1', 'F2', 'MINI'], payline: [], rules: ['Six fireballs start the Fire Link.'], paytable: [] },
     presentation: { badge: 'NEW · FIRE LINK', tileSubtitle: 'GRAND 1,000X' } },
+  { code: 'LUXURY_LIFE', name: 'Luxury Life', description: 'Fifteen lines, DOUBLE wilds.', minStake: 0.15, maxStake: 30, engineType: 'LINES_5X3', featuredSymbol: 'STAR',
+    engine: { layout: 'LINES_5X3', symbols: ['YACHT', 'JET', 'LIMO', 'RING', 'WATCH', 'GOLD', 'COIN', 'SILVER', 'DOUBLE'], payline: [], rules: ['DOUBLE wilds double every win.'], paytable: [],
+      lines: [[5, 6, 7, 8, 9], [0, 1, 2, 3, 4], [10, 11, 12, 13, 14], [0, 6, 12, 8, 4], [10, 6, 2, 8, 14], [0, 1, 7, 13, 14], [10, 11, 7, 3, 4], [5, 1, 2, 3, 9],
+        [5, 11, 12, 13, 9], [0, 6, 7, 8, 4], [10, 6, 7, 8, 14], [5, 1, 7, 13, 9], [5, 11, 7, 3, 9], [0, 6, 2, 8, 4], [10, 6, 12, 8, 14]] },
+    presentation: { badge: 'NEW · 15 LINES', tileSubtitle: 'DOUBLE WILDS' } },
   { code: 'ASCENT_CRASH', name: 'Ascent Crash', description: 'Cash out before the climb ends.', minStake: 0.1, maxStake: 50, engineType: 'CRASH', presentation: { tileSubtitle: 'Arcade · From 0.10 credits' } }
 ]
 const wallet = { balance: 125.5, currency: 'USD', held: 20, status: 'ACTIVE' }
@@ -205,6 +210,12 @@ await page.route('**/api/**', async route => {
       const screen = ['JACKPOT', 'JACKPOT', 'JACKPOT', 'BAR1', 'SEVEN', 'BAR2', 'BLANK', 'BAR3', 'BLANK']
       return json({ requestId: body.requestId, betId: 'd2', gameCode: 'VEGAS_JACKPOT_DEVIL_HEART', symbols: [...screen, 'JP20'], stake: body.stake,
         payout: 2, balance: 127.78, currency: 'USD', outcome: 'JACKPOT', multiplier: 20 })
+    }
+    if (path === '/api/games/LUXURY_LIFE/play') {
+      // Five yachts on the middle line with a DOUBLE (x2: 1,000 line bets), three coins on the top, and line 14 (COIN, DOUBLE, COIN).
+      const screen = ['COIN', 'COIN', 'COIN', 'JET', 'RING', 'YACHT', 'DOUBLE', 'YACHT', 'YACHT', 'YACHT', 'SILVER', 'GOLD', 'WATCH', 'LIMO', 'GOLD']
+      return json({ requestId: body.requestId, betId: 'll1', gameCode: 'LUXURY_LIFE', symbols: screen, stake: body.stake,
+        payout: 10.12, balance: 177.07, currency: 'USD', outcome: 'JACKPOT', multiplier: 67.47 })
     }
     if (path === '/api/games/BREAK_THE_BANK/play') {
       // Seven fireballs start the Fire Link; one respin lands two more (a MAJOR among them), then three blanks.
@@ -597,6 +608,22 @@ await page.getByText('WIN 41.80').waitFor({ timeout: 20000 }).catch(() => findin
 await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
 await audit('33-fire-link-done')
 console.log('## fire link  (seven fireballs, a MAJOR drops in, respins run out, 41.80)')
+await page.getByLabel('Back to lobby').first().click()
+
+// Luxury Life: five yachts and a DOUBLE on the middle line; each paying line is drawn in turn, then MEGA WIN and 10.12.
+await page.getByRole('tab', { name: 'SLOTS' }).click()
+await page.getByLabel('Play Luxury Life').first().click()
+await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {})
+await page.getByLabel('Spin').first().waitFor({ timeout: 15000 }).catch(() => findings.push('luxury life: the game did not open'))
+await audit('34-luxury-life')
+await page.getByRole('button', { name: 'Spin', exact: true }).click()
+await page.getByText(/^LINE 1 · /).waitFor({ timeout: 15000 }).catch(() => findings.push('luxury life: line 1 was never shown'))
+await page.screenshot({ path: `${OUT}/34a-luxury-life-line.png` })
+await page.getByText('MEGA WIN').first().waitFor({ timeout: 15000 }).catch(() => findings.push('luxury life: no MEGA WIN banner'))
+await page.getByText('WIN 10.12').waitFor({ timeout: 20000 }).catch(() => findings.push("luxury life: the round never showed the server's 10.12"))
+await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
+await audit('35-luxury-life-done')
+console.log('## luxury life  (five yachts with a DOUBLE, three lines drawn, MEGA WIN, 10.12)')
 await page.getByLabel('Back to lobby').first().click()
 await page.getByRole('tab', { name: 'OTHER' }).click()
 
