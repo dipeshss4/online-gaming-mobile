@@ -52,3 +52,10 @@ for target in ('assets/video', '../frontend/public/art/video'):
         art = trimmed(os.path.join(RENDERS, f'VS_{name}.png'))
         art.save(os.path.join(folder, f'{name}.png'), optimize=True)
     print('wrote', target)
+
+FIRE = ['FIRE', 'MINI', 'MINOR', 'MAJOR']
+for target in ('assets/firelink', '../frontend/public/art/firelink'):
+    folder = os.path.join(ROOT, target); os.makedirs(folder, exist_ok=True)
+    for name in FIRE:
+        trimmed(os.path.join(RENDERS, f'FB_{name}.png'), 320).save(os.path.join(folder, f'{name}.png'), optimize=True)
+    print('wrote', target)

@@ -39,6 +39,7 @@ const LOGOS: Record<string, Logo> = {
   SIMPLE_DOLLAR: { kicker: 'SIMPLE', title: '$ DOLLAR', metal: JADE, plaque: ['#063a24', '#021a10'], frame: FRAME_GOLD, serif: true },
   TRIPLE_MATCH_SCRATCH: { kicker: 'INSTANT SCRATCH', title: 'TRIPLE MATCH', metal: GOLD, plaque: ['#0b2a7a', '#030c2a'], frame: FRAME_GOLD },
   LOTERIA_SCRATCH: { kicker: 'SCRATCH · TABLA', title: '¡LOTERÍA!', metal: ROSE, plaque: ['#0b4a2a', '#03180e'], frame: FRAME_GOLD, serif: true },
+  BREAK_THE_BANK: { kicker: 'FIRE LINK', title: 'BREAK THE BANK', metal: GOLD, plaque: ['#4a0d04', '#1a0401'], frame: FRAME_FIRE },
   BLAZING_HIT: { kicker: 'HOT HITS', title: 'BLAZING HIT', metal: RUBY, plaque: ['#4a0d04', '#1a0401'], frame: FRAME_FIRE },
 };
 
@@ -100,6 +101,7 @@ export function GameLogo({ game, height = 40, maxWidth }: { game: Game; height?:
 export function themeOf(game: Game): GameTheme {
   const layout = game.engine?.layout;
   if (game.code === 'VEGAS_JACKPOT_DEVIL_HEART' || layout === 'CLASSIC_5L') return { background: ['#4a0a06', '#250404', '#120102'], frame: '#ff7a1a', accent: '#ffd23f', reels: '#1a0204', mood: 'embers' };
+  if (layout === 'FIRE_LINK') return { background: ['#5a1206', '#250402', '#0e0101'], frame: '#ff8a2a', accent: '#ffd23f', reels: '#120201', mood: 'embers' };
   if (layout === 'GRID_3X3') return { background: ['#5a1a06', '#2a0803', '#140402'], frame: '#ffb01f', accent: '#ffd23f', reels: '#1a0703', mood: 'embers' };
   if (layout === 'VIDEO_5X3') return { background: ['#3a1478', '#1d0838', '#0b0422'], frame: '#ff3cac', accent: '#ffd23f', reels: '#140a24', mood: 'bokeh' };
   if (layout === 'SCRATCH_MATCH3') return { background: ['#1b3fa8', '#0a1a5a', '#050a24'], frame: '#ffd23f', accent: '#ffd23f', reels: '#0b2a7a', mood: 'sparkle' };
