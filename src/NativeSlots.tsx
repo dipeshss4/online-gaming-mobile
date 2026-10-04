@@ -4,14 +4,14 @@ import { randomUUID } from 'expo-crypto';
 import { ApiError, Balance, Game, PlayResult, request } from './api';
 import { clearPending, PendingBet, readPending, savePending } from './pendingBet';
 import { s } from './styles';
-import { LandscapeGame } from './LandscapeGame';
+import { GameShell, PayRow, Rules } from './GameShell';
+import { themeOf } from './GameLogo';
 import { SymbolArt } from './WebLook';
 import { Tap } from './Tap';
 import { BetBar } from './BetBar';
 import { feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
 import { sound } from './sound';
-import { SoundToggle } from './Popups';
 
 export const supportsNativeSlots = (game: Game) => ['REEL_3', 'GRID_3X3'].includes(game.engine?.layout || '');
 const glyphs: Record<string, string> = { '7': '7', CHERRY: '🍒', LEMON: '🍋', ORANGE: '🍊', BELL: '🔔', STAR: '★', BAR: 'BAR', DIAMOND: '◆', KOI: '🐟', RED_LANTERN: '🏮', JADE_LION: '🦁', JADE_COMPASS: '◈', CRANE: '🪽', FLAME_LOTUS: '🪷' };
@@ -44,11 +44,6 @@ function Reel({ values, spinning, index, reduced, highlight, cellHeight }: { cel
     <SymbolArt symbol={value} size={cellHeight-8}/></Animated.View>)}</Animated.View></View>;
 }
 export function NativeSlots({ game, token, userId, initialBalance, onClose, onSettled }: { game: Game; token: string; userId: string; initialBalance: Balance | null; onClose: () => void; onSettled: () => void }) {
-  const {width,height}=useWindowDimensions();
-  const landscape=width>height;
-  // What is left for the reels once the single header row, the cabinet's own title, padding and status line
-  // are taken out. The cap only bites on a tall screen, where a symbol any larger stops reading as a reel.
-  const cellHeight=landscape?Math.max(44,Math.min(92,Math.floor((height-150)/3))):80;
   const [stake, setStake] = useState(String(game.minStake));
   const [wallet, setWallet] = useState(initialBalance);
   const [pending, setPending] = useState<PendingBet | null>(null);
@@ -105,30 +100,35 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
   }
   const display = result?.symbols || idle;
   const settled = result && !busy;
-  return <LandscapeGame stageItems={2}>
-    {/* One row of chrome, not three: every line above the cabinet is height taken from the reels. */}
-    <View style={g.topBar}>
-      <Tap haptic="select" disabled={busy} onPress={onClose} style={s.inlineButton}><Text style={s.link}>{busy ? 'Round in progress…' : '← Back to lobby'}</Text></Tap>
-      <SoundToggle />
-      <Text numberOfLines={1} style={[s.kicker, { flex: 1 }]}>{game.presentation?.eyebrow || 'THE ORIGINAL COLLECTION'}</Text>
-      <Text style={s.accent}>{wallet ? `${cash(wallet.balance)} ${wallet.currency}` : 'Refresh wallet in lobby'}</Text>
-    </View>
-    <ImageBackground source={grid ? require('../assets/web/lucky-fire-blitz-bg-v1.png') : undefined} style={[g.cabinet, landscape&&{padding:10,gap:8}, {backgroundColor:game.presentation?.skin==='fruit'?'#063a33':'#3a0f5e'}]} imageStyle={{borderRadius:18,opacity:.6}}><Text style={[g.cabinetTitle,landscape&&{fontSize:22}]}>✦  {game.name.toUpperCase()}  ✦</Text><View style={g.reels}>{[0, 1, 2].map(col => <Reel cellHeight={cellHeight} key={col} index={col} reduced={reduced} spinning={busy && stopped <= col} highlight={!!settled && result.payout > 0} values={grid ? [display[col], display[col + 3], display[col + 6]] : [game.engine?.symbols?.[(col + 1) % (game.engine.symbols.length || 1)] || 'STAR', display[col], game.engine?.symbols?.[(col + 3) % (game.engine.symbols.length || 1)] || 'BAR']} />)}</View><Text style={g.line}>{grid ? 'CENTER ROW PAYS' : 'ONE PAYLINE'} · {busy ? 'SPINNING' : 'READY'}</Text><WinCelebration win={win} /></ImageBackground>
-    <View accessibilityLiveRegion="polite" style={[s.card,landscape&&{padding:10,gap:4}]}><Text style={s.kicker}>{busy ? 'SETTLING YOUR ROUND' : settled ? result.outcome.replaceAll('_', ' ') : 'YOUR NEXT ROUND'}</Text><Text style={[s.title,landscape&&{fontSize:18}]}>{settled ? `Return ${cash(result.payout)} ${result.currency}` : busy ? 'Reels in motion…' : 'Choose your stake'}</Text>{settled && <Text style={s.muted}>Stake {cash(result.stake)} · Net {cash(result.payout - result.stake)} · {result.multiplier}×</Text>}</View>
-    {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
-    {!!pending && !busy && <Text style={s.muted}>Pending: {pending.gameCode} · {cash(pending.stake)}. {pending.gameCode !== game.code ? 'Open that game to recover the round.' : 'Recover resends this exact bet, not a new bet.'}</Text>}
-    <BetBar label="BET PER SPIN" value={pending ? pending.stake : Number(stake)} onChange={value => setStake(value.toFixed(2))} min={game.minStake} max={game.maxStake} disabled={busy || !!pending} />
-    <Tap haptic="heavy" disabled={busy || !ready || (!!pending && pending.gameCode !== game.code)} onPress={spin} style={[s.button, {borderRadius:landscape?12:50,width:landscape?'100%':100,height:landscape?56:100,alignSelf:'center',justifyContent:'center',borderWidth:3,borderColor:'#ffd23f'}]}><Text style={s.buttonText}>{busy ? 'Spinning…' : pending ? 'Recover bet' : 'SPIN'}</Text></Tap>
-    <Text style={s.small}>Each spin debits the displayed stake. Returns include the stake. No autoplay. Outcomes and payouts are determined by your backend.</Text>
-    <Text style={s.title}>Paytable & rules</Text>{game.engine?.paytable?.map((line, i) => <View key={i} style={g.balance}><Text style={[s.muted, { flex: 1 }]}>{line.label}</Text><Text style={s.accent}>{line.multiplier}×</Text></View>)}{game.engine?.rules?.map((rule, i) => <Text key={i} style={s.small}>• {rule}</Text>)}
-  </LandscapeGame>;
+  const status = busy ? 'GOOD LUCK!' : settled ? (result.payout > 0 ? `WIN ${cash(result.payout)} · ${result.multiplier}×` : 'SO CLOSE · SPIN AGAIN') : grid ? 'CENTER ROW PAYS' : 'ONE PAYLINE · CENTER ROW';
+  return <GameShell game={game} balance={wallet} onBack={onClose} backDisabled={busy} status={status}
+    notice={error ? <Text accessibilityRole="alert" style={s.error}>{error}</Text>
+      : pending && !busy ? `Pending: ${pending.gameCode} · ${cash(pending.stake)}. ${pending.gameCode !== game.code ? 'Open that game to recover the round.' : 'SPIN resends this exact bet, not a new one.'}` : undefined}
+    bet={<BetBar inline label="BET PER SPIN" value={pending ? pending.stake : Number(stake)} onChange={value => setStake(value.toFixed(2))} min={game.minStake} max={game.maxStake} disabled={busy || !!pending} />}
+    win={cash(settled ? result.payout : 0)}
+    spin={{ label: busy ? '…' : pending ? 'RECOVER' : 'SPIN', accessibilityLabel: pending ? 'Recover bet' : 'Spin', onPress: spin, disabled: busy || !ready || (!!pending && pending.gameCode !== game.code) }}
+    overlay={<WinCelebration win={win} />}
+    info={<>
+      {game.engine?.paytable?.map((line, i) => <PayRow key={i} label={line.label} pays={`${line.multiplier}×`} />)}
+      <Text style={s.small}>Each spin debits the bet shown. Returns include the bet. Outcomes and payouts are decided by the game server.</Text>
+      <Rules rules={game.engine?.rules} />
+    </>}>
+    {stage => {
+      // Three reels, as large as the stage allows: three rows high, three reels (and the cabinet's border) wide.
+      const cellHeight = Math.max(44, Math.floor(Math.min((stage.height - 34) / 3, (stage.width - 60) / 3.9)));
+      return <ImageBackground source={grid ? require('../assets/web/lucky-fire-blitz-bg-v1.png') : undefined}
+        style={[g.cabinet, { backgroundColor: game.presentation?.skin === 'fruit' ? '#063a33' : '#3a0f5e', borderColor: themeOf(game).frame }]} imageStyle={{ borderRadius: 18, opacity: .6 }}>
+        <View style={g.reels}>{[0, 1, 2].map(col => <View key={col} style={{ width: cellHeight * 1.2 }}><Reel cellHeight={cellHeight} index={col} reduced={reduced} spinning={busy && stopped <= col} highlight={!!settled && result.payout > 0}
+          values={grid ? [display[col], display[col + 3], display[col + 6]] : [game.engine?.symbols?.[(col + 1) % (game.engine.symbols.length || 1)] || 'STAR', display[col], game.engine?.symbols?.[(col + 3) % (game.engine.symbols.length || 1)] || 'BAR']} /></View>)}</View>
+        {!grid && <View pointerEvents="none" style={[g.payline, { top: 10 + cellHeight * 1.5 }]} />}
+      </ImageBackground>;
+    }}
+  </GameShell>;
 }
 const g = StyleSheet.create({
-  balance: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
-  cabinet: { overflow: 'hidden', padding: 16, borderRadius: 18, borderWidth: 2, borderColor: '#ffd23f', backgroundColor: '#22104a', gap: 20 },
-  cabinetTitle: { textAlign: 'center', color: '#ffd23f', fontWeight: '800', letterSpacing: -1, fontSize: 30, fontFamily: Platform.OS === 'android' ? 'serif' : 'Georgia', fontStyle: 'italic' },
-  reels: { flexDirection: 'row', gap: 10 }, reel: { flex: 1, overflow: 'hidden', borderRadius: 3, backgroundColor: '#180d23', borderWidth: 1, borderColor: '#b56cff66' },
+  cabinet: { overflow: 'hidden', padding: 10, borderRadius: 18, borderWidth: 3, borderColor: '#ffd23f', backgroundColor: '#22104a' },
+  payline: { position: 'absolute', left: 4, right: 4, height: 2, backgroundColor: '#ffd23f', opacity: .7 },
+  reels: { flexDirection: 'row', gap: 10, justifyContent: 'center' }, reel: { flex: 1, overflow: 'hidden', borderRadius: 3, backgroundColor: '#180d23', borderWidth: 1, borderColor: '#b56cff66' },
   cell: { height: 80, alignItems: 'center', justifyContent: 'center', padding: 4 }, glyph: { color: '#f0d693', fontWeight: '900', fontSize: 23, textAlign: 'center' },
   winner: { borderColor: '#ffd23f', backgroundColor: '#3a2520' }, payGlow: { position: 'absolute' as const, left: 0, right: 0, top: 0, bottom: 0, backgroundColor: '#ffd23f' }, line: { color: '#d9c290', fontSize: 11, textAlign: 'center', letterSpacing: 1.6 }
 });

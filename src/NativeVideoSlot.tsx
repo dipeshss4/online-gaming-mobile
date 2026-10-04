@@ -5,14 +5,13 @@ import { randomUUID } from 'expo-crypto';
 import { API_URL, ApiError, Balance, Game, PlayResult, request } from './api';
 import { clearPending, PendingBet, readPending, savePending } from './pendingBet';
 import { s } from './styles';
-import { LandscapeGame } from './LandscapeGame';
+import { GameShell, PayRow, Rules } from './GameShell';
 import { SymbolArt } from './WebLook';
 import { Tap } from './Tap';
 import { BetBar } from './BetBar';
 import { feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
 import { sound } from './sound';
-import { SoundToggle } from './Popups';
 
 /**
  * The five-reel video slot (Seven Stars Deluxe and the Game builder's games), as on the website: twenty lines,
@@ -94,11 +93,7 @@ const cash = (n: number) => n.toFixed(2);
 const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, onSettled }: { game: Game; token: string; userId: string; initialBalance: Balance | null; onClose: () => void; onSettled: () => void }) {
-  const { width, height } = useWindowDimensions(), landscape = width > height;
   const engine = game.engine as Engine;
-  // Five reels across whatever the stage is: the whole width in portrait, the stage column in landscape (capped by height).
-  const cell = landscape ? Math.max(40, Math.min(84, Math.floor((height - 170) / ROWS), Math.floor((width * .62 - 70) / REELS)))
-    : Math.max(44, Math.min(96, Math.floor((width - 72) / REELS)));
   const reelSymbols = (engine.symbols ?? []).filter(symbol => symbol !== SCATTER);
   const idle = Array.from({ length: CELLS }, (_, i) => reelSymbols[(i * 7 + Math.floor(i / REELS)) % (reelSymbols.length || 1)] || '7');
   const [stake, setStake] = useState(String(game.minStake));
@@ -201,47 +196,42 @@ export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, 
   const status = busy && feature?.banner ? `${SCATTERS_FOR_FEATURE} SCATTERS · ${FREE_SPINS} FREE SPINS!`
     : busy && feature ? `FREE SPIN ${feature.spin} / ${FREE_SPINS} · WINS ×${FREE_SPIN_FACTOR}`
     : busy ? 'SPINNING' : `${engine.lines?.length ?? 20} LINES · READY`;
-  return <LandscapeGame stageItems={2} stage={0.66}>
-    <View style={v.topBar}>
-      <Tap haptic="select" disabled={busy} onPress={onClose} style={s.inlineButton}><Text style={s.link}>{busy ? 'Round in progress…' : '← Back to lobby'}</Text></Tap>
-      <SoundToggle />
-      <Text numberOfLines={1} style={[s.kicker, { flex: 1 }]}>{game.presentation?.eyebrow || 'VIDEO SLOTS'}</Text>
-      <Text style={s.accent}>{wallet ? `${cash(wallet.balance)} ${wallet.currency}` : 'Refresh wallet in lobby'}</Text>
-    </View>
-    <LinearGradient colors={feature ? ['#0b3a6e', '#081a3a'] : ['#4a1478', '#1d0838']} style={[v.cabinet, landscape && { padding: 10, gap: 8 }]}>
-      <Text style={[v.title, landscape && { fontSize: 20 }]} numberOfLines={1}>✦  {game.name.toUpperCase()}  ✦</Text>
-      <View style={v.reels}>{Array.from({ length: REELS }, (_, col) => <VideoReel key={col} index={col} cell={cell} reduced={reduced} art={engine.art}
-        spinning={busy && stopped <= col} strip={reelSymbols.length ? reelSymbols : ['7']}
-        values={[0, 1, 2].map(row => screen[row * REELS + col])}
-        dim={wins.length > 0}
-        lit={row => { const index = row * REELS + col; return litBy.get(index) ?? (scatterLit && screen[index] === SCATTER ? '#22e1ff' : null); }} />)}</View>
-      <Text style={v.line}>{status}</Text>
-      <View style={v.meter}><Text style={v.meterLabel}>{feature ? 'FREE SPINS WIN' : 'WIN'}</Text><Text style={v.meterValue}>{cash(meter)}</Text></View>
+  return <GameShell game={game} balance={wallet} onBack={onClose} backDisabled={busy}
+    status={result && !busy ? (result.payout > 0 ? `WIN ${cash(result.payout)} · ${result.multiplier}×` : 'SO CLOSE · SPIN AGAIN')
+      : busy && wins.length && !feature?.banner ? wins.map(found => `LINE ${found.line + 1} · ${found.count}× ${found.symbol.replaceAll('_', ' ')}`).slice(0, 2).join('  ·  ') : status}
+    notice={error ? <Text accessibilityRole="alert" style={s.error}>{error}</Text>
+      : pending && !busy ? `Pending: ${pending.gameCode} · ${cash(pending.stake)}. ${pending.gameCode !== game.code ? 'Open that game to recover the round.' : 'SPIN resends this exact bet, not a new one.'}` : undefined}
+    bet={<BetBar inline label={`TOTAL BET · ${engine.lines?.length ?? 20} LINES`} value={pending ? pending.stake : Number(stake)} onChange={value => setStake(value.toFixed(2))} min={game.minStake} max={game.maxStake} disabled={busy || !!pending} />}
+    win={cash(meter)}
+    spin={{ label: busy ? '…' : pending ? 'RECOVER' : 'SPIN', accessibilityLabel: pending ? 'Recover bet' : 'Spin', onPress: spin, disabled: busy || !ready || (!!pending && pending.gameCode !== game.code) }}
+    overlay={<>
       {feature?.banner && <View style={v.banner} accessibilityRole="alert"><Text style={v.bannerSmall}>{SCATTERS_FOR_FEATURE} SCATTERS</Text><Text style={v.bannerBig}>{FREE_SPINS} FREE SPINS</Text><Text style={v.bannerSmall}>EVERY WIN PAYS ×{FREE_SPIN_FACTOR}</Text></View>}
       <WinCelebration win={win} />
-    </LinearGradient>
-    <View accessibilityLiveRegion="polite" style={[s.card, landscape && { padding: 10, gap: 4 }]}>
-      <Text style={s.kicker}>{busy ? 'PLAYING YOUR ROUND' : result ? result.outcome.replaceAll('_', ' ') : 'YOUR NEXT ROUND'}</Text>
-      <Text style={[s.title, landscape && { fontSize: 18 }]}>{result && !busy ? `Return ${cash(result.payout)} ${result.currency}` : busy ? 'Reels in motion…' : 'Choose your stake'}</Text>
-      {wins.length > 0 && <Text style={s.muted} numberOfLines={3}>{wins.map(found => `Line ${found.line + 1}: ${found.count}× ${found.symbol.replaceAll('_', ' ')} pays ${found.pays}×`).join(' · ')}</Text>}
-      {result && !busy && <Text style={s.muted}>Stake {cash(result.stake)} · Net {cash(result.payout - result.stake)} · {result.multiplier}×</Text>}
-    </View>
-    {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
-    {!!pending && !busy && <Text style={s.muted}>Pending: {pending.gameCode} · {cash(pending.stake)}. {pending.gameCode !== game.code ? 'Open that game to recover the round.' : 'Recover resends this exact bet, not a new bet.'}</Text>}
-    <BetBar label={`TOTAL BET · ${engine.lines?.length ?? 20} LINES`} value={pending ? pending.stake : Number(stake)} onChange={value => setStake(value.toFixed(2))} min={game.minStake} max={game.maxStake} disabled={busy || !!pending} />
-    <Tap haptic="heavy" disabled={busy || !ready || (!!pending && pending.gameCode !== game.code)} onPress={spin} style={[s.button, { borderRadius: landscape ? 12 : 50, width: landscape ? '100%' : 100, height: landscape ? 56 : 100, alignSelf: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#ffd23f' }]}><Text style={s.buttonText}>{busy ? 'Spinning…' : pending ? 'Recover bet' : 'SPIN'}</Text></Tap>
-    <Text style={s.small}>Each spin debits the displayed stake across all lines, free spins included. Returns include the stake. No autoplay. Outcomes and payouts are determined by the server.</Text>
-    <Text style={s.title}>Paytable & rules</Text>
-    <View style={v.special}><VideoSymbol symbol={WILD} art={engine.art} size={44} /><Text style={[s.small, { flex: 1 }]}>Stands in for every symbol except the scatter.</Text></View>
-    <View style={v.special}><VideoSymbol symbol={SCATTER} art={engine.art} size={44} /><Text style={[s.small, { flex: 1 }]}>{SCATTERS_FOR_FEATURE} or more anywhere: {FREE_SPINS} free spins, every win ×{FREE_SPIN_FACTOR}.</Text></View>
-    {engine.paytable?.map((line, i) => <View key={i} style={v.pay}><Text style={[s.muted, { flex: 1 }]}>{line.label}</Text><Text style={s.accent}>{line.multiplier}×</Text></View>)}
-    {engine.rules?.map((rule, i) => <Text key={i} style={s.small}>• {rule}</Text>)}
-  </LandscapeGame>;
+    </>}
+    info={<>
+      <PayRow label={<View style={v.special}><VideoSymbol symbol={WILD} art={engine.art} size={40} /><Text style={[s.small, { flexShrink: 1 }]}>Stands in for every symbol except the scatter.</Text></View>} pays="WILD" />
+      <PayRow label={<View style={v.special}><VideoSymbol symbol={SCATTER} art={engine.art} size={40} /><Text style={[s.small, { flexShrink: 1 }]}>{SCATTERS_FOR_FEATURE}+ anywhere: {FREE_SPINS} free spins.</Text></View>} pays={`×${FREE_SPIN_FACTOR}`} />
+      {engine.paytable?.map((line, i) => <PayRow key={i} label={line.label} pays={`${line.multiplier}×`} />)}
+      <Text style={s.small}>Each spin debits the total bet across all lines, free spins included. Returns include the bet.</Text>
+      <Rules rules={engine.rules} />
+    </>}>
+    {stage => {
+      // Five reels, three rows: as big as the stage allows either way.
+      const cell = Math.max(40, Math.floor(Math.min((stage.height - 24) / ROWS, (stage.width - 40) / (REELS * 1.12))));
+      return <LinearGradient colors={feature ? ['#0b3a6e', '#081a3a'] : ['#4a1478', '#1d0838']} style={v.cabinet}>
+        <View style={v.reels}>{Array.from({ length: REELS }, (_, col) => <View key={col} style={{ width: cell * 1.08 }}><VideoReel index={col} cell={cell} reduced={reduced} art={engine.art}
+          spinning={busy && stopped <= col} strip={reelSymbols.length ? reelSymbols : ['7']}
+          values={[0, 1, 2].map(row => screen[row * REELS + col])}
+          dim={wins.length > 0}
+          lit={row => { const index = row * REELS + col; return litBy.get(index) ?? (scatterLit && screen[index] === SCATTER ? '#22e1ff' : null); }} /></View>)}</View>
+      </LinearGradient>;
+    }}
+  </GameShell>;
 }
 
 const v = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
-  cabinet: { overflow: 'hidden', padding: 14, borderRadius: 18, borderWidth: 2, borderColor: '#ffd23f', gap: 12 },
+  cabinet: { overflow: 'hidden', padding: 8, borderRadius: 18, borderWidth: 3, borderColor: '#ff3cac' },
   title: { textAlign: 'center', color: '#ffd23f', fontWeight: '800', fontSize: 26, fontFamily: Platform.OS === 'android' ? 'serif' : 'Georgia', fontStyle: 'italic' },
   reels: { flexDirection: 'row', gap: 4, justifyContent: 'center' },
   reel: { flex: 1, overflow: 'hidden', borderRadius: 6, backgroundColor: '#140a24', borderWidth: 1, borderColor: '#b56cff66' },

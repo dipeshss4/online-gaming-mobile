@@ -4,14 +4,15 @@ import * as SecureStore from 'expo-secure-store';
 import { randomUUID } from 'expo-crypto';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Game, request } from './api';
+import type { Balance } from './api';
 import { s } from './styles';
 import { Tap } from './Tap';
 import { BetBar } from './BetBar';
 import { c as t, feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
 import { sound } from './sound';
-import { SoundToggle } from './Popups';
-import { LandscapeGame } from './LandscapeGame';
+import { GameShell, PayRow, Rules } from './GameShell';
+import { useWindowDimensions } from 'react-native';
 
 type Ticket = { panel: number; stake: number; payout: number; collectedAt: number | null; status: string };
 type Flight = { id: string; serverTime: string; startedAt: string; status: 'FLYING' | 'COLLECTED' | 'CRASHED'; multiplier: number; tickets: Ticket[]; growthRate?: number };
@@ -28,7 +29,8 @@ const FRAME_MS = 33;
  * difference between the two clocks), so the climb is smooth between the half-second status checks instead of
  * jumping. The number shown is never an authority: a cash-out pays what the server says when it receives it.
  */
-export function NativeCrash({ game, token, userId, onClose, onSettled }: { game: Game; token: string; userId: string; onClose: () => void; onSettled: () => void }) {
+export function NativeCrash({ game, token, userId, balance = null, onClose, onSettled }: { game: Game; token: string; userId: string; balance?: Balance | null; onClose: () => void; onSettled: () => void }) {
+  const window = useWindowDimensions();
   const [stakes, setStakes] = useState([String(game.minStake), '0']), [round, setRound] = useState<Flight | null>(null), [history, setHistory] = useState<Flight[]>([]);
   const [attempt, setAttempt] = useState<Attempt | null>(null), [ready, setReady] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [win, setWin] = useState<Win | null>(null);
@@ -56,7 +58,8 @@ export function NativeCrash({ game, token, userId, onClose, onSettled }: { game:
       const a: Attempt | null = saved ? JSON.parse(saved) : null;
       const flights = await request<Flight[]>('/api/crash', token);
       if (!alive.current) return;
-      setAttempt(a); setHistory(flights);
+      // Only a list is a history; anything else (an older server, a proxy's error page) starts it empty.
+      setAttempt(a); setHistory(Array.isArray(flights) ? flights : []);
       const current = flights.find(f => f.status === 'FLYING') || flights[0] || null;
       if (current?.status === 'FLYING') apply(current); else setRound(current);
       setReady(true);
@@ -150,68 +153,62 @@ export function NativeCrash({ game, token, userId, onClose, onSettled }: { game:
 
   const total = stakes.map(Number).reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0);
 
-  return <LandscapeGame stage={0.62} stageItems={2}>
-    <View style={x.topBar}>
-      <Tap haptic="select" disabled={busy} onPress={onClose} style={s.inlineButton}><Text style={s.link}>‹ Back</Text></Tap><SoundToggle />
-      <Text numberOfLines={1} style={[s.title, { flex: 1, fontSize: 20 }]}>{game.name}</Text>
-      <View style={[x.liveDot, flying && { backgroundColor: t.win }]} /><Text style={s.kicker}>{flying ? 'IN FLIGHT' : 'READY'}</Text>
-    </View>
-
-    <LinearGradient colors={['#3a0f5e', '#1c0b4d', '#0e0822']} style={x.sky} onLayout={measure}>
+  const caption = crashed ? `FLEW AWAY AT ${shown.toFixed(2)}×` : collected ? 'CASHED OUT' : flying ? 'CLIMBING · CASH OUT BEFORE IT FLIES AWAY' : 'SET YOUR BETS AND LAUNCH';
+  const editable = !busy && !attempt && !flying;
+  // On an upright phone the console wraps: each bet gets its own row, then the launch button.
+  const upright = window.height > window.width && window.width < 600;
+  return <GameShell game={game} balance={balance} onBack={onClose} backDisabled={busy} status={caption}
+    notice={error ? <Text accessibilityRole="alert" style={s.error}>{error}</Text>
+      : !ready ? <Tap onPress={restore} style={s.inlineButton}><Text style={s.link}>Flights did not load · Tap to reload</Text></Tap>
+      : attempt ? `Unresolved launch: ${attempt.stakeOne.toFixed(2)} + ${attempt.stakeTwo.toFixed(2)}. Recover it before starting another flight.` : undefined}
+    overlay={<WinCelebration win={win} />}
+    info={<>
+      <PayRow label="Cash out at any multiplier before the flight ends" pays="× STAKE" />
+      <Text style={s.small}>Set BET 2 to OFF to fly with one bet. Launch debits both stakes. A cash-out pays at the multiplier when the server receives it, not the one on screen. Leaving this screen does not stop the flight.</Text>
+      <Rules rules={game.engine?.rules} />
+    </>}
+    controls={<>
+      {[0, 1].map(index => {
+        const ticket = round?.tickets.find(x => x.panel === index + 1);
+        const value = attempt ? String(index === 0 ? attempt.stakeOne : attempt.stakeTwo) : stakes[index];
+        return <View key={index} style={[x.panel, upright && { flexBasis: '100%' }]}>
+          <BetBar inline label={ticket && ticket.status !== 'UNUSED' ? (ticket.status === 'OPEN' ? `BET ${index + 1} · IN FLIGHT` : ticket.status === 'COLLECTED' ? `BET ${index + 1} · WON ${ticket.payout.toFixed(2)}` : `BET ${index + 1} · LOST`) : `BET ${index + 1}`}
+            allowOff={index === 1} value={Number(value) || 0} onChange={amount => setStakes(old => old.map((o, i) => i === index ? amount.toFixed(2) : o))} min={game.minStake} max={game.maxStake} disabled={!editable} />
+        </View>;
+      })}
+      {flying && open.length > 0 ? <View style={x.cashRow}>{open.map(ticket => <Tap key={ticket.panel} haptic="heavy" disabled={busy} onPress={() => void collect(ticket.panel)} style={x.cashButton}>
+          <Text style={x.cashLabel}>CASH OUT{open.length > 1 ? ` ${ticket.panel}` : ''}</Text>
+          <Text style={x.cashValue}>{(ticket.stake * shown).toFixed(2)}</Text>
+        </Tap>)}</View>
+        : <Tap haptic="heavy" accessibilityLabel={attempt ? 'Recover flight' : 'Launch'} disabled={busy || !ready || (!attempt && flying)} onPress={launch} style={[x.launch, (busy || !ready || (!attempt && flying)) && { opacity: 0.45 }]}>
+          <Text style={x.launchText}>{busy ? '…' : attempt ? 'RECOVER' : flying ? 'IN FLIGHT' : 'LAUNCH'}</Text>
+          {!busy && !attempt && !flying && <Text style={x.launchSub}>{total.toFixed(2)}</Text>}
+        </Tap>}
+    </>}>
+    {stage => <LinearGradient colors={['#3a0f5e', '#1c0b4d', '#0e0822']} style={[x.sky, { width: stage.width - 8, height: stage.height - 6 }]} onLayout={measure}>
       {[0.25, 0.5, 0.75].map(f => <View key={f} style={[x.gridLine, { top: pad.top + f * (size.h - pad.top - pad.bottom) }]} />)}
       <View style={[x.axis, { left: pad.left, bottom: pad.bottom, width: Math.max(0, size.w - pad.left - 12) }]} />
       <View style={[x.axisY, { left: pad.left, bottom: pad.bottom, top: pad.top - 20 }]} />
       {/* Recent crash points, newest first, coloured by how far each flight went. */}
       <View style={x.recent}>{recent.map(f => <View key={f.id} style={[x.recentChip, { backgroundColor: f.status === 'COLLECTED' ? '#2ee57a22' : f.multiplier >= 2 ? '#ffd23f1f' : '#ef7b6b1c' }]}>
         <Text style={[x.recentText, { color: f.status === 'COLLECTED' ? t.win : f.multiplier >= 2 ? t.gold : '#ef9a8c' }]}>{f.multiplier.toFixed(2)}×</Text></View>)}</View>
-
       {trail.map(([a, b], i) => {
         const dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy);
         return <View key={i} style={[x.segment, { width: length + 1, left: (a.x + b.x) / 2 - (length + 1) / 2, top: (a.y + b.y) / 2 - 1.5, backgroundColor: tone, opacity: 0.35 + 0.65 * (i / SEGMENTS), transform: [{ rotate: `${Math.atan2(dy, dx)}rad` }] }]} />;
       })}
       {size.w > 0 && <Text style={[x.plane, { left: head.x - 20, top: head.y - 26, color: tone, transform: [{ rotate: crashed ? '0deg' : `${-Math.min(angle, 1.2)}rad` }] }]}>{crashed ? '💥' : '✈'}</Text>}
-
       <View pointerEvents="none" style={x.center}>
         <Text accessibilityLiveRegion="polite" style={[x.multiplier, { color: crashed ? '#ef7b6b' : collected ? t.win : '#fff1d2' }]}>{shown.toFixed(2)}×</Text>
         <Text style={[x.caption, { color: tone }]}>{crashed ? 'FLEW AWAY' : collected ? 'CASHED OUT' : flying ? 'CLIMBING' : round ? 'PLACE YOUR NEXT BET' : 'PLACE YOUR BET'}</Text>
       </View>
-
-      <WinCelebration win={win} />
-    </LinearGradient>
-
-    {/* The one big button: Launch before a flight, Cash out during one. Top of the column, never scrolled away. */}
-    {flying && open.length > 0 ? <View style={x.cashRow}>{open.map(ticket => <Tap key={ticket.panel} haptic="heavy" disabled={busy} onPress={() => void collect(ticket.panel)} style={x.cashButton}>
-        <Text style={x.cashLabel}>CASH OUT{open.length > 1 ? ` · BET ${ticket.panel}` : ''}</Text>
-        <Text style={x.cashValue}>≈ {(ticket.stake * shown).toFixed(2)}</Text>
-      </Tap>)}</View>
-      : <Tap haptic="heavy" disabled={busy || !ready || (!attempt && flying)} onPress={launch} style={[x.launch, (busy || !ready || (!attempt && flying)) && { opacity: 0.45 }]}>
-        <Text style={x.launchText}>{busy ? 'Please wait…' : attempt ? 'Recover flight' : flying ? 'Flight in progress' : `Launch · ${total.toFixed(2)}`}</Text>
-      </Tap>}
-    {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
-    {!ready && <Tap onPress={restore} style={s.secondary}><Text style={s.secondaryText}>Reload flights</Text></Tap>}
-    {attempt && <Text style={s.muted}>Unresolved launch: {attempt.stakeOne.toFixed(2)} + {attempt.stakeTwo.toFixed(2)}. Recover it before starting another flight.</Text>}
-
-    {[0, 1].map(index => {
-      const ticket = round?.tickets.find(x => x.panel === index + 1);
-      const value = attempt ? String(index === 0 ? attempt.stakeOne : attempt.stakeTwo) : stakes[index];
-      const editable = !busy && !attempt && !flying;
-      return <View key={index} style={x.panel}>
-        <View style={x.panelHead}><Text style={s.kicker}>BET {index + 1}</Text>
-          {ticket && ticket.status !== 'UNUSED' && <Text style={[x.ticket, ticket.status === 'COLLECTED' && { color: t.win }, ticket.status === 'LOST' && { color: '#ef9a8c' }]}>
-            {ticket.status === 'OPEN' ? `In flight · ${ticket.stake.toFixed(2)}` : ticket.status === 'COLLECTED' ? `Won ${ticket.payout.toFixed(2)} @ ${ticket.collectedAt?.toFixed(2)}×` : `Lost ${ticket.stake.toFixed(2)}`}</Text>}
-        </View>
-        <BetBar label="STAKE" allowOff={index === 1} value={Number(value) || 0} onChange={amount => setStakes(old => old.map((o, i) => i === index ? amount.toFixed(2) : o))} min={game.minStake} max={game.maxStake} disabled={!editable} />
-      </View>;
-    })}
-
-    <Text style={s.small}>Set a panel to Off to fly with one bet. Launch debits both stakes. A cash-out pays at the multiplier when the server receives it, not the one on screen. Leaving this screen does not stop the flight. No autoplay or automatic cash-out.</Text>
-  </LandscapeGame>;
+    </LinearGradient>}
+  </GameShell>;
 }
 
 const x = StyleSheet.create({
   topBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#6d6878' },
-  sky: { height: 300, borderRadius: 18, borderWidth: 1, borderColor: '#22e1ff66', overflow: 'hidden' },
+  sky: { borderRadius: 18, borderWidth: 2, borderColor: '#22e1ff88', overflow: 'hidden' },
   gridLine: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: '#ffffff0a' },
   axis: { position: 'absolute', height: 1, backgroundColor: '#bdc6d533' },
   axisY: { position: 'absolute', width: 1, backgroundColor: '#bdc6d533' },
@@ -223,13 +220,14 @@ const x = StyleSheet.create({
   center: { position: 'absolute', left: 0, right: 0, top: 38, alignItems: 'center' },
   multiplier: { fontSize: 58, fontWeight: '900', letterSpacing: -1, fontVariant: ['tabular-nums'] },
   caption: { fontSize: 12, fontWeight: '800', letterSpacing: 2 },
-  cashRow: { flexDirection: 'row', gap: 8 },
-  cashButton: { flex: 1, minHeight: 58, borderRadius: 14, backgroundColor: '#2ee57a', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#9ff0c4' },
+  cashRow: { flexDirection: 'row', gap: 6 },
+  cashButton: { minWidth: 96, minHeight: 58, paddingHorizontal: 8, borderRadius: 14, backgroundColor: '#2ee57a', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#9ff0c4' },
   cashLabel: { color: '#08251a', fontSize: 12, fontWeight: '900', letterSpacing: 1 },
   cashValue: { color: '#08251a', fontSize: 18, fontWeight: '900' },
-  panel: { gap: 8, padding: 12, borderRadius: 14, backgroundColor: t.surface, borderWidth: 1, borderColor: t.line },
+  panel: { flex: 1, minWidth: 0 },
   panelHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   ticket: { color: t.gold, fontSize: 12, fontWeight: '700' },
-  launch: { minHeight: 56, borderRadius: 14, backgroundColor: t.gold, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff0c4' },
+  launch: { flexGrow: 1, minWidth: 96, minHeight: 58, paddingHorizontal: 10, borderRadius: 16, backgroundColor: t.gold, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff0c4' },
   launchText: { color: t.goldInk, fontWeight: '900', fontSize: 16, letterSpacing: 0.5 },
+  launchSub: { color: t.goldInk, fontWeight: '800', fontSize: 12 },
 });

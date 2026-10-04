@@ -1,16 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Platform, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { randomUUID } from 'expo-crypto';
 import { ApiError, Balance, Game, PlayResult, request } from './api';
 import { clearPending, PendingBet, readPending, savePending } from './pendingBet';
 import { s } from './styles';
-import { Tap } from './Tap';
 import { BetBar } from './BetBar';
 import { c, feel } from './theme';
 import { Win, WinCelebration } from './WinCelebration';
 import { sound } from './sound';
-import { SoundToggle } from './Popups';
+import { GameShell, PayRow, Rules } from './GameShell';
 
 /**
  * Vegas Jackpot: Devil Heart in the app: three reels and five lines. A WILD or 2X fills its reel and locks it for a
@@ -53,7 +52,7 @@ export function DevilSymbol({ symbol, size }: { symbol: string; size: number }) 
   if (symbol.startsWith('BAR')) {
     const count = Number(symbol.slice(3)), tone = count === 3 ? ['#ff5ab4', '#a1135f'] : count === 2 ? ['#ffd23f', '#a46a00'] : ['#ff6a3a', '#9e1f05'];
     return <View accessibilityLabel={`${['single', 'double', 'triple'][count - 1]} bar`} style={{ width: size * 1.3, height: size, alignItems: 'center', justifyContent: 'center', gap: size * .04 }}>
-      <Text style={[d.horns, { fontSize: size * .2 }]}>▲   ▲</Text>
+      <Text style={[d.horns, { fontSize: Math.max(11, size * .2) }]}>▲   ▲</Text>
       {Array.from({ length: count }, (_, i) => <LinearGradient key={i} colors={tone as [string, string]} style={[d.plate, { width: size * 1.2, height: Math.max(17, size * .22) }]}>
         <Text style={[d.barText, { fontSize: Math.max(11, size * .16), lineHeight: Math.max(13, size * .19) }]}>BAR</Text></LinearGradient>)}
     </View>;
@@ -74,14 +73,14 @@ export function DevilSymbol({ symbol, size }: { symbol: string; size: number }) 
 }
 
 /** One reel: a running strip while it spins, then its three symbols, with the cells the shown line paid lit. */
-function Reel({ cells, spinning, locked, lit, dim, reel, size, reduced }: { cells: string[]; spinning: boolean; locked: boolean; lit: Set<number>; dim: boolean; reel: number; size: number; reduced: boolean }) {
+function Reel({ cells, spinning, locked, lit, dim, reel, size, width, reduced }: { width: number; cells: string[]; spinning: boolean; locked: boolean; lit: Set<number>; dim: boolean; reel: number; size: number; reduced: boolean }) {
   const offset = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!spinning || reduced) { offset.setValue(0); return; }
     const run = Animated.loop(Animated.timing(offset, { toValue: -BLUR.length * size, duration: 380 + reel * 60, easing: Easing.linear, useNativeDriver: true }));
     run.start(); return () => { run.stop(); offset.setValue(0); };
   }, [spinning, reduced, size, reel]);
-  return <View style={[d.reel, { height: size * 3 }, locked && d.locked]} accessibilityLabel={spinning ? `Reel ${reel + 1} spinning` : `Reel ${reel + 1}: ${cells.join(', ')}`}>
+  return <View style={[d.reel, { height: size * 3, width }, locked && d.locked]} accessibilityLabel={spinning ? `Reel ${reel + 1} spinning` : `Reel ${reel + 1}: ${cells.join(', ')}`}>
     {spinning && !reduced
       ? <Animated.View style={{ transform: [{ translateY: offset }] }}>{[...BLUR, ...BLUR].map((symbol, i) => <View key={i} style={[d.cell, { height: size }]}><DevilSymbol symbol={symbol} size={size * .78} /></View>)}</Animated.View>
       : cells.map((symbol, row) => { const cell = row * 3 + reel; return <View key={row} style={[d.cell, { height: size }, lit.has(cell) && d.lit, dim && !lit.has(cell) && { opacity: .35 }]}><DevilSymbol symbol={symbol} size={size * .78} /></View>; })}
@@ -90,8 +89,6 @@ function Reel({ cells, spinning, locked, lit, dim, reel, size, reduced }: { cell
 }
 
 export function NativeDevilHeart({ game, token, userId, initialBalance, onClose, onSettled }: { game: Game; token: string; userId: string; initialBalance: Balance | null; onClose: () => void; onSettled: () => void }) {
-  const { width, height } = useWindowDimensions(), landscape = width > height;
-  const size = landscape ? Math.max(48, Math.min(96, Math.floor((height - 120) / 3))) : Math.max(56, Math.min(110, Math.floor((width - 80) / 3.6)));
   const [stake, setStake] = useState(game.minStake), [wallet, setWallet] = useState(initialBalance);
   const [pending, setPending] = useState<PendingBet | null>(null), [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [reduced, setReduced] = useState(false);
@@ -176,62 +173,53 @@ export function NativeDevilHeart({ game, token, userId, initialBalance, onClose,
   }
 
   const lit = new Set((showing === null ? lines : [showing]).flatMap(cellsOf));
-  const reels = <LinearGradient colors={['#3a0806', '#250404']} style={d.cabinet}>
-    <View style={d.marquee}>
-      <View style={d.jackpotBox}><Text style={d.boxLabel}>JACKPOT</Text><Text style={d.boxValue}>10×–30× BET</Text></View>
-      <View style={{ alignItems: 'center', flex: 1 }}><Text style={d.eyebrow}>VEGAS JACKPOT</Text><Text style={d.title} numberOfLines={1}>Devil Heart</Text></View>
-    </View>
-    <View style={d.stage}>
-      <View style={d.tags}>{LINES.map((rows, line) => <Text key={line} style={[d.tag, { top: rows[0] * size + size / 2 - 10 + (line === 1 ? -11 : line === 3 ? 11 : line === 2 ? -11 : line === 4 ? 11 : 0), backgroundColor: LINE_COLORS[line], opacity: lines.includes(line) ? 1 : .5 }]}>{line + 1}</Text>)}</View>
-      <View style={d.reels}>{[0, 1, 2].map(reel => <Reel key={reel} reel={reel} size={size} reduced={reduced} cells={[0, 1, 2].map(row => screen[row * 3 + reel])} spinning={spinning[reel]} locked={locked[reel]} lit={lit} dim={lines.length > 0} />)}</View>
-      <View style={d.tags}>{LINES.map((rows, line) => <Text key={line} style={[d.tag, { top: rows[2] * size + size / 2 - 10 + (line === 1 ? -11 : line === 4 ? 11 : line === 2 ? -11 : line === 3 ? 11 : 0), backgroundColor: LINE_COLORS[line], opacity: lines.includes(line) ? 1 : .5 }]}>{line + 1}</Text>)}</View>
-    </View>
-    <Text style={d.status} accessibilityLiveRegion="polite">{status}</Text>
-    {jackpot !== null && <View style={d.jackpotWin} accessibilityRole="alert"><Text style={d.jackpotSmall}>JACKPOT!</Text><Text style={d.jackpotBig}>{jackpot}× BET</Text></View>}
-    <WinCelebration win={win} />
-  </LinearGradient>;
-
-  const controls = <>
-    <View style={d.topBar}>
-      <Tap haptic="select" disabled={busy} onPress={onClose} style={s.inlineButton}><Text style={s.link}>{busy ? 'Round in progress…' : '← Lobby'}</Text></Tap>
-      <SoundToggle />
-      <Text style={[s.accent, { flex: 1, textAlign: 'right' }]} numberOfLines={1}>{wallet ? `${cash(wallet.balance)} ${wallet.currency}` : 'Refresh wallet in lobby'}</Text>
-    </View>
-    <View style={d.winBox}><Text style={d.boxLabel}>WIN</Text><Text style={d.winValue}>{cash(meter)}</Text></View>
-    {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
-    {!!pending && !busy && <Text style={s.small}>Pending: {pending.gameCode} · {cash(pending.stake)}. {pending.gameCode !== game.code ? 'Open that game to recover the round.' : 'Recover resends this exact bet, not a new bet.'}</Text>}
-    <BetBar label={`TOTAL BET · 5 LINES · ${cash(stake / 5)} A LINE`} value={pending ? pending.stake : stake} onChange={setStake} min={game.minStake} max={game.maxStake} disabled={busy || !!pending} />
-    <Tap haptic="heavy" accessibilityLabel={pending ? 'Recover bet' : 'Spin'} disabled={busy || !ready || (!!pending && pending.gameCode !== game.code)} onPress={spin} style={d.spin}>
-      <LinearGradient colors={['#ff9a3a', '#d10f1f', '#6e0010']} style={StyleSheet.absoluteFill} />
-      <Text style={d.spinText}>{busy ? '…' : pending ? 'RECOVER' : 'SPIN'}</Text>
-    </Tap>
-    <Text style={s.kicker}>PAYTABLE · LINE BET MULTIPLES</Text>
-    {[['JACKPOT ×3', '10×–30× BET'], ['ANY 3 JACKPOT / WILD / 2X', '40'], ['7 7 7', '12'], ['TRIPLE BAR ×3', '7'], ['DOUBLE BAR ×3', '5'], ['SINGLE BAR ×3', '3'], ['ANY 3 BARS', '1']].map(([label, pays]) =>
-      <View key={label} style={d.payRow}><Text style={s.muted}>{label}</Text><Text style={s.accent}>{pays}</Text></View>)}
-    {game.engine?.rules?.map((rule, i) => <Text key={i} style={s.small}>• {rule}</Text>)}
-  </>;
-
-  if (!landscape) return <ScrollView contentContainerStyle={[s.content, { backgroundColor: '#1a0204' }]}>{reels}{controls}</ScrollView>;
-  return <View style={{ flex: 1, flexDirection: 'row', backgroundColor: '#1a0204' }}>
-    <View style={{ flex: 1, minWidth: 0, padding: 8, justifyContent: 'center' }}>{reels}</View>
-    <ScrollView style={{ flexGrow: 0, flexShrink: 0, width: Math.max(250, Math.min(340, width * .36)) }} contentContainerStyle={{ padding: 10, gap: 8 }}>{controls}</ScrollView>
-  </View>;
+  const tagTop = (row: number, line: number, side: 'left' | 'right', size: number) => {
+    // Lines that start (or end) on the same row are fanned out around it, so every number stays readable.
+    const group = LINES.map((rows, l) => l).filter(l => LINES[l][side === 'left' ? 0 : 2] === row), order = group.indexOf(line);
+    return row * size + size / 2 - 11 + (order - (group.length - 1) / 2) * 24;
+  };
+  return <GameShell game={game} balance={wallet} onBack={onClose} backDisabled={busy} status={status}
+    notice={error ? <Text accessibilityRole="alert" style={s.error}>{error}</Text>
+      : pending && !busy ? `Pending: ${pending.gameCode} · ${cash(pending.stake)}. ${pending.gameCode !== game.code ? 'Open that game to recover the round.' : 'SPIN resends this exact bet, not a new one.'}` : undefined}
+    bet={<BetBar inline label={`TOTAL BET · ${cash(stake / 5)} × 5 LINES`} value={pending ? pending.stake : stake} onChange={setStake} min={game.minStake} max={game.maxStake} disabled={busy || !!pending} />}
+    win={cash(meter)}
+    spin={{ label: busy ? '…' : pending ? 'RECOVER' : 'SPIN', accessibilityLabel: pending ? 'Recover bet' : 'Spin', onPress: spin, disabled: busy || !ready || (!!pending && pending.gameCode !== game.code) }}
+    overlay={<>
+      {jackpot !== null && <View style={d.jackpotWin} accessibilityRole="alert"><Text style={d.jackpotSmall}>JACKPOT!</Text><Text style={d.jackpotBig}>{jackpot}× BET</Text></View>}
+      <WinCelebration win={win} />
+    </>}
+    info={<>
+      <PayRow label={<View style={d.payArt}>{['JACKPOT', 'JACKPOT', 'JACKPOT'].map((x, i) => <DevilSymbol key={i} symbol={x} size={34} />)}</View>} pays="10×–30× BET" />
+      <PayRow label={<View style={d.payArt}>{['JACKPOT', 'WILD', 'X2'].map((x, i) => <DevilSymbol key={i} symbol={x} size={34} />)}<Text style={s.small}> any 3</Text></View>} pays="40" />
+      <PayRow label={<View style={d.payArt}>{['SEVEN', 'SEVEN', 'SEVEN'].map((x, i) => <DevilSymbol key={i} symbol={x} size={34} />)}</View>} pays="12" />
+      <PayRow label={<View style={d.payArt}>{['BAR3', 'BAR3', 'BAR3'].map((x, i) => <DevilSymbol key={i} symbol={x} size={28} />)}</View>} pays="7" />
+      <PayRow label={<View style={d.payArt}>{['BAR2', 'BAR2', 'BAR2'].map((x, i) => <DevilSymbol key={i} symbol={x} size={28} />)}</View>} pays="5" />
+      <PayRow label={<View style={d.payArt}>{['BAR1', 'BAR1', 'BAR1'].map((x, i) => <DevilSymbol key={i} symbol={x} size={28} />)}</View>} pays="3" />
+      <PayRow label="Any three BARs" pays="1" />
+      <Text style={s.small}>Line pays are multiples of the line bet (a fifth of the total bet).</Text>
+      <Rules rules={game.engine?.rules} />
+    </>}>
+    {stage => {
+      // The reels fill the stage: three rows high, or as wide as three reels and the line numbers allow.
+      const narrow = stage.width < stage.height, reelWidth = narrow ? 1.25 : 1.45;
+      const size = Math.max(44, Math.floor(Math.min((stage.height - 16) / 3, (stage.width - 76) / (3 * reelWidth + .25))));
+      return <View style={d.stage}>
+        <View style={[d.tags, { height: size * 3 + 10 }]}>{LINES.map((rows, line) => <Text key={line} style={[d.tag, { top: tagTop(rows[0], line, 'left', size) + 5, backgroundColor: LINE_COLORS[line], opacity: lines.includes(line) ? 1 : .55 }]}>{line + 1}</Text>)}</View>
+        <View style={d.reels}>{[0, 1, 2].map(reel => <Reel key={reel} reel={reel} size={size} width={size * reelWidth} reduced={reduced} cells={[0, 1, 2].map(row => screen[row * 3 + reel])} spinning={spinning[reel]} locked={locked[reel]} lit={lit} dim={lines.length > 0} />)}</View>
+        <View style={[d.tags, { height: size * 3 + 10 }]}>{LINES.map((rows, line) => <Text key={line} style={[d.tag, { top: tagTop(rows[2], line, 'right', size) + 5, backgroundColor: LINE_COLORS[line], opacity: lines.includes(line) ? 1 : .55 }]}>{line + 1}</Text>)}</View>
+      </View>;
+    }}
+  </GameShell>;
 }
 
 const serif = Platform.OS === 'android' ? 'serif' : 'Georgia';
 const d = StyleSheet.create({
-  cabinet: { borderRadius: 18, borderWidth: 3, borderColor: '#ff7a1a', padding: 8, gap: 6, overflow: 'hidden' },
-  marquee: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  jackpotBox: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: 2, borderColor: c.gold, backgroundColor: '#1a0204cc' },
-  boxLabel: { color: '#ff9a6a', fontSize: 11, fontWeight: '900', letterSpacing: 1.5, textAlign: 'center' },
-  boxValue: { color: '#ffe45c', fontSize: 14, fontWeight: '900' },
-  eyebrow: { color: '#ff9ad6', fontSize: 11, fontWeight: '800', letterSpacing: 3 },
-  title: { color: '#ffe45c', fontSize: 24, fontWeight: '900', fontStyle: 'italic', fontFamily: serif, textShadowColor: '#ff3a00', textShadowRadius: 12, textShadowOffset: { width: 0, height: 0 } },
-  stage: { flexDirection: 'row', alignItems: 'stretch', justifyContent: 'center', gap: 4 },
+  stage: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  payArt: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   tags: { width: 22 },
   tag: { position: 'absolute', left: 0, width: 22, height: 20, borderRadius: 5, textAlign: 'center', fontSize: 11, fontWeight: '900', color: '#1a0204', lineHeight: 20, overflow: 'hidden' },
   reels: { flexDirection: 'row', gap: 5, padding: 5, borderRadius: 12, borderWidth: 3, borderColor: '#ffb01f', backgroundColor: '#120102', flexShrink: 1 },
-  reel: { flex: 1, minWidth: 64, overflow: 'hidden', borderRadius: 8, backgroundColor: '#2e0609', borderWidth: 1, borderColor: '#ff6a3a55' },
+  reel: { overflow: 'hidden', borderRadius: 8, backgroundColor: '#2e0609', borderWidth: 1, borderColor: '#ff6a3a55' },
   locked: { borderColor: c.gold, borderWidth: 2, backgroundColor: '#4a0c08' },
   lockTag: { position: 'absolute', bottom: 4, alignSelf: 'center', paddingHorizontal: 8, borderRadius: 999, backgroundColor: c.gold, color: '#3a0005', fontSize: 11, fontWeight: '900', letterSpacing: 1.5, overflow: 'hidden' },
   cell: { alignItems: 'center', justifyContent: 'center' },
@@ -245,14 +233,7 @@ const d = StyleSheet.create({
   x2: { color: '#ffe45c', fontWeight: '900' },
   diamond: { position: 'absolute', transform: [{ rotate: '45deg' }], borderWidth: 3, borderColor: c.gold, borderRadius: 4 },
   jp: { color: '#fff', fontWeight: '900', textAlign: 'center' },
-  status: { color: '#ffe45c', fontWeight: '900', fontSize: 15, letterSpacing: 2, textAlign: 'center' },
   jackpotWin: { position: 'absolute', alignSelf: 'center', top: '35%', paddingHorizontal: 26, paddingVertical: 12, borderRadius: 18, borderWidth: 4, borderColor: c.gold, backgroundColor: '#8a0010', alignItems: 'center' },
   jackpotSmall: { color: '#fff', fontWeight: '900', letterSpacing: 3 },
   jackpotBig: { color: '#ffe45c', fontWeight: '900', fontSize: 34, fontFamily: serif },
-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  winBox: { alignItems: 'center', paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: '#ff6a3a88', backgroundColor: '#1a0204' },
-  winValue: { color: '#ffe45c', fontSize: 22, fontWeight: '900' },
-  spin: { minHeight: 60, borderRadius: 30, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: c.gold },
-  spinText: { color: '#fff', fontSize: 22, fontWeight: '900', letterSpacing: 2 },
-  payRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6 },
 });

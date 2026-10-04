@@ -214,7 +214,8 @@ await page.route('**/api/**', async route => {
     if (winningRound) return json({ requestId: body.requestId, betId: `b-win-${Date.now()}`, gameCode: 'HOT_7S', symbols: ['7', '7', '7'], stake: 1, payout: 50, balance: 174.5, currency: 'USD', outcome: 'WIN', multiplier: 50 })
     return json({ requestId: body.requestId, betId: 'b9', gameCode: 'HOT_7S', symbols: ['7', '7', 'BAR'], stake: 1, payout: 0, balance: 124.5, currency: 'USD', outcome: 'LOSS', multiplier: 0 })
   }
-  if (path === '/api/crash') return json({ id: 'c1', status: 'WAITING', multiplier: 1, serverTime: now, startedAt: now, tickets: [], growthRate: 0.07 })
+  // GET lists the player's flights; POST launches one.
+  if (path === '/api/crash') return route.request().method() === 'GET' ? json([]) : json({ id: 'c1', status: 'WAITING', multiplier: 1, serverTime: now, startedAt: now, tickets: [], growthRate: 0.07 })
   return json({ items: [], totalPages: 0 })
 })
 
@@ -292,7 +293,7 @@ console.log('## floor on the lobby  (totals, biggest wins, recent rounds)')
 const tile = page.getByLabel('Play Hot 7s').first()
 if (await tile.count()) { await tile.click().catch(() => {}); await page.waitForTimeout(2500); await audit('06-slots') }
 // Leave the game before the tabs are checked; without this the later screenshots are still the game.
-const back = page.getByText(/Back to lobby/).first()
+const back = page.getByLabel('Back to lobby').first()
 if (await back.count()) { await back.click(); await page.waitForTimeout(1500) }
 await page.getByText('All Games').first().waitFor({ timeout: 15000 })
 
@@ -397,7 +398,7 @@ await audit('07b-landscape-lobby')
 // columns were once decided by flex ratios that Android and the browser divided differently, and the game
 // ended up the smaller side on a real device.
 await page.getByLabel('Play Hot 7s').first().click()
-await page.getByText(/Back to lobby/).first().waitFor({ timeout: 15000 })
+await page.getByLabel('Back to lobby').first().waitFor({ timeout: 15000 })
 await page.waitForTimeout(1200)
 const stage = await page.evaluate(() => {
   const reels = [1, 2, 3].map(n => document.querySelector(`[aria-label^="Reel ${n}"]`)).filter(Boolean)
@@ -432,7 +433,7 @@ console.log('## bet bar  (MAX 50.00, MIN 0.10, + 0.20, picker 1.00)')
 
 // Winning has to look like winning. The reels stop one at a time, so this waits for the whole round.
 winningRound = true
-await page.getByRole('button', { name: /^SPIN$/ }).click()
+await page.getByRole('button', { name: 'Spin', exact: true }).click()
 await page.getByText('BIG WIN').waitFor({ timeout: 20000 })
 if (slotBets.at(-1)?.stake !== 1) findings.push(`bet bar: the spin sent stake ${slotBets.at(-1)?.stake}, not the 1.00 picked`)
 await page.getByText('50.00').first().waitFor({ timeout: 10000 })
@@ -444,7 +445,7 @@ console.log('## win celebration clears  (banner leaves by itself)')
 winningRound = false
 
 // Dragon Tide, the fish table, drawn with Skia: it fills the sideways screen, and firing at a creature is a bet on it.
-await page.getByText(/Back to lobby/).first().click()
+await page.getByLabel('Back to lobby').first().click()
 await page.getByText('All Games').first().waitFor({ timeout: 15000 })
 await page.getByLabel('Play Dragon Tide').first().click()
 // Every game opens behind the branded loading screen: the logo, the game's name and a progress bar that moves.
@@ -495,15 +496,15 @@ await page.getByLabel(/^Reel 5:/).waitFor({ timeout: 15000 }).catch(() => findin
 const reels = await page.evaluate(() => [...document.querySelectorAll('[aria-label^="Reel "]')].map(el => { const box = el.getBoundingClientRect(); return { width: Math.round(box.width), height: Math.round(box.height) } }))
 if (reels.length !== 5 || reels.some(reel => reel.width < 40 || reel.height < 120)) findings.push(`video slot: the reels are ${JSON.stringify(reels)}`)
 await audit('22-video-slot')
-await page.getByRole('button', { name: /^SPIN$/ }).click()
+await page.getByRole('button', { name: 'Spin', exact: true }).click()
 await page.getByText('8 FREE SPINS', { exact: true }).waitFor({ timeout: 20000 }).catch(() => findings.push('video slot: three scatters did not announce the free spins'))
 await page.screenshot({ path: `${OUT}/23a-video-free-spins.png` })
-await page.getByText('Return 4.00 USD').waitFor({ timeout: 40000 }).catch(() => findings.push('video slot: the round never showed the server\'s return'))
-await page.getByText('129.30 USD').first().waitFor({ timeout: 5000 }).catch(() => findings.push('video slot: the balance did not move to the server\'s'))
+await page.getByText(/WIN 4\.00/).first().waitFor({ timeout: 40000 }).catch(() => findings.push('video slot: the round never showed the server\'s return'))
+await page.getByText('129.30').first().waitFor({ timeout: 5000 }).catch(() => findings.push('video slot: the balance did not move to the server\'s'))
 if (videoBets.length !== 1 || videoBets[0].stake !== 0.2 || !/^[0-9a-f-]{36}$/.test(videoBets[0].requestId)) findings.push(`video slot: the bets sent were ${JSON.stringify(videoBets)}`)
 await audit('23-video-slot-played')
 console.log(`## video slot  (${reels.length} reels ${reels[0]?.width}x${reels[0]?.height}, one bet, 8 free spins, return 4.00)`)
-await page.getByText(/Back to lobby/).first().click()
+await page.getByLabel('Back to lobby').first().click()
 await page.getByText('All Games').first().waitFor({ timeout: 15000 })
 
 // Vegas Jackpot: Devil Heart: a WILD reel locks for a free respin, and three JACKPOTs win the jackpot.
@@ -524,7 +525,7 @@ await page.getByText('WIN 2.00').waitFor({ timeout: 20000 }).catch(() => finding
 if (devilBets.length !== 2 || devilBets.some(bet => bet.stake !== 0.1 || !/^[0-9a-f-]{36}$/.test(bet.requestId)) || devilBets[0].requestId === devilBets[1].requestId) findings.push(`devil heart: the bets sent were ${JSON.stringify(devilBets)}`)
 await audit('28-devil-heart-played')
 console.log('## devil heart  (WILD reel locked, respin, 0.48; then a 20x jackpot, 2.00)')
-await page.getByText(/← Lobby/).first().click()
+await page.getByLabel('Back to lobby').first().click()
 await page.getByRole('tab', { name: 'ALL GAMES' }).click()
 
 // The lobby's dock files games by kind, as the game rooms do: keno sits under OTHER, the fish table under FISHING.
@@ -542,15 +543,55 @@ await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 150
 await page.getByLabel('Keno board').waitFor({ timeout: 15000 })
 for (const n of [42, 7, 19]) await page.getByLabel(`Number ${n}`, { exact: true }).click()
 const board = await page.getByLabel('Keno board').boundingBox()
-if (!board || board.height < 300) findings.push(`keno: the board is only ${board?.height}px tall sideways`)
+// The board reshapes to the screen (16 by 5 on a short phone held sideways); what matters is a ball big enough to tap.
+const ball = await page.getByLabel('Number 42', { exact: false }).first().boundingBox()
+if (!board || !ball || ball.height < 40 || board.width > 844) findings.push(`keno: balls are ${Math.round(ball?.height)}px on a board ${Math.round(board?.width)}x${Math.round(board?.height)}`)
 await audit('25-keno-marked')
 await page.getByRole('button', { name: /^PLAY$/ }).click()
-await page.getByText('3 hits · Return 4.30 USD').waitFor({ timeout: 20000 }).catch(() => findings.push('keno: the result never showed the server\'s return'))
+await page.getByText('3 HITS · WIN 4.30').waitFor({ timeout: 20000 }).catch(() => findings.push('keno: the result never showed the server\'s return'))
 if (kenoBets.length !== 1 || kenoBets[0].selection !== '7-19-42' || kenoBets[0].stake !== 0.1 || !/^[0-9a-f-]{36}$/.test(kenoBets[0].requestId)) findings.push(`keno: the bets sent were ${JSON.stringify(kenoBets)}`)
 await audit('26-keno-played')
 console.log(`## keno  (board ${Math.round(board?.width)}x${Math.round(board?.height)}, ticket ${kenoBets[0]?.selection}, 3 hits, return 4.30)`)
-await page.getByText(/← Lobby/).first().click()
+await page.getByLabel('Back to lobby').first().click()
 await page.getByRole('tab', { name: 'ALL GAMES' }).click()
+
+// Every game, in the game-room frame, on an iPad held sideways and on a phone held upright: the game takes most of
+// the screen, the console is one bar, and nothing spills or shrinks below a usable size.
+for (const [size, viewport] of [['ipad', { width: 1180, height: 820 }], ['portrait', { width: 390, height: 844 }]]) {
+  await page.setViewportSize(viewport)
+  await page.waitForTimeout(600)
+  for (const [name, code] of [['Hot 7s', 'hot7s'], ['Seven Stars Deluxe', 'video'], ['Vegas Jackpot: Devil Heart', 'devil'], ['Galaxy Keno', 'keno'], ['Roulette', 'roulette'], ['Ascent Crash', 'crash']]) {
+    const allTab = page.getByRole('tab', { name: 'ALL GAMES' })
+    if (await allTab.count()) await allTab.click()
+    else await page.getByText('Home', { exact: true }).last().click().catch(() => {})
+    await page.getByLabel(`Play ${name}`).first().click({ timeout: 15000 })
+    await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {})
+    if (!await page.getByLabel('Game information').waitFor({ timeout: 15000 }).then(() => true).catch(() => false)) {
+      await page.screenshot({ path: `${OUT}/29-${size}-${code}-missing.png` }); findings.push(`${size} ${code}: the game screen did not open`)
+      await page.getByLabel('Back to lobby').first().click({ timeout: 3000 }).catch(() => {}); continue
+    }
+    await page.waitForTimeout(700)
+    const used = await page.evaluate(() => {
+      const pick = [...document.querySelectorAll('[aria-label^="Reel "],[aria-label="Keno board"],[aria-label^="Bet number-"],[aria-label^="Bet Number"]')]
+      const boxes = (pick.length ? pick : []).map(el => el.getBoundingClientRect())
+      if (!boxes.length) return null
+      const top = Math.min(...boxes.map(b => b.top)), bottom = Math.max(...boxes.map(b => b.bottom)), left = Math.min(...boxes.map(b => b.left)), right = Math.max(...boxes.map(b => b.right))
+      return { height: Math.round(bottom - top), width: Math.round(right - left) }
+    })
+    if (used && code !== 'crash' && used.height < viewport.height * (size === 'ipad' ? .5 : .25) && used.width < viewport.width * .8)
+      findings.push(`${size} ${code}: the game is only ${used.width}x${used.height} of ${viewport.width}x${viewport.height}`)
+    await audit(`29-${size}-${code}`)
+    await page.getByLabel('Game information').click()
+    await page.getByText('RETURN TO GAME').waitFor({ timeout: 5000 }).catch(() => findings.push(`${size} ${code}: the info button did not open the paytable`))
+    if (code === 'devil') await page.screenshot({ path: `${OUT}/29-${size}-devil-info.png` })
+    await page.getByText('RETURN TO GAME').click().catch(() => {})
+    await page.getByLabel('Back to lobby').first().click()
+    await page.waitForTimeout(600)
+    console.log(`## ${size} ${code}  (${used ? `${used.width}x${used.height}` : 'drawn'} of ${viewport.width}x${viewport.height})`)
+  }
+}
+await page.setViewportSize({ width: 844, height: 390 })
+await page.waitForTimeout(600)
 
 // An expired token must not kill the floor: the app renews the session and the data keeps coming.
 liveUnauthorized = 1
