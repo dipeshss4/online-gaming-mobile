@@ -37,6 +37,8 @@ const LOGOS: Record<string, Logo> = {
   TEN_X_TRIPLE: { kicker: 'TRIPLE PAY', title: '10× TRIPLE', metal: GOLD, plaque: ['#4a0606', '#1a0101'], frame: FRAME_GOLD, serif: true },
   WILD_BUFFALO: { kicker: 'FRONTIER', title: 'WILD BUFFALO', metal: GOLD, plaque: ['#3a1e06', '#140a01'], frame: FRAME_GOLD },
   SIMPLE_DOLLAR: { kicker: 'SIMPLE', title: '$ DOLLAR', metal: JADE, plaque: ['#063a24', '#021a10'], frame: FRAME_GOLD, serif: true },
+  TRIPLE_MATCH_SCRATCH: { kicker: 'INSTANT SCRATCH', title: 'TRIPLE MATCH', metal: GOLD, plaque: ['#0b2a7a', '#030c2a'], frame: FRAME_GOLD },
+  LOTERIA_SCRATCH: { kicker: 'SCRATCH · TABLA', title: '¡LOTERÍA!', metal: ROSE, plaque: ['#0b4a2a', '#03180e'], frame: FRAME_GOLD, serif: true },
   BLAZING_HIT: { kicker: 'HOT HITS', title: 'BLAZING HIT', metal: RUBY, plaque: ['#4a0d04', '#1a0401'], frame: FRAME_FIRE },
 };
 
@@ -100,6 +102,8 @@ export function themeOf(game: Game): GameTheme {
   if (game.code === 'VEGAS_JACKPOT_DEVIL_HEART' || layout === 'CLASSIC_5L') return { background: ['#4a0a06', '#250404', '#120102'], frame: '#ff7a1a', accent: '#ffd23f', reels: '#1a0204', mood: 'embers' };
   if (layout === 'GRID_3X3') return { background: ['#5a1a06', '#2a0803', '#140402'], frame: '#ffb01f', accent: '#ffd23f', reels: '#1a0703', mood: 'embers' };
   if (layout === 'VIDEO_5X3') return { background: ['#3a1478', '#1d0838', '#0b0422'], frame: '#ff3cac', accent: '#ffd23f', reels: '#140a24', mood: 'bokeh' };
+  if (layout === 'SCRATCH_MATCH3') return { background: ['#1b3fa8', '#0a1a5a', '#050a24'], frame: '#ffd23f', accent: '#ffd23f', reels: '#0b2a7a', mood: 'sparkle' };
+  if (layout === 'SCRATCH_LOTERIA') return { background: ['#0b6b3a', '#063a22', '#021a0e'], frame: '#ff4fb0', accent: '#ffe45c', reels: '#0b4a2a', mood: 'sparkle' };
   if (layout === 'KENO') return { background: ['#0b2a5a', '#0b0626', '#05031a'], frame: '#22e1ff', accent: '#22e1ff', reels: '#0e1a3a', mood: 'stars' };
   if (layout === 'ROULETTE') return { background: ['#0b4a2a', '#06301c', '#03180e'], frame: '#e7c888', accent: '#ffe45c', reels: '#103629', mood: 'spotlights' };
   if (game.engineType === 'CRASH' || game.code === 'ASCENT_CRASH') return { background: ['#1b2f8a', '#0a1030', '#05081a'], frame: '#22e1ff', accent: '#22e1ff', reels: '#0a1030', mood: 'stars' };
