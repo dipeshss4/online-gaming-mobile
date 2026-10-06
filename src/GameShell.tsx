@@ -46,7 +46,7 @@ export function GameShell({ game, balance, onBack, backDisabled, status, notice,
       {/* An upright phone has no room beside the buttons: the logo gets its own row below. */}
       <View style={g.logo}>{!upright && <GameLogo game={game} height={compact ? 34 : 46} maxWidth={width - 44 - 44 - 170 - 40} />}</View>
       <SoundToggle />
-      <View style={[g.credits, { borderColor: theme.frame }]}><Text style={g.coin}>$</Text><Text style={g.creditsText} numberOfLines={1}>{balance ? balance.balance.toFixed(2) : '—'}</Text></View>
+      <View style={[g.credits, { borderColor: theme.frame }]}><Text style={g.coin}>$</Text><Text style={g.creditsText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={.7}>{balance ? balance.balance.toFixed(2) : '—'}</Text></View>
     </View>
     {upright && <View style={g.logoRow}><GameLogo game={game} height={38} maxWidth={width - 24} /></View>}
     <View style={g.stage} onLayout={measure}>{stage.width > 0 && children(stage)}</View>
@@ -90,7 +90,7 @@ const g = StyleSheet.create({
   info: { color: '#fff', fontSize: 22, fontWeight: '900', fontStyle: 'italic' },
   logo: { flex: 1, alignItems: 'center', overflow: 'hidden' },
   logoRow: { alignItems: 'center', paddingHorizontal: 12, paddingBottom: 4 },
-  credits: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40, paddingLeft: 4, paddingRight: 12, borderRadius: 20, borderWidth: 1.5, backgroundColor: '#00000088', maxWidth: 160 },
+  credits: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40, paddingLeft: 4, paddingRight: 12, borderRadius: 20, borderWidth: 1.5, backgroundColor: '#00000088', maxWidth: 220 },
   coin: { width: 28, height: 28, borderRadius: 14, backgroundColor: c.gold, color: c.goldInk, textAlign: 'center', lineHeight: 28, fontWeight: '900', fontSize: 15, overflow: 'hidden' },
   creditsText: { color: '#fff', fontWeight: '900', fontSize: 16, flexShrink: 1 },
   stage: { flex: 1, minHeight: 0, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },

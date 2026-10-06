@@ -94,6 +94,8 @@ export function NativeLuxuryLife({ game, token, userId, initialBalance, onClose,
       for (let reel = 1; reel <= REELS; reel++) { if (!alive.current) return; setStopped(reel); sound.play('reel-land'); await wait(200); }
       const found = winningLines(cells, lines), perLine = data.stake / lines.length;
       if (found.length) {
+        // The last reel is still landing (its run and bounce take about half a second); draw lines once it rests.
+        await wait(450);
         setWins(found);
         let running = 0;
         for (const line of found.slice(0, 6)) {
