@@ -108,13 +108,7 @@ for (const [name, notes] of [['win-small', [440, 554]], ['win-good', [330, 440, 
   for (let i = 0; i < 14; i++) tone(b, 2200 + (i * 373) % 1400, .55 + i * .08, .18, 'sine', .05)
   write('fanfare', b, .8)
 }
-// The web's intro: four low pulses and a rising sweep.
-{
-  const b = buffer(3.2)
-  ;[0, .72, 1.44, 2.16].forEach((offset, i) => { tone(b, 55 + i * 10, offset, .18, 'sine', .42); tone(b, 330 + i * 92, offset + .05, .35, 'triangle', .16) })
-  sweep(b, 90, 780, 0, 2.95, 'sawtooth', .1)
-  write('intro', b, .8)
-}
+// The opening film's score (intro.wav) is rendered by scripts/make-game-sounds.mjs, cut to AppIntro's beats.
 
 // ---- music: each scene's loop from the web, eight steps long so it wraps without a seam
 const scenes = {
