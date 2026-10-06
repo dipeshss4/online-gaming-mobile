@@ -2,12 +2,14 @@ import { AppState, Platform } from 'react-native';
 import { useEffect, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { AudioPlayer, createAudioPlayer, setAudioModeAsync } from 'expo-audio';
+import { GAME_SOUNDS } from './gameSounds';
 
 /**
  * The app's sound: the website's casino sounds (scripts/make-sounds.mjs renders them), with music per scene and
  * effects for spins, reels, wins and messages. The same settings as the website decide it — Admin → Site content
  * → Sound for the lobby and master volume, Admin → Games → Gameplay & sound for each game — and the player's
- * own switch wins over both.
+ * own switch wins over both. Each game also has a sound of its own (scripts/make-game-sounds.mjs): its music, a
+ * sting as it opens and its win jingle; a game without one plays its scene's music.
  */
 export type Scene = 'lobby' | 'slots' | 'roulette' | 'crash' | 'fish';
 export type SiteSound = { lobbyMusic: boolean; introSound: boolean; masterVolume: number };
@@ -41,7 +43,12 @@ class SoundDirector {
   private mix: GameSound = FULL;
   private scene: Scene | null = null;
   private music: AudioPlayer | null = null;
-  private musicScene: Scene | null = null;
+  private musicKey: string | null = null;
+  /** The open game with a sound of its own, and its sting and win players. */
+  private game: string | null = null;
+  private gamePlayers = new Map<string, AudioPlayer>();
+  private ducked = 0;
+  private duckTimer: ReturnType<typeof setTimeout> | null = null;
   // Reel stops land a few hundred milliseconds apart, so they get a player each instead of cutting each other off.
   private effects = new Map<Effect, AudioPlayer[]>();
   private turn = new Map<Effect, number>();
@@ -77,9 +84,15 @@ class SoundDirector {
   }
 
   /** Where the player is. A game brings its own mix; the lobby uses the site's. */
-  setScene(scene: Scene | null, game?: { settings?: { sound?: GameSound } } | null) {
+  setScene(scene: Scene | null, game?: { code?: string; settings?: { sound?: GameSound } } | null) {
     this.scene = scene;
     this.mix = scene && scene !== 'lobby' ? game?.settings?.sound ?? FULL : FULL;
+    const own = scene && scene !== 'lobby' && game?.code && GAME_SOUNDS[game.code] ? game.code : null;
+    const opened = own && own !== this.game;
+    if (own !== this.game) { for (const player of this.gamePlayers.values()) player.remove(); this.gamePlayers.clear(); }
+    this.game = own;
+    // The game's sting plays over its music, which waits underneath until the sting has had its moment.
+    if (opened && this.playGame('open')) this.duck(2600);
     this.applyMusic();
   }
 
@@ -99,8 +112,32 @@ class SoundDirector {
       void player.seekTo(0).then(() => player.play(), () => player.play());
     } catch { /* a missing sound never stops play */ }
   }
-  /** The round's result: a fanfare that grows with the multiplier, or a soft tone for a loss. */
-  result(multiplier: number) { this.play(multiplier <= 0 ? 'lose' : multiplier >= 10 ? 'win-big' : multiplier >= 2 ? 'win-good' : 'win-small'); }
+  /** The round's result: the game's own win jingle (or a fanfare that grows with the multiplier), a soft tone for a loss. */
+  result(multiplier: number) {
+    if (multiplier > 0 && multiplier < 10 && this.playGame('win')) return;
+    this.play(multiplier <= 0 ? 'lose' : multiplier >= 10 ? 'win-big' : multiplier >= 2 ? 'win-good' : 'win-small');
+  }
+  /** One of the open game's own sounds. False when there is none or effects are off, so the caller can fall back. */
+  private playGame(kind: 'open' | 'win') {
+    const set = this.game ? GAME_SOUNDS[this.game] : null;
+    if (!set || !this.on || !this.mix.enabled || !this.mix.effects) return false;
+    const volume = this.level() * this.mix.effectsVolume / 100;
+    if (volume <= 0) return false;
+    try {
+      let player = this.gamePlayers.get(kind);
+      if (!player) { player = createAudioPlayer(set[kind]); this.gamePlayers.set(kind, player); }
+      player.volume = volume;
+      const ready = player;
+      void ready.seekTo(0).then(() => ready.play(), () => ready.play());
+      return true;
+    } catch { return false; }
+  }
+  /** Lowers the music for a moment, under a sting. */
+  private duck(ms: number) {
+    this.ducked = .3;
+    if (this.duckTimer) clearTimeout(this.duckTimer);
+    this.duckTimer = setTimeout(() => { this.ducked = 0; this.duckTimer = null; this.applyMusic(); }, ms);
+  }
   /** The site's welcome sound, when the site has it switched on. */
   welcome() { if (this.site.introSound) this.play('fanfare'); }
 
@@ -111,13 +148,15 @@ class SoundDirector {
     const wanted = this.on && scene && (scene === 'lobby' ? this.site.lobbyMusic : this.mix.enabled && this.mix.music) ? scene : null;
     if (!wanted) { this.music?.pause(); return; }
     try {
-      if (this.musicScene !== wanted || !this.music) {
+      const own = wanted !== 'lobby' && this.game ? GAME_SOUNDS[this.game] : null;
+      const key = own ? `game:${this.game}` : wanted;
+      if (this.musicKey !== key || !this.music) {
         this.music?.remove();
-        this.music = createAudioPlayer(MUSIC[wanted]);
+        this.music = createAudioPlayer(own ? own.music : MUSIC[wanted]);
         this.music.loop = true;
-        this.musicScene = wanted;
+        this.musicKey = key;
       }
-      this.music.volume = this.level() * (wanted === 'lobby' ? .5 : this.mix.musicVolume / 100) * .6;
+      this.music.volume = this.level() * (wanted === 'lobby' ? .5 : this.mix.musicVolume / 100) * .6 * (this.ducked || 1);
       this.music.play();
     } catch { /* music is decoration */ }
   }
