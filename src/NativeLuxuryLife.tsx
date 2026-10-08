@@ -14,6 +14,7 @@ import { MarqueeFrame } from './fx/MarqueeFrame';
 import { Paylines } from './fx/Paylines';
 import { sound } from './sound';
 import { GameShell, PayRow, Rules } from './GameShell';
+import { usePace } from './playControls';
 
 /**
  * Luxury Life in the app: five reels, three rows, fifteen lines, and the DOUBLE diamond wild that doubles every win it
@@ -68,7 +69,8 @@ export function NativeLuxuryLife({ game, token, userId, initialBalance, onClose,
     AccessibilityInfo.isReduceMotionEnabled().then(value => { fast.current = value; setReduced(value); });
     return () => { alive.current = false; };
   }, [userId]);
-  const wait = (ms: number) => pause(fast.current ? Math.min(ms, 100) : ms);
+  // The show's pauses follow the player's TURBO and STOP (src/playControls.ts).
+  const play = usePace(game), wait = play.pace.wait;
   async function show(text: string, ms: number) {
     setBanner(text); slam.setValue(0);
     Animated.spring(slam, { toValue: 1, friction: 4, tension: 110, useNativeDriver: true }).start();
@@ -78,7 +80,7 @@ export function NativeLuxuryLife({ game, token, userId, initialBalance, onClose,
   async function spin() {
     if (lock.current || !ready || (pending && pending.gameCode !== game.code)) return;
     if (!pending && wallet && stake > wallet.balance) { setError('Insufficient available balance.'); return; }
-    lock.current = true; setBusy(true); setError(''); setWin(null); setMeter(0); setWins([]); setShown(null); setStopped(0); setStatus('GOOD LUCK!');
+    lock.current = true; play.pace.begin(); setBusy(true); setError(''); setWin(null); setMeter(0); setWins([]); setShown(null); setStopped(0); setStatus('GOOD LUCK!');
     let submitted = false;
     try {
       const bet = pending || { gameCode: game.code, requestId: randomUUID(), stake };
@@ -115,6 +117,7 @@ export function NativeLuxuryLife({ game, token, userId, initialBalance, onClose,
       setStatus(data.payout > 0 ? `WIN ${cash(data.payout)}` : 'DOUBLE WILDS DOUBLE EVERY WIN');
       feel(data.payout > 0 ? 'win' : 'tap'); sound.result(data.payout > 0 ? data.multiplier : 0);
       if (data.payout > 0) setWin({ payout: data.payout, stake: data.stake, multiplier: data.multiplier, currency: data.currency, id: data.betId });
+      play.pace.report({ payout: data.payout, stake: data.stake, multiplier: data.multiplier });
       onSettled();
     } catch (e) {
       if (!alive.current) return;
@@ -128,7 +131,7 @@ export function NativeLuxuryLife({ game, token, userId, initialBalance, onClose,
   const litBy = new Map<number, string>();
   for (const line of drawn) for (const cell of line.cells.slice(0, line.count)) if (!litBy.has(cell)) litBy.set(cell, LINE_COLOURS[line.index % LINE_COLOURS.length]);
   const perLine = (pending ? pending.stake : stake) / lines.length;
-  return <GameShell game={game} balance={wallet} onBack={onClose} backDisabled={busy} status={status}
+  return <GameShell game={game} play={{ ...play, stake: pending ? pending.stake : stake }} balance={wallet} onBack={onClose} backDisabled={busy} status={status}
     notice={error ? <Text accessibilityRole="alert" style={s.error}>{error}</Text>
       : pending && !busy ? `Pending: ${pending.gameCode} · ${cash(pending.stake)}. ${pending.gameCode !== game.code ? 'Open that game to recover the round.' : 'SPIN resends this exact bet, not a new one.'}` : undefined}
     bet={<BetBar inline label={`TOTAL BET · ${lines.length} LINES`} value={pending ? pending.stake : stake} onChange={setStake} min={game.minStake} max={game.maxStake} disabled={busy || !!pending} />}

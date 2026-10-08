@@ -14,6 +14,7 @@ import { MarqueeFrame } from './fx/MarqueeFrame';
 import { sound } from './sound';
 import { SymbolArt } from './WebLook';
 import { GameShell, PayRow, Rules } from './GameShell';
+import { usePace } from './playControls';
 
 /**
  * Break the Bank in the app: five reels of four rows, then the Fire Link. The round comes whole from the server
@@ -79,7 +80,8 @@ export function NativeFireLink({ game, token, userId, initialBalance, onClose, o
     AccessibilityInfo.isReduceMotionEnabled().then(value => { fast.current = value; setReduced(value); });
     return () => { alive.current = false; };
   }, [userId]);
-  const wait = (ms: number) => pause(fast.current ? Math.min(ms, 100) : ms);
+  // The show's pauses follow the player's TURBO and STOP (src/playControls.ts).
+  const play = usePace(game), wait = play.pace.wait;
   async function show(text: string, ms: number) {
     setBanner(text); slam.setValue(0);
     Animated.spring(slam, { toValue: 1, friction: 4, tension: 110, useNativeDriver: true }).start();
@@ -89,7 +91,7 @@ export function NativeFireLink({ game, token, userId, initialBalance, onClose, o
   async function spin() {
     if (lock.current || !ready || (pending && pending.gameCode !== game.code)) return;
     if (!pending && wallet && stake > wallet.balance) { setError('Insufficient available balance.'); return; }
-    lock.current = true; setBusy(true); setError(''); setWin(null); setMeter(0); setRows([]); setLink(false); setLocked(new Set()); setLinkTotal(0); setStopped(0); setStatus('GOOD LUCK!');
+    lock.current = true; play.pace.begin(); setBusy(true); setError(''); setWin(null); setMeter(0); setRows([]); setLink(false); setLocked(new Set()); setLinkTotal(0); setStopped(0); setStatus('GOOD LUCK!');
     let submitted = false;
     try {
       const bet = pending || { gameCode: game.code, requestId: randomUUID(), stake };
@@ -131,6 +133,7 @@ export function NativeFireLink({ game, token, userId, initialBalance, onClose, o
       setStatus(data.payout > 0 ? `WIN ${cash(data.payout)}` : 'SIX FIREBALLS START THE FIRE LINK');
       feel(data.payout > 0 ? 'win' : 'tap'); sound.result(data.payout > 0 ? data.multiplier : 0);
       if (data.payout > 0) setWin({ payout: data.payout, stake: data.stake, multiplier: data.multiplier, currency: data.currency, id: data.betId });
+      play.pace.report({ payout: data.payout, stake: data.stake, multiplier: data.multiplier });
       onSettled();
     } catch (e) {
       if (!alive.current) return;
@@ -141,7 +144,7 @@ export function NativeFireLink({ game, token, userId, initialBalance, onClose, o
   }
 
   const jackpots: [string, number][] = [['MINI', 25], ['MINOR', 50], ['MAJOR', 150], ['GRAND', 1000]];
-  return <GameShell game={game} balance={wallet} onBack={onClose} backDisabled={busy} status={link && busy ? `RESPINS LEFT · ${left}` : status}
+  return <GameShell game={game} play={{ ...play, stake: pending ? pending.stake : stake }} balance={wallet} onBack={onClose} backDisabled={busy} status={link && busy ? `RESPINS LEFT · ${left}` : status}
     notice={error ? <Text accessibilityRole="alert" style={s.error}>{error}</Text>
       : pending && !busy ? `Pending: ${pending.gameCode} · ${cash(pending.stake)}. ${pending.gameCode !== game.code ? 'Open that game to recover the round.' : 'SPIN resends this exact bet, not a new one.'}` : undefined}
     bet={<BetBar inline label="TOTAL BET" value={pending ? pending.stake : stake} onChange={setStake} min={game.minStake} max={game.maxStake} disabled={busy || !!pending} />}

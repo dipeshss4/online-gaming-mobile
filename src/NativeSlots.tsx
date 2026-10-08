@@ -5,6 +5,7 @@ import { ApiError, Balance, Game, PlayResult, request } from './api';
 import { clearPending, PendingBet, readPending, savePending } from './pendingBet';
 import { s } from './styles';
 import { GameShell, PayRow, Rules } from './GameShell';
+import { usePace } from './playControls';
 import { themeOf } from './GameLogo';
 import { SpinReel } from './fx/SpinReel';
 import { Paylines } from './fx/Paylines';
@@ -39,12 +40,14 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
     const listener = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduced);
     return () => { alive.current = false; listener.remove(); };
   }, [userId]);
+  // The show's pauses follow the player's TURBO and STOP (src/playControls.ts).
+  const play = usePace(game);
   async function spin() {
     if (locked.current || !ready || (pending && pending.gameCode !== game.code)) return;
     const amount = Number(stake);
     if (!pending && (!/^\d+(\.\d{1,2})?$/.test(stake) || amount < game.minStake || amount > Math.min(game.maxStake, 1000))) { setError(`Enter a stake between ${game.minStake} and ${Math.min(game.maxStake, 1000)}, with at most 2 decimals.`); return; }
     if (!pending && wallet && amount > wallet.balance) { setError('Insufficient available balance.'); return; }
-    locked.current = true; setBusy(true); setError(''); setResult(null); setStopped(0); setWin(null);
+    locked.current = true; play.pace.begin(); setBusy(true); setError(''); setResult(null); setStopped(0); setWin(null);
     let submitted = false;
     try {
       const bet = pending || { gameCode: game.code, requestId: randomUUID(), stake: amount };
@@ -61,7 +64,7 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
       setTease(teasing);
       for (let reel = 1; reel <= 3; reel++) {
         if (reel === 3 && teasing) sound.play('tease');
-        if (!reduced) await new Promise(resolve => setTimeout(resolve, reel === 1 ? 900 : reel === 3 && teasing ? 1500 : 350));
+        await play.pace.wait(reel === 1 ? 900 : reel === 3 && teasing ? 1500 : 350);
         if (!alive.current) return;
         setStopped(reel); sound.play('reel-land');
       }
@@ -69,6 +72,7 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
       setWallet({ ...wallet, balance: data.balance, currency: data.currency });
       feel(data.payout > 0 ? 'win' : 'tap'); sound.result(data.payout > 0 ? data.multiplier : 0);
       if (data.payout > 0) setWin({ payout: data.payout, stake: data.stake, multiplier: data.multiplier, currency: data.currency, id: data.betId });
+      play.pace.report({ payout: data.payout, stake: data.stake, multiplier: data.multiplier });
       onSettled();
     } catch (e) {
       if (!alive.current) return;
@@ -84,7 +88,7 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
   const display = result?.symbols || idle;
   const settled = result && !busy;
   const status = busy ? 'GOOD LUCK!' : settled ? (result.payout > 0 ? `WIN ${cash(result.payout)} · ${result.multiplier}×` : 'SO CLOSE · SPIN AGAIN') : grid ? 'CENTER ROW PAYS' : 'ONE PAYLINE · CENTER ROW';
-  return <GameShell game={game} balance={wallet} onBack={onClose} backDisabled={busy} status={status}
+  return <GameShell game={game} play={{ ...play, stake: pending ? pending.stake : Number(stake) || game.minStake }} balance={wallet} onBack={onClose} backDisabled={busy} status={status}
     notice={error ? <Text accessibilityRole="alert" style={s.error}>{error}</Text>
       : pending && !busy ? `Pending: ${pending.gameCode} · ${cash(pending.stake)}. ${pending.gameCode !== game.code ? 'Open that game to recover the round.' : 'SPIN resends this exact bet, not a new one.'}` : undefined}
     bet={<BetBar inline label="BET PER SPIN" value={pending ? pending.stake : Number(stake)} onChange={value => setStake(value.toFixed(2))} min={game.minStake} max={game.maxStake} disabled={busy || !!pending} />}

@@ -10,6 +10,7 @@ import { Win, WinCelebration } from './WinCelebration';
 import { BigWin } from './fx/BigWin';
 import { sound } from './sound';
 import { GameShell, PayRow, Rules } from './GameShell';
+import { usePace } from './playControls';
 import { SpinReel } from './fx/SpinReel';
 import { Paylines } from './fx/Paylines';
 
@@ -74,7 +75,8 @@ export function NativeDevilHeart({ game, token, userId, initialBalance, onClose,
     AccessibilityInfo.isReduceMotionEnabled().then(value => { fast.current = value; setReduced(value); });
     return () => { alive.current = false; };
   }, [userId]);
-  const wait = (ms: number) => pause(fast.current ? Math.min(ms, 100) : ms);
+  // The show's pauses follow the player's TURBO and STOP (src/playControls.ts).
+  const play = usePace(game), wait = play.pace.wait;
 
   async function land(next: string[], reels: number[], spinMs: number) {
     setLines([]); setShowing(null);
@@ -97,7 +99,7 @@ export function NativeDevilHeart({ game, token, userId, initialBalance, onClose,
   async function spin() {
     if (lock.current || !ready || (pending && pending.gameCode !== game.code)) return;
     if (!pending && wallet && stake > wallet.balance) { setError('Insufficient available balance.'); return; }
-    lock.current = true; setBusy(true); setError(''); setWin(null); setMeter(0); setJackpot(null); setLocked([false, false, false]); setStatus('GOOD LUCK!');
+    lock.current = true; play.pace.begin(); setBusy(true); setError(''); setWin(null); setMeter(0); setJackpot(null); setLocked([false, false, false]); setStatus('GOOD LUCK!');
     let submitted = false;
     try {
       const bet = pending || { gameCode: game.code, requestId: randomUUID(), stake };
@@ -130,6 +132,7 @@ export function NativeDevilHeart({ game, token, userId, initialBalance, onClose,
       setStatus(data.payout > 0 ? `WIN ${cash(data.payout)}` : 'SO CLOSE · SPIN AGAIN');
       feel(data.payout > 0 ? 'win' : 'tap'); sound.result(data.payout > 0 ? data.multiplier : 0);
       if (data.payout > 0) setWin({ payout: data.payout, stake: data.stake, multiplier: data.multiplier, currency: data.currency, id: data.betId });
+      play.pace.report({ payout: data.payout, stake: data.stake, multiplier: data.multiplier });
       onSettled();
     } catch (e) {
       if (!alive.current) return;
@@ -149,7 +152,7 @@ export function NativeDevilHeart({ game, token, userId, initialBalance, onClose,
     const group = LINES.map((rows, l) => l).filter(l => LINES[l][side === 'left' ? 0 : 2] === row), order = group.indexOf(line);
     return row * size + size / 2 - 11 + (order - (group.length - 1) / 2) * 24;
   };
-  return <GameShell game={game} balance={wallet} onBack={onClose} backDisabled={busy} status={status}
+  return <GameShell game={game} play={{ ...play, stake: pending ? pending.stake : stake }} balance={wallet} onBack={onClose} backDisabled={busy} status={status}
     notice={error ? <Text accessibilityRole="alert" style={s.error}>{error}</Text>
       : pending && !busy ? `Pending: ${pending.gameCode} · ${cash(pending.stake)}. ${pending.gameCode !== game.code ? 'Open that game to recover the round.' : 'SPIN resends this exact bet, not a new one.'}` : undefined}
     bet={<BetBar inline label={`TOTAL BET · ${cash(stake / 5)} × 5 LINES`} value={pending ? pending.stake : stake} onChange={setStake} min={game.minStake} max={game.maxStake} disabled={busy || !!pending} />}

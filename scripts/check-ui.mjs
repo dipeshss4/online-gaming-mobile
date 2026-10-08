@@ -22,6 +22,7 @@ catch { defaults = { brand: { logoGlyph: '7', tagline: 'THE ORIGINAL COLLECTION'
   signIn: { formKicker: "MEMBERS' ENTRANCE", loginTitle: 'Welcome back.', loginSubtitle: 'Your next game is waiting.', registerTitle: 'Join the floor.', registerSubtitle: 'Create your demo player account.', registrationClosed: 'New accounts are paused right now.' },
   lobby: { welcomeLabel: 'THE ORIGINAL COLLECTION', heroEnabled: true, featuredGameCode: 'HOT_7S', heroEyebrow: 'IN THE SPOTLIGHT', heroHeadline: 'A classic feeling.', heroAccent: 'A fresh spin.', heroBody: 'Discover {game} and find your rhythm.', heroNote: 'PLAY WITH DEMO CREDITS · NO CASH VALUE', heroArtLabel: 'ONLINE GAME ORIGINAL', quickLinkTitle: 'Your game. Your pace.', quickLinkBody: 'Original games, one demo wallet.', libraryEyebrow: 'FIND YOUR NEXT FAVORITE', defaultBadge: 'ONLINE GAME ORIGINAL' } } }
 const findings = []
+let luxuryRounds = 0
 const now = new Date().toISOString()
 
 // The welcome pop-up and new-message pop-up are switched off until their own scenario, so they do not cover the
@@ -76,7 +77,8 @@ const games = [
     engine: { layout: 'LINES_5X3', symbols: ['YACHT', 'JET', 'LIMO', 'RING', 'WATCH', 'GOLD', 'COIN', 'SILVER', 'DOUBLE'], payline: [], rules: ['DOUBLE wilds double every win.'], paytable: [],
       lines: [[5, 6, 7, 8, 9], [0, 1, 2, 3, 4], [10, 11, 12, 13, 14], [0, 6, 12, 8, 4], [10, 6, 2, 8, 14], [0, 1, 7, 13, 14], [10, 11, 7, 3, 4], [5, 1, 2, 3, 9],
         [5, 11, 12, 13, 9], [0, 6, 7, 8, 4], [10, 6, 7, 8, 14], [5, 1, 7, 13, 9], [5, 11, 7, 3, 9], [0, 6, 2, 8, 4], [10, 6, 12, 8, 14]] },
-    presentation: { badge: 'NEW · 15 LINES', tileSubtitle: 'DOUBLE WILDS' } },
+    presentation: { badge: 'NEW · 15 LINES', tileSubtitle: 'DOUBLE WILDS' },
+    settings: { pacing: { spinMs: 1600, reelStopMs: 180, turboAllowed: true, turboSpinMs: 700, turboReelStopMs: 60 }, autoplay: { enabled: true, maxRounds: 50, stopOnAnyWin: false, stopOnBigWin: true } } },
   { code: 'ASCENT_CRASH', name: 'Ascent Crash', description: 'Cash out before the climb ends.', minStake: 0.1, maxStake: 50, engineType: 'CRASH', presentation: { tileSubtitle: 'Arcade · From 0.10 credits' } }
 ]
 const wallet = { balance: 125.5, currency: 'USD', held: 20, status: 'ACTIVE' }
@@ -210,6 +212,11 @@ await page.route('**/api/**', async route => {
       const screen = ['JACKPOT', 'JACKPOT', 'JACKPOT', 'BAR1', 'SEVEN', 'BAR2', 'BLANK', 'BAR3', 'BLANK']
       return json({ requestId: body.requestId, betId: 'd2', gameCode: 'VEGAS_JACKPOT_DEVIL_HEART', symbols: [...screen, 'JP20'], stake: body.stake,
         payout: 2, balance: 127.78, currency: 'USD', outcome: 'JACKPOT', multiplier: 20 })
+    }
+    if (path === '/api/games/LUXURY_LIFE/play' && luxuryRounds++ > 0) {
+      // After the first round, quiet losses: the autoplay run plays on through them.
+      return json({ requestId: body.requestId, betId: `ll${luxuryRounds}`, gameCode: 'LUXURY_LIFE', stake: body.stake, payout: 0, balance: 170, currency: 'USD', outcome: 'LOSS', multiplier: 0,
+        symbols: ['COIN', 'JET', 'RING', 'GOLD', 'LIMO', 'WATCH', 'SILVER', 'YACHT', 'COIN', 'JET', 'RING', 'GOLD', 'LIMO', 'WATCH', 'SILVER'] })
     }
     if (path === '/api/games/LUXURY_LIFE/play') {
       // Five yachts on the middle line with a DOUBLE (x2: 1,000 line bets), three coins on the top, and line 14 (COIN, DOUBLE, COIN).
@@ -624,6 +631,31 @@ await page.getByText('WIN 10.12').waitFor({ timeout: 20000 }).catch(() => findin
 await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
 await audit('35-luxury-life-done')
 console.log('## luxury life  (five yachts with a DOUBLE, three lines drawn, MEGA WIN, 10.12)')
+
+// The round controls: TURBO switches on; SPIN becomes STOP during a round; AUTO runs rounds back to back until STOP.
+await page.getByLabel('Turbo off').click().catch(() => findings.push('controls: no TURBO button'))
+await page.getByLabel('Turbo on').waitFor({ timeout: 3000 }).catch(() => findings.push('controls: TURBO did not switch on'))
+const beforeSkip = luxuryRounds
+await page.getByRole('button', { name: 'Spin', exact: true }).click()
+await page.getByLabel('Stop the reels').click({ timeout: 3000 }).catch(() => findings.push('controls: SPIN did not become STOP during the round'))
+await page.getByRole('button', { name: 'Spin', exact: true }).waitFor({ timeout: 4000 }).catch(() => findings.push('controls: STOP did not end the round quickly'))
+if (luxuryRounds !== beforeSkip + 1) findings.push(`controls: STOP placed ${luxuryRounds - beforeSkip} bets instead of 1`)
+await page.getByLabel('Autoplay', { exact: true }).click().catch(() => findings.push('controls: no AUTO button'))
+await page.getByText('AUTOPLAY', { exact: true }).waitFor({ timeout: 3000 }).catch(() => findings.push('controls: the autoplay picker did not open'))
+await page.waitForTimeout(500)
+await audit('36-autoplay-picker')
+const beforeAuto = luxuryRounds
+await page.getByLabel('Autoplay 10 rounds').click()
+for (let i = 0; i < 40 && luxuryRounds < beforeAuto + 3; i++) await page.waitForTimeout(250)
+if (luxuryRounds < beforeAuto + 3) findings.push(`controls: autoplay played ${luxuryRounds - beforeAuto} rounds in 10s`)
+await page.screenshot({ path: `${OUT}/36a-autoplay-running.png` })
+await page.getByLabel(/^Stop autoplay/).first().click().catch(() => findings.push('controls: no STOP while autoplay ran'))
+await page.waitForTimeout(3500)
+const settled = luxuryRounds
+await page.waitForTimeout(2500)
+if (luxuryRounds !== settled) findings.push('controls: autoplay kept betting after STOP')
+console.log(`## round controls  (turbo on, STOP rushed a round, autoplay played ${settled - beforeAuto} rounds and stopped)`)
+await page.getByLabel('Turbo on').click().catch(() => {})
 await page.getByLabel('Back to lobby').first().click()
 await page.getByRole('tab', { name: 'OTHER' }).click()
 
