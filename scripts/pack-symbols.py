@@ -66,3 +66,13 @@ for target in ('assets/luxury', '../frontend/public/art/luxury'):
     for name in LUXURY:
         trimmed(os.path.join(RENDERS, f'LX_{name}.png'), 320).save(os.path.join(folder, f'{name}.png'), optimize=True)
     print('wrote', target)
+
+# The lobby's casino art (scripts/render-casino.py): tile centrepieces and dock icons, and the casino-floor backdrop.
+CASINO = ['ROULETTE', 'CHIPS', 'DICE', 'CARDS', 'SLOT', 'ROCKET', 'KENO', 'SCRATCH', 'COINS', 'FISH', 'HEART', 'CROWN']
+if os.path.exists(os.path.join(RENDERS, 'CA_ROULETTE.png')):
+    folder = os.path.join(ROOT, 'assets/casino'); os.makedirs(folder, exist_ok=True)
+    for name in CASINO:
+        trimmed(os.path.join(RENDERS, f'CA_{name}.png'), 360).save(os.path.join(folder, f'{name}.png'), optimize=True)
+    floor = Image.open(os.path.join(RENDERS, 'CA_FLOOR.png')).convert('RGB').resize((1280, 576), Image.LANCZOS)
+    floor.save(os.path.join(folder, 'FLOOR.jpg'), quality=78, optimize=True, progressive=True)
+    print('wrote assets/casino')
