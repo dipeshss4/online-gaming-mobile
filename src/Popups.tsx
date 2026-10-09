@@ -5,6 +5,7 @@ import { API_URL, Game, Inbox, inbox as inboxApi } from './api';
 import { Tap } from './Tap';
 import { c, feel, grad, useReducedMotion } from './theme';
 import { sound, useSoundOn } from './sound';
+import { onOpenInbox } from './notifications';
 
 const serif = Platform.OS === 'android' ? 'serif' : 'Georgia';
 
@@ -16,7 +17,11 @@ export type Promo = { enabled: boolean; imageId: string; title: string; intro: s
 let promoShowing = false;
 const promoListeners = new Set<(showing: boolean) => void>();
 function setPromoShowing(showing: boolean) { promoShowing = showing; promoListeners.forEach(listener => listener(showing)); }
-function usePromoShowing() {
+export const isPromoShowing = () => promoShowing;
+/** The notifications prompt, while open: the welcome offer waits its turn instead of stacking on it. */
+let otherPopup = false;
+export function setOtherPopup(open: boolean) { otherPopup = open; }
+export function usePromoShowing() {
   const [showing, setShowing] = useState(promoShowing);
   useEffect(() => { promoListeners.add(setShowing); return () => { promoListeners.delete(setShowing); }; }, []);
   return showing;
@@ -37,7 +42,12 @@ export function PromoPopup({ promo, email, games, onPlay }: { promo?: Promo; ema
     // A moment after the lobby appears, so it lands on a screen rather than a blank one.
     setPromoShowing(true);
     let fired = false;
-    const timer = setTimeout(() => { fired = true; setOpen(true); sound.welcome(); feel('win'); }, 600);
+    let timer: ReturnType<typeof setTimeout>;
+    const show = () => {
+      if (otherPopup) { timer = setTimeout(show, 1000); return; }
+      fired = true; setOpen(true); sound.welcome(); feel('win');
+    };
+    timer = setTimeout(show, 600);
     return () => { clearTimeout(timer); if (!fired) setPromoShowing(false); };
   }, [promo, email]);
   // Leaving the lobby with the offer still open must not hold back the inbox forever.
@@ -155,6 +165,8 @@ export function InboxButton({ token }: { token: string }) {
       if (newest) { next.messages.forEach(message => announced.add(message.id)); setFresh(newest); }
     } catch { /* the envelope stays as it was; an older server has no inbox */ }
   }, [token]);
+  // A tapped notification about a message opens the inbox on it.
+  useEffect(() => { onOpenInbox(() => { setOpen(true); void load(); }); return () => onOpenInbox(null); }, [load]);
   useEffect(() => {
     void load();
     const timer = setInterval(() => { if (AppState.currentState === 'active') void load(); }, REFRESH_MS);

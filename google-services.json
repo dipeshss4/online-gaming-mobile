@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1090074760980",
+    "project_id": "loot777x",
+    "storage_bucket": "loot777x.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1090074760980:android:bf3c08460bce7817a41401",
+        "android_client_info": {
+          "package_name": "com.onlinegaming.preview"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCMBAN10svhADQK7yxnskZ2o4mp8P_i_do"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
