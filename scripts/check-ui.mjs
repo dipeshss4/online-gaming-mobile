@@ -331,6 +331,9 @@ await page.locator('input[type=password], input[secureTextEntry]').first().fill(
 await page.getByText(/^(Sign in|Sign In)$/).first().click().catch(() => {})
 await page.waitForTimeout(2500)
 await audit('02-lobby')
+await page.getByLabel('Play Roulette').first().scrollIntoViewIfNeeded().catch(() => {})
+await page.screenshot({ path: `${OUT}/02b-lobby-cards.png` })
+await page.evaluate(() => window.scrollTo(0, 0)).catch(() => {})
 
 // The floor is the first thing on the lobby, so it is seen without scrolling past the games.
 const floorText = await page.locator('body').innerText()
