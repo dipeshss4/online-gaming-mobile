@@ -22,7 +22,7 @@ catch { defaults = { brand: { logoGlyph: '7', tagline: 'THE ORIGINAL COLLECTION'
   signIn: { formKicker: "MEMBERS' ENTRANCE", loginTitle: 'Welcome back.', loginSubtitle: 'Your next game is waiting.', registerTitle: 'Join the floor.', registerSubtitle: 'Create your demo player account.', registrationClosed: 'New accounts are paused right now.' },
   lobby: { welcomeLabel: 'THE ORIGINAL COLLECTION', heroEnabled: true, featuredGameCode: 'HOT_7S', heroEyebrow: 'IN THE SPOTLIGHT', heroHeadline: 'A classic feeling.', heroAccent: 'A fresh spin.', heroBody: 'Discover {game} and find your rhythm.', heroNote: 'PLAY WITH DEMO CREDITS · NO CASH VALUE', heroArtLabel: 'ONLINE GAME ORIGINAL', quickLinkTitle: 'Your game. Your pace.', quickLinkBody: 'Original games, one demo wallet.', libraryEyebrow: 'FIND YOUR NEXT FAVORITE', defaultBadge: 'ONLINE GAME ORIGINAL' } } }
 const findings = []
-let luxuryRounds = 0
+let luxuryRounds = 0, luxuryFree = false
 const now = new Date().toISOString()
 
 // The welcome pop-up and new-message pop-up are switched off until their own scenario, so they do not cover the
@@ -212,6 +212,15 @@ await page.route('**/api/**', async route => {
       const screen = ['JACKPOT', 'JACKPOT', 'JACKPOT', 'BAR1', 'SEVEN', 'BAR2', 'BLANK', 'BAR3', 'BLANK']
       return json({ requestId: body.requestId, betId: 'd2', gameCode: 'VEGAS_JACKPOT_DEVIL_HEART', symbols: [...screen, 'JP20'], stake: body.stake,
         payout: 2, balance: 127.78, currency: 'USD', outcome: 'JACKPOT', multiplier: 20 })
+    }
+    if (path === '/api/games/LUXURY_LIFE/play' && luxuryFree) {
+      // Three KEYs (2x the bet) start 8 free spins; the third pays three coins on the top line, tripled: 2.80x.
+      luxuryFree = false
+      const quiet = ['COIN', 'JET', 'RING', 'GOLD', 'LIMO', 'WATCH', 'SILVER', 'YACHT', 'COIN', 'JET', 'RING', 'GOLD', 'LIMO', 'WATCH', 'SILVER']
+      const paying = ['COIN', 'COIN', 'COIN', 'JET', 'RING', 'WATCH', 'SILVER', 'YACHT', 'COIN', 'JET', 'RING', 'GOLD', 'LIMO', 'WATCH', 'SILVER']
+      const base = ['KEY', 'JET', 'RING', 'GOLD', 'LIMO', 'WATCH', 'SILVER', 'KEY', 'COIN', 'JET', 'RING', 'GOLD', 'LIMO', 'WATCH', 'KEY']
+      return json({ requestId: body.requestId, betId: 'llfree', gameCode: 'LUXURY_LIFE', stake: body.stake, payout: Math.round(2.8 * body.stake * 100) / 100, balance: 170.27, currency: 'USD',
+        outcome: 'BIG_WIN', multiplier: 2.8, symbols: [...base, 'FREE:8', ...Array.from({ length: 8 }, (_, i) => i === 2 ? paying : quiet).flat()] })
     }
     if (path === '/api/games/LUXURY_LIFE/play' && luxuryRounds++ > 0) {
       // After the first round, quiet losses: the autoplay run plays on through them.
@@ -656,6 +665,19 @@ await page.waitForTimeout(2500)
 if (luxuryRounds !== settled) findings.push('controls: autoplay kept betting after STOP')
 console.log(`## round controls  (turbo on, STOP rushed a round, autoplay played ${settled - beforeAuto} rounds and stopped)`)
 await page.getByLabel('Turbo on').click().catch(() => {})
+
+// Free spins: three KEYs glow, 8 FREE SPINS, the counter runs, the third spin's line shows ×3, and the server's total lands.
+luxuryFree = true
+await page.getByRole('button', { name: 'Spin', exact: true }).click()
+await page.getByText('8 FREE SPINS', { exact: true }).waitFor({ timeout: 15000 }).catch(() => findings.push('free spins: no 8 FREE SPINS banner'))
+await page.screenshot({ path: `${OUT}/37-free-spins-banner.png` })
+await page.getByText(/^FREE SPIN 3 \/ 8/).first().waitFor({ timeout: 30000 }).catch(() => findings.push('free spins: the counter never reached 3 / 8'))
+await page.getByText(/\(×3\)$/).first().waitFor({ timeout: 15000 }).catch(() => findings.push('free spins: the paying line was not marked ×3'))
+await page.screenshot({ path: `${OUT}/37a-free-spin-line.png` })
+await page.getByText('WIN 0.42').waitFor({ timeout: 60000 }).catch(() => findings.push("free spins: the round never showed the server's 0.42"))
+await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
+await audit('38-free-spins-done')
+console.log('## luxury life free spins  (three KEYs, 8 free spins, a tripled line, 0.42)')
 await page.getByLabel('Back to lobby').first().click()
 await page.getByRole('tab', { name: 'OTHER' }).click()
 

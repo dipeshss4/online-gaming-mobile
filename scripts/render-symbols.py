@@ -498,8 +498,28 @@ def lux_double():
     rounded_box((2.42, .6, .08), .08, GOLD(), loc=(0, -.75, .37))
     text('DOUBLE', .42, .06, .015, GOLD(), loc=(0, -.77, .55))
 
+def key_parts():
+    """The KEY scatter: an ornate gold key on a velvet VIP tag."""
+    gold = GOLD()
+    bpy.ops.mesh.primitive_torus_add(major_radius=.42, minor_radius=.09, major_segments=64, location=(-.75, .25, 0)); add(bpy.context.object, gold)
+    bpy.ops.object.shade_smooth()
+    for k in range(6):
+        a = k * math.pi / 3
+        sphere((-.75 + .42 * math.cos(a), .25 + .42 * math.sin(a), .06), (.07, .07, .07), gold, 24)
+    sphere((-.75, .25, 0), (.16, .16, .1), mat('Ruby', (1, .02, .2), rough=0, coat=1), 32)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=32, radius=.07, depth=1.35, location=(.0, .25, 0)); s = bpy.context.object
+    s.rotation_euler = (0, math.radians(90), 0); add(s, gold); bpy.ops.object.shade_smooth()
+    for x, h in ((.45, .32), (.62, .22)):
+        rounded_box((.1, h, .1), .02, gold, (x, .25 - h / 2 - .02, 0))
+    for x in (-.25, -.15): sphere((x, .25, 0), (.03, .1, .1), gold, 16)
+    tag = rounded_box((1.3, .55, .06), .12, mat('Velvet', (.35, .0, .25), rough=.6, sss=.1), (.05, -.45, -.12))
+    rounded_box((1.38, .63, .04), .12, gold, (.05, -.45, -.16))
+    text('FREE SPINS', .2, .02, .006, gold, loc=(.05, -.46, -.07))
+
+def lux_key(): tilted(key_parts, (8, -10, 12))
+
 LUXURY = {'YACHT': lux_yacht, 'JET': lux_jet, 'LIMO': lux_limo, 'RING': lux_ring, 'WATCH': lux_watch,
-          'GOLD': lambda: lux_bars(GOLD()), 'COIN': lux_coin, 'SILVER': lambda: lux_bars(SILVER_METAL()), 'DOUBLE': lux_double}
+          'GOLD': lambda: lux_bars(GOLD()), 'COIN': lux_coin, 'SILVER': lambda: lux_bars(SILVER_METAL()), 'DOUBLE': lux_double, 'KEY': lux_key}
 
 FIREBALLS = {'FIRE': ((.25, .01, 0), (1, .22, 0), (1, .78, .25)), 'MINI': ((.0, .12, .03), (.05, .7, .15), (.75, 1, .5)),
              'MINOR': ((.0, .03, .2), (.05, .3, 1), (.6, .9, 1)), 'MAJOR': ((.12, .0, .2), (.6, .05, .9), (1, .6, 1))}
