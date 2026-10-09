@@ -6,6 +6,7 @@ import { API_URL, ApiError, Balance, Game, PlayResult, request } from './api';
 import { clearPending, PendingBet, readPending, savePending } from './pendingBet';
 import { s } from './styles';
 import { GameShell, PayRow, Rules } from './GameShell';
+import { usePace } from './playControls';
 import { SpinReel } from './fx/SpinReel';
 import { Paylines } from './fx/Paylines';
 
@@ -99,13 +100,16 @@ export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, 
     return () => { alive.current = false; listener.remove(); };
   }, [userId]);
 
+  // The show's pauses follow the player's TURBO and STOP (src/playControls.ts).
+  const play = usePace(game);
+
   /** Spins every reel, then stops them left to right on the given screen. */
   async function land(next: string[], spinMs: number) {
     setWins([]); setScatterLit(false); setStopped(0);
-    if (!fast.current) await pause(spinMs);
+    await play.pace.wait(spinMs);
     setScreen(next);
     for (let reel = 1; reel <= REELS; reel++) {
-      if (!fast.current) await pause(140);
+      await play.pace.wait(140);
       if (!alive.current) return;
       setStopped(reel); sound.play('reel-land');
     }
@@ -116,7 +120,7 @@ export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, 
     const amount = Number(stake), max = Math.min(game.maxStake, 1000);
     if (!pending && (!/^\d+(\.\d{1,2})?$/.test(stake) || amount < game.minStake || amount > max)) { setError(`Enter a stake between ${game.minStake} and ${max}, with at most 2 decimals.`); return; }
     if (!pending && wallet && amount > wallet.balance) { setError('Insufficient available balance.'); return; }
-    locked.current = true; setBusy(true); setError(''); setResult(null); setWin(null); setMeter(0); setFeature(null); setWins([]); setStopped(0);
+    locked.current = true; play.pace.begin(); setBusy(true); setError(''); setResult(null); setWin(null); setMeter(0); setFeature(null); setWins([]); setStopped(0);
     let submitted = false;
     try {
       const bet = pending || { gameCode: game.code, requestId: randomUUID(), stake: amount };
@@ -134,12 +138,12 @@ export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, 
       await land(base, 700);
       const found = evaluate(base, engine);
       let total = found.pays * data.stake;
-      if (found.wins.length) { setWins(found.wins); setMeter(total); sound.play('reel-stop'); if (!fast.current) await pause(1100); }
+      if (found.wins.length) { setWins(found.wins); setMeter(total); sound.play('reel-stop'); await play.pace.wait(1100); }
       // Three scatters: the free spins play out one screen at a time, every win doubled.
       if (spins.length && found.scatters >= SCATTERS_FOR_FEATURE && alive.current) {
         setScatterLit(true); feel('win'); sound.result(20);
         setFeature({ spin: 0, total, banner: true });
-        if (!fast.current) await pause(2000);
+        await play.pace.wait(2000);
         for (let index = 0; index < spins.length && alive.current; index++) {
           setFeature({ spin: index + 1, total, banner: false });
           sound.play('spin');
@@ -148,8 +152,8 @@ export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, 
           if (free.wins.length) {
             total += free.pays * FREE_SPIN_FACTOR * data.stake;
             setWins(free.wins); setMeter(total); setFeature({ spin: index + 1, total, banner: false });
-            if (!fast.current) await pause(900);
-          } else if (!fast.current) await pause(300);
+            await play.pace.wait(900);
+          } else await play.pace.wait(300);
         }
       }
       if (!alive.current) return;
@@ -158,6 +162,7 @@ export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, 
       setWallet(current => current ? { ...current, balance: data.balance, currency: data.currency } : current);
       feel(data.payout > 0 ? 'win' : 'tap'); sound.result(data.payout > 0 ? data.multiplier : 0);
       if (data.payout > 0) setWin({ payout: data.payout, stake: data.stake, multiplier: data.multiplier, currency: data.currency, id: data.betId });
+      play.pace.report({ payout: data.payout, stake: data.stake, multiplier: data.multiplier });
       onSettled();
     } catch (e) {
       if (!alive.current) return;
@@ -180,7 +185,7 @@ export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, 
   const status = busy && feature?.banner ? `${SCATTERS_FOR_FEATURE} SCATTERS · ${FREE_SPINS} FREE SPINS!`
     : busy && feature ? `FREE SPIN ${feature.spin} / ${FREE_SPINS} · WINS ×${FREE_SPIN_FACTOR}`
     : busy ? 'SPINNING' : `${engine.lines?.length ?? 20} LINES · READY`;
-  return <GameShell game={game} balance={wallet} onBack={onClose} backDisabled={busy}
+  return <GameShell game={game} play={{ ...play, stake: pending ? pending.stake : Number(stake) || game.minStake }} balance={wallet} onBack={onClose} backDisabled={busy}
     status={result && !busy ? (result.payout > 0 ? `WIN ${cash(result.payout)} · ${result.multiplier}×` : 'SO CLOSE · SPIN AGAIN')
       : busy && wins.length && !feature?.banner ? wins.map(found => `LINE ${found.line + 1} · ${found.count}× ${found.symbol.replaceAll('_', ' ')}`).slice(0, 2).join('  ·  ') : status}
     notice={error ? <Text accessibilityRole="alert" style={s.error}>{error}</Text>
