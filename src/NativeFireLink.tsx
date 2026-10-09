@@ -71,6 +71,8 @@ export function NativeFireLink({ game, token, userId, initialBalance, onClose, o
   const [stopped, setStopped] = useState(REELS), [rows, setRows] = useState<number[]>([]);
   const [link, setLink] = useState(false), [locked, setLocked] = useState<Set<number>>(new Set()), [fresh, setFresh] = useState<Set<number>>(new Set());
   const [left, setLeft] = useState(3), [linkTotal, setLinkTotal] = useState(0), [banner, setBanner] = useState<string | null>(null);
+  // Near-miss suspense: the reel the feature now hangs on (and every one after it) spins on, slower and glowing.
+  const [teaseFrom, setTeaseFrom] = useState<number | null>(null);
   const [meter, setMeter] = useState(0), [win, setWin] = useState<Win | null>(null), [status, setStatus] = useState('SIX FIREBALLS START THE FIRE LINK');
   const alive = useRef(true), lock = useRef(false), fast = useRef(false);
   const drop = useRef(new Animated.Value(1)).current, slam = useRef(new Animated.Value(0)).current;
@@ -104,7 +106,15 @@ export function NativeFireLink({ game, token, userId, initialBalance, onClose, o
       const round = parseRound(data.symbols);
       setBoard(round.base);
       await wait(700);
-      for (let reel = 1; reel <= REELS; reel++) { if (!alive.current) return; setStopped(reel); sound.play('reel-land'); await wait(200); }
+      let teasing: number | null = null; setTeaseFrom(null);
+      for (let reel = 1; reel <= REELS; reel++) {
+        if (!alive.current) return;
+        // Four fireballs already down: the reels still to stop could start the Fire Link, so they hang on.
+        if (teasing === null && reel >= 3 && round.base.filter((cell, i) => i % REELS < reel - 1 && isBall(cell)).length >= 4) { teasing = reel - 1; setTeaseFrom(teasing); }
+        if (teasing !== null) { sound.play('tease'); await wait(850); }
+        setStopped(reel); sound.play('reel-land'); await wait(200);
+      }
+      setTeaseFrom(null);
       const paying = [0, 1, 2, 3].filter(row => rowPay(round.base.slice(row * REELS, row * REELS + REELS)) > 0);
       if (paying.length) {
         setRows(paying); setMeter(paying.reduce((sum, row) => sum + rowPay(round.base.slice(row * REELS, row * REELS + REELS)), 0) * data.stake);
@@ -171,7 +181,7 @@ export function NativeFireLink({ game, token, userId, initialBalance, onClose, o
                 return <View key={row} style={[f.linkCell, { height: size }, locked.has(i) && f.lockedCell]}>
                   {locked.has(i) && <Animated.View style={fresh.has(i) ? { transform: [{ scale: drop.interpolate({ inputRange: [0, 1], outputRange: [1.8, 1] }) }], opacity: drop } : undefined}><Cell cell={board[i]} size={size * .92} stake={stake} /></Animated.View>}
                 </View>; })}</View>
-              : <SpinReel key={reel} index={reel} size={size} width={size * 1.2} reduced={reduced} strip={STRIP} spinning={busy && stopped <= reel}
+              : <SpinReel key={reel} index={reel} size={size} width={size * 1.2} reduced={reduced} strip={STRIP} spinning={busy && stopped <= reel} tease={busy && teaseFrom !== null && reel >= teaseFrom && stopped <= reel}
                 cells={Array.from({ length: ROWS }, (_, row) => board[row * REELS + reel])}
                 lit={row => rows.includes(row) ? c.gold : null} dim={rows.length > 0}
                 render={(cell, cellSize) => <Cell cell={cell} size={cellSize * .86} stake={stake} />} />)}

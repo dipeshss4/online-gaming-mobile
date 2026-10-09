@@ -503,7 +503,10 @@ await page.getByRole('button', { name: 'Spin', exact: true }).click()
 // The tease: 7 · 7 on the first two reels, so the last reel spins on, glowing, before it lands.
 await page.waitForTimeout(1600)
 await page.screenshot({ path: `${OUT}/14a-tease.png` })
-// 50x the bet is an EPIC WIN: the full-screen show, the amount rolling up to the server's payout, tap to collect.
+// 50x the bet is an EPIC WIN: the show opens as BIG WIN, climbs to MEGA and EPIC as the amount rolls up to the
+// server's payout; the first tap skips the count, the second collects.
+await page.getByText('BIG WIN', { exact: true }).first().waitFor({ timeout: 20000 }).catch(() => findings.push('big win: the show did not open on BIG WIN'))
+await page.getByText('MEGA WIN', { exact: true }).first().waitFor({ timeout: 8000 }).catch(() => findings.push('big win: the title did not climb to MEGA WIN'))
 await page.getByText('EPIC WIN').first().waitFor({ timeout: 20000 })
 if (slotBets.at(-1)?.stake !== 1) findings.push(`bet bar: the spin sent stake ${slotBets.at(-1)?.stake}, not the 1.00 picked`)
 await page.waitForTimeout(1200)
@@ -511,7 +514,8 @@ await page.screenshot({ path: `${OUT}/14b-epic-win.png` })
 await page.getByText('50.00').first().waitFor({ timeout: 10000 })
 await audit('14-win')
 console.log('## win celebration  (EPIC WIN show, amount rolls up to 50.00)')
-await page.getByRole('button', { name: /EPIC WIN: 50.00. Tap to collect/ }).click()
+await page.getByRole('button', { name: /EPIC WIN: 50.00. Tap to (skip the count|collect)/ }).click()
+await page.getByRole('button', { name: /EPIC WIN: 50.00. Tap to collect/ }).click({ timeout: 3000 }).catch(() => findings.push('big win: the first tap did not finish the count'))
 await page.getByText('EPIC WIN').first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => findings.push('big win: tapping did not collect'))
 console.log('## win celebration clears  (tap to collect)')
 winningRound = false
@@ -621,6 +625,7 @@ await page.getByText(/RESPINS LEFT/).waitFor({ timeout: 10000 }).catch(() => fin
 await page.getByLabel('MAJOR jackpot').first().waitFor({ timeout: 10000 }).catch(() => findings.push('fire link: the MAJOR never dropped in'))
 await page.screenshot({ path: `${OUT}/32a-fire-link-feature.png` })
 await page.getByText('WIN 41.80').waitFor({ timeout: 20000 }).catch(() => findings.push("fire link: the round never showed the server's 41.80"))
+await page.getByRole('button', { name: /Tap to skip the count/ }).click({ timeout: 8000 }).catch(() => {})
 await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
 await audit('33-fire-link-done')
 console.log('## fire link  (seven fireballs, a MAJOR drops in, respins run out, 41.80)')
@@ -637,6 +642,7 @@ await page.getByText(/^LINE 1 · /).waitFor({ timeout: 15000 }).catch(() => find
 await page.screenshot({ path: `${OUT}/34a-luxury-life-line.png` })
 await page.getByText('MEGA WIN').first().waitFor({ timeout: 15000 }).catch(() => findings.push('luxury life: no MEGA WIN banner'))
 await page.getByText('WIN 10.12').waitFor({ timeout: 20000 }).catch(() => findings.push("luxury life: the round never showed the server's 10.12"))
+await page.getByRole('button', { name: /Tap to skip the count/ }).click({ timeout: 8000 }).catch(() => {})
 await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
 await audit('35-luxury-life-done')
 console.log('## luxury life  (five yachts with a DOUBLE, three lines drawn, MEGA WIN, 10.12)')
@@ -669,6 +675,9 @@ await page.getByLabel('Turbo on').click().catch(() => {})
 // Free spins: three KEYs glow, 8 FREE SPINS, the counter runs, the third spin's line shows ×3, and the server's total lands.
 luxuryFree = true
 await page.getByRole('button', { name: 'Spin', exact: true }).click()
+// KEYs on reels 1 and 3: reels 4 and 5 hang on, glowing, before they land.
+await page.waitForTimeout(1500)
+await page.screenshot({ path: `${OUT}/37-anticipation.png` })
 await page.getByText('8 FREE SPINS', { exact: true }).waitFor({ timeout: 15000 }).catch(() => findings.push('free spins: no 8 FREE SPINS banner'))
 await page.screenshot({ path: `${OUT}/37-free-spins-banner.png` })
 await page.getByText(/^FREE SPIN 3 \/ 8/).first().waitFor({ timeout: 30000 }).catch(() => findings.push('free spins: the counter never reached 3 / 8'))

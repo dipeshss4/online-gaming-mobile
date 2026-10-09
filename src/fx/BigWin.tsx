@@ -8,24 +8,39 @@ import type { Win } from '../WinCelebration';
 
 /**
  * The big-win show, as the game rooms stage it, for wins of 10x the bet and more: the game dims, light rays spin up,
- * BIG WIN (25x MEGA WIN, 50x EPIC WIN) slams in in gold, the amount rolls up while a fountain of coins sprays from
- * the bottom of the screen, and it waits for a tap to collect (or closes itself after a few seconds). The amount is
- * always the server's payout.
+ * BIG WIN slams in in gold, and the amount rolls up while a fountain of coins sprays from the bottom of the screen.
+ * The title climbs with the count, as the modern cabinets do it: passing 25x it slams again as MEGA WIN, 50x as EPIC
+ * WIN and 100x as LEGENDARY WIN, each with its own colours and a heavier hit. The first tap jumps the count to the
+ * end, the second collects (or it closes itself a few seconds after the count). The amount is always the server's.
  */
 export const isBigWin = (win: Win | null) => !!win && win.multiplier >= 10;
 const COINS = 34;
-const tierOf = (m: number) => m >= 50 ? { title: 'EPIC WIN', rays: ['#ff3cac', '#8a3cff'], roll: 4200 } : m >= 25 ? { title: 'MEGA WIN', rays: ['#22e1ff', '#3c7bff'], roll: 3400 } : { title: 'BIG WIN', rays: ['#ffd23f', '#ff7a1a'], roll: 2600 };
+/** The tiers the count climbs through, by multiple of the bet. */
+const TIERS = [
+  { at: 10, title: 'BIG WIN', rays: ['#ffd23f', '#ff7a1a'] },
+  { at: 25, title: 'MEGA WIN', rays: ['#22e1ff', '#3c7bff'] },
+  { at: 50, title: 'EPIC WIN', rays: ['#ff3cac', '#8a3cff'] },
+  { at: 100, title: 'LEGENDARY WIN', rays: ['#fff3a0', '#ff3cac'] },
+];
+const tierAt = (m: number) => [...TIERS].reverse().find(tier => m >= tier.at) ?? TIERS[0];
+/** Longer counts for bigger wins: each tier the count passes adds to the show. */
+const rollFor = (m: number) => 2200 + TIERS.filter(tier => m >= tier.at).length * 1100;
 
 export function BigWin({ win, onClose }: { win: Win | null; onClose?: () => void }) {
   const reduced = useReducedMotion();
   const { width, height } = useWindowDimensions(), short = Math.min(width, height);
-  const [shown, setShown] = useState<Win | null>(null), [amount, setAmount] = useState(0);
+  const [shown, setShown] = useState<Win | null>(null), [amount, setAmount] = useState(0), [counted, setCounted] = useState(false);
   const enter = useRef(new Animated.Value(0)).current, spin = useRef(new Animated.Value(0)).current;
   const slam = useRef(new Animated.Value(0)).current, roll = useRef(new Animated.Value(0)).current, fountain = useRef(new Animated.Value(0)).current;
   const pulse = useRef(new Animated.Value(0)).current;
   const coins = useRef(Array.from({ length: COINS }, (_, i) => ({ x: ((i * 37) % 100) / 100 - .5, lift: .55 + ((i * 53) % 40) / 100, delay: (i % 12) / 12, size: .06 + ((i * 7) % 4) / 100, turn: i % 2 ? 1 : -1 }))).current;
   const closing = useRef(false);
 
+  /** First tap: the count jumps to the end. Second tap: collect. */
+  function tap() {
+    if (!counted && shown) { roll.stopAnimation(); roll.setValue(1); setAmount(shown.payout); setCounted(true); return; }
+    close();
+  }
   function close() {
     if (closing.current) return;
     closing.current = true;
@@ -35,31 +50,42 @@ export function BigWin({ win, onClose }: { win: Win | null; onClose?: () => void
 
   useEffect(() => {
     if (!isBigWin(win)) return;
-    const next = win!, tier = tierOf(next.multiplier);
-    closing.current = false; setShown(next); setAmount(0);
+    const next = win!, length = rollFor(next.multiplier);
+    closing.current = false; setShown(next); setAmount(0); setCounted(false);
     feel('win'); sound.play('bigwin'); sound.play('coins');
-    if (reduced) { enter.setValue(1); slam.setValue(1); setAmount(next.payout); const t = setTimeout(close, 2500); return () => clearTimeout(t); }
+    if (reduced) { enter.setValue(1); slam.setValue(1); setAmount(next.payout); setCounted(true); const t = setTimeout(close, 2500); return () => clearTimeout(t); }
     [enter, slam, roll, fountain].forEach(v => v.setValue(0));
     // The count ticks as it climbs: one tick per twentieth of the way, so it speeds up and slows down with the roll.
-    let lastStep = 0;
-    const id = roll.addListener(({ value }) => { setAmount(value * next.payout); const step = Math.floor(value * 20); if (step > lastStep) { lastStep = step; sound.play('tick'); } });
+    // Each tier the climbing amount passes slams the title in again, heavier.
+    let lastStep = 0, lastTier = TIERS[0].title;
+    const id = roll.addListener(({ value }) => {
+      const now = value * next.payout; setAmount(now);
+      const step = Math.floor(value * 20); if (step > lastStep) { lastStep = step; sound.play('tick'); }
+      const reached = tierAt(now / next.stake);
+      if (reached.title !== lastTier && next.multiplier >= reached.at) {
+        lastTier = reached.title; feel('heavy'); sound.play('coins');
+        slam.setValue(.35); Animated.spring(slam, { toValue: 1, friction: 3, tension: 140, useNativeDriver: true }).start();
+      }
+      if (value >= 1) setCounted(true);
+    });
     const rays = Animated.loop(Animated.timing(spin, { toValue: 1, duration: 6000, easing: Easing.linear, useNativeDriver: true }));
     const beat = Animated.loop(Animated.sequence([Animated.timing(pulse, { toValue: 1, duration: 420, useNativeDriver: true }), Animated.timing(pulse, { toValue: 0, duration: 420, useNativeDriver: true })]));
     const show = Animated.sequence([
       Animated.timing(enter, { toValue: 1, duration: 220, useNativeDriver: true }),
       Animated.spring(slam, { toValue: 1, friction: 4, tension: 120, useNativeDriver: true }),
     ]);
-    const counting = Animated.timing(roll, { toValue: 1, duration: tier.roll, easing: Easing.out(Easing.quad), useNativeDriver: false });
+    const counting = Animated.timing(roll, { toValue: 1, duration: length, easing: Easing.out(Easing.quad), useNativeDriver: false });
     const spray = Animated.loop(Animated.timing(fountain, { toValue: 1, duration: 1600, easing: Easing.linear, useNativeDriver: true }));
     rays.start(); beat.start(); show.start(); counting.start(); spray.start();
-    const t = setTimeout(close, tier.roll + 2600);
+    const t = setTimeout(close, length + 2600);
     return () => { clearTimeout(t); roll.removeListener(id); rays.stop(); beat.stop(); counting.stop(); spray.stop(); };
   }, [win?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!shown) return null;
-  const tier = tierOf(shown.multiplier), title = Math.min(short * .16, width * .12);
+  // The title shown is the tier the count has reached so far, not where it will end.
+  const tier = tierAt(Math.min(shown.multiplier, amount / shown.stake)), title = Math.min(short * .16, width * .12) * (tier.title.length > 9 ? .8 : 1);
   return <Animated.View style={[StyleSheet.absoluteFill, b.root, { opacity: enter }]}>
-    <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityRole="button" accessibilityLabel={`${tier.title}: ${shown.payout.toFixed(2)}. Tap to collect`}>
+    <Pressable style={StyleSheet.absoluteFill} onPress={tap} accessibilityRole="button" accessibilityLabel={`${tierAt(shown.multiplier).title}: ${shown.payout.toFixed(2)}. ${counted ? 'Tap to collect' : 'Tap to skip the count'}`}>
       <View style={[StyleSheet.absoluteFill, b.dim]} />
       {/* Rays behind the title, turning. */}
       <Animated.View pointerEvents="none" style={[b.center, { transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }]}>
@@ -89,7 +115,7 @@ export function BigWin({ win, onClose }: { win: Win | null; onClose?: () => void
           <Text style={b.under}>{shown.multiplier}× YOUR BET OF {shown.stake.toFixed(2)}</Text>
         </Animated.View>
       </View>
-      <Text style={b.tap}>TAP TO COLLECT</Text>
+      <Text style={b.tap}>{counted ? 'TAP TO COLLECT' : 'TAP TO SKIP'}</Text>
     </Pressable>
   </Animated.View>;
 }
