@@ -18,11 +18,13 @@ import { usePace } from './playControls';
 
 /**
  * Luxury Life in the app: five reels, three rows, fifteen lines, and the DOUBLE diamond wild that doubles every win it
- * is part of. The round comes whole from the server (LuxuryLifeEngine); this spins the reels onto its fifteen cells,
- * then draws each winning line in turn while the meter counts up.
+ * is part of, and the gold KEY: three or more anywhere pay and start tripled free spins. The round comes whole from the
+ * server (LuxuryLifeEngine): the base spin's fifteen cells, then FREE:n and each free spin's; this spins the reels onto
+ * each screen in turn, lights its KEYs, and draws each winning line while the meter counts up.
  */
 export const supportsLuxuryLife = (game: Game) => game.engine?.layout === 'LINES_5X3';
-const REELS = 5, ROWS = 3, CELLS = 15, WILD = 'DOUBLE', FIVE_WILDS = 1000;
+const REELS = 5, ROWS = 3, CELLS = 15, WILD = 'DOUBLE', KEY = 'KEY', FIVE_WILDS = 1000;
+const KEY_PAYS = [2, 10, 50], FREE_SPINS = [8, 12, 20], FREE_MULTIPLIER = 3;
 const PAYS: Record<string, number[]> = {
   YACHT: [25, 100, 500], JET: [20, 75, 300], LIMO: [15, 50, 200], RING: [10, 30, 120],
   WATCH: [8, 25, 100], GOLD: [5, 15, 60], COIN: [4, 12, 40], SILVER: [3, 8, 30],
@@ -31,8 +33,9 @@ const ART: Record<string, number> = {
   YACHT: require('../assets/luxury/YACHT.png'), JET: require('../assets/luxury/JET.png'), LIMO: require('../assets/luxury/LIMO.png'),
   RING: require('../assets/luxury/RING.png'), WATCH: require('../assets/luxury/WATCH.png'), GOLD: require('../assets/luxury/GOLD.png'),
   COIN: require('../assets/luxury/COIN.png'), SILVER: require('../assets/luxury/SILVER.png'), DOUBLE: require('../assets/luxury/DOUBLE.png'),
+  KEY: require('../assets/luxury/KEY.png'),
 };
-const STRIP = ['YACHT', 'COIN', 'RING', 'DOUBLE', 'SILVER', 'JET', 'GOLD', 'WATCH', 'LIMO'];
+const STRIP = ['YACHT', 'COIN', 'RING', 'DOUBLE', 'SILVER', 'KEY', 'JET', 'GOLD', 'WATCH', 'LIMO'];
 const FALLBACK = [[1, 1, 1, 1, 1], [0, 0, 0, 0, 0], [2, 2, 2, 2, 2], [0, 1, 2, 1, 0], [2, 1, 0, 1, 2], [0, 0, 1, 2, 2], [2, 2, 1, 0, 0],
   [1, 0, 0, 0, 1], [1, 2, 2, 2, 1], [0, 1, 1, 1, 0], [2, 1, 1, 1, 2], [1, 0, 1, 2, 1], [1, 2, 1, 0, 1], [0, 1, 0, 1, 0], [2, 1, 2, 1, 2]]
   .map(rows => rows.map((row, reel) => row * REELS + reel));
@@ -44,9 +47,18 @@ const pause = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 function linePay(line: string[]) {
   const target = line.find(cell => cell !== WILD);
   if (!target) return { pays: FIVE_WILDS, count: REELS };
+  if (target === KEY) return { pays: 0, count: 0 };
   let count = 0, wilds = 0;
   while (count < REELS && (line[count] === target || line[count] === WILD)) { if (line[count] === WILD) wilds++; count++; }
   return count >= 3 ? { pays: PAYS[target][count - 3] * 2 ** wilds, count } : { pays: 0, count: 0 };
+}
+const keysOn = (screen: string[]) => screen.filter(cell => cell === KEY).length;
+const keyPay = (keys: number) => keys >= 3 ? KEY_PAYS[Math.min(keys, 5) - 3] : 0;
+/** A round's screens: the base spin, then each free spin. */
+function parseRound(symbols: string[]) {
+  const base = symbols.slice(0, CELLS), token = symbols[CELLS];
+  const count = token?.startsWith('FREE:') ? Number(token.slice(5)) : 0;
+  return { base, free: Array.from({ length: count }, (_, s) => symbols.slice(CELLS + 1 + s * CELLS, CELLS + 1 + (s + 1) * CELLS)) };
 }
 type LineWin = { index: number; cells: number[]; pays: number; count: number };
 const winningLines = (screen: string[], lines: number[][]): LineWin[] =>
@@ -59,6 +71,7 @@ export function NativeLuxuryLife({ game, token, userId, initialBalance, onClose,
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [reduced, setReduced] = useState(false);
   const [screen, setScreen] = useState<string[]>(() => Array.from({ length: CELLS }, (_, i) => STRIP[(i * 4) % STRIP.length]));
   const [stopped, setStopped] = useState(REELS), [wins, setWins] = useState<LineWin[]>([]), [shown, setShown] = useState<number | null>(null);
+  const [free, setFree] = useState<{ spin: number; of: number } | null>(null), [keysLit, setKeysLit] = useState(false);
   const [banner, setBanner] = useState<string | null>(null), [meter, setMeter] = useState(0), [win, setWin] = useState<Win | null>(null);
   const [status, setStatus] = useState('DOUBLE WILDS DOUBLE EVERY WIN');
   const alive = useRef(true), lock = useRef(false), fast = useRef(false);
@@ -80,7 +93,7 @@ export function NativeLuxuryLife({ game, token, userId, initialBalance, onClose,
   async function spin() {
     if (lock.current || !ready || (pending && pending.gameCode !== game.code)) return;
     if (!pending && wallet && stake > wallet.balance) { setError('Insufficient available balance.'); return; }
-    lock.current = true; play.pace.begin(); setBusy(true); setError(''); setWin(null); setMeter(0); setWins([]); setShown(null); setStopped(0); setStatus('GOOD LUCK!');
+    lock.current = true; play.pace.begin(); setBusy(true); setError(''); setWin(null); setMeter(0); setWins([]); setShown(null); setStopped(0); setStatus('GOOD LUCK!'); setFree(null); setKeysLit(false);
     let submitted = false;
     try {
       const bet = pending || { gameCode: game.code, requestId: randomUUID(), stake };
@@ -90,28 +103,49 @@ export function NativeLuxuryLife({ game, token, userId, initialBalance, onClose,
       if (data.requestId !== bet.requestId || data.gameCode !== game.code || data.symbols.length < CELLS) throw new Error('Unexpected result. Keep this request for reconciliation.');
       await clearPending(userId); setPending(null);
       if (!alive.current) return;
-      const cells = data.symbols.slice(0, CELLS);
-      setScreen(cells);
-      await wait(700);
-      for (let reel = 1; reel <= REELS; reel++) { if (!alive.current) return; setStopped(reel); sound.play('reel-land'); await wait(200); }
-      const found = winningLines(cells, lines), perLine = data.stake / lines.length;
-      if (found.length) {
-        // The last reel is still landing (its run and bounce take about half a second); draw lines once it rests.
-        await wait(450);
-        setWins(found);
-        let running = 0;
-        for (const line of found.slice(0, 6)) {
-          if (!alive.current) return;
-          setShown(line.index); running += line.pays * perLine; setMeter(running);
-          setStatus(`LINE ${line.index + 1} · ${cash(line.pays * perLine)}`); feel('select'); sound.play('reel-land');
-          await wait(found.length > 3 ? 520 : 800);
+      const round = parseRound(data.symbols), perLine = data.stake / lines.length;
+      // One screen: the reels land on it, its KEYs glow and its lines are drawn, and the meter climbs by what it paid.
+      let running = 0;
+      const playScreen = async (cells: string[], factor: number, first: boolean) => {
+        setWins([]); setShown(null); setKeysLit(false);
+        if (!first) { setStopped(0); sound.play('spin'); }
+        setScreen(cells);
+        await wait(first ? 700 : 450);
+        for (let reel = 1; reel <= REELS; reel++) { if (!alive.current) return false; setStopped(reel); sound.play('reel-land'); await wait(first ? 200 : 140); }
+        const found = winningLines(cells, lines), keys = keysOn(cells);
+        if (keys >= 3 || found.length) await wait(450);   // the last reel lands before anything lights
+        if (keys >= 3) {
+          setKeysLit(true); running += keyPay(keys) * data.stake * factor; setMeter(running);
+          setStatus(`${keys} KEYS · ${cash(keyPay(keys) * data.stake * factor)}`); sound.play('coins'); feel('heavy'); await wait(900);
         }
-        setShown(null);
-        const doubled = found.some(line => line.cells.slice(0, line.count).some(cell => cells[cell] === WILD));
-        if (data.multiplier >= 25) { sound.play('bigwin'); await show('MEGA WIN', 2000); }
-        else if (data.multiplier >= 3) { sound.play('bigwin'); await show('BIG WIN', 1500); }
-        else if (doubled) await show('DOUBLED!', 1000);
-      }
+        if (found.length) {
+          setWins(found);
+          const before = running;
+          for (const line of found.slice(0, 6)) {
+            if (!alive.current) return false;
+            setShown(line.index); running += line.pays * perLine * factor; setMeter(running);
+            setStatus(`LINE ${line.index + 1} · ${cash(line.pays * perLine * factor)}${factor > 1 ? ' (×3)' : ''}`); feel('select'); sound.play('reel-land');
+            await wait(found.length > 3 ? 520 : 800);
+          }
+          setShown(null);
+          // Only six lines get their own moment; the meter still counts every one.
+          running = before + found.reduce((sum, line) => sum + line.pays, 0) * perLine * factor; setMeter(running);
+        }
+        return true;
+      };
+      if (!await playScreen(round.base, 1, true)) return;
+      if (round.free.length) {
+        sound.play('bigwin'); await show(`${round.free.length} FREE SPINS`, 1800);
+        for (let spin = 0; spin < round.free.length; spin++) {
+          if (!alive.current) return;
+          setFree({ spin: spin + 1, of: round.free.length }); setStatus(`FREE SPIN ${spin + 1} / ${round.free.length} · EVERY WIN ×${FREE_MULTIPLIER}`);
+          if (!await playScreen(round.free[spin], FREE_MULTIPLIER, false)) return;
+          await wait(300);
+        }
+        setFree(null); await show('FREE SPINS COMPLETE', 1600);
+      } else if (data.multiplier >= 25) { sound.play('bigwin'); await show('MEGA WIN', 2000); }
+      else if (data.multiplier >= 3) { sound.play('bigwin'); await show('BIG WIN', 1500); }
+      else if (winningLines(round.base, lines).some(line => line.cells.slice(0, line.count).some(cell => round.base[cell] === WILD))) await show('DOUBLED!', 1000);
       if (!alive.current) return;
       setMeter(data.payout); setWallet(current => current ? { ...current, balance: data.balance, currency: data.currency } : current);
       setStatus(data.payout > 0 ? `WIN ${cash(data.payout)}` : 'DOUBLE WILDS DOUBLE EVERY WIN');
@@ -124,7 +158,7 @@ export function NativeLuxuryLife({ game, token, userId, initialBalance, onClose,
       if (!pending && e instanceof ApiError && [400, 401, 403, 404, 422, 429].includes(e.status)) await clearPending(userId).then(() => setPending(null)).catch(() => {});
       feel('warn'); setStatus('DOUBLE WILDS DOUBLE EVERY WIN');
       setError(`${e instanceof Error ? e.message : 'Unable to play'}${submitted ? ' If a bet is pending, use Recover with the same request ID.' : ''}`);
-    } finally { lock.current = false; if (alive.current) { setBusy(false); setStopped(REELS); } }
+    } finally { lock.current = false; if (alive.current) { setBusy(false); setStopped(REELS); setFree(null); } }
   }
 
   const drawn = shown === null ? wins : wins.filter(line => line.index === shown);
@@ -138,10 +172,13 @@ export function NativeLuxuryLife({ game, token, userId, initialBalance, onClose,
     win={cash(meter)}
     spin={{ busy, label: pending ? 'RECOVER' : 'SPIN', accessibilityLabel: pending ? 'Recover bet' : 'Spin', onPress: spin, disabled: busy || !ready || (!!pending && pending.gameCode !== game.code) }}
     overlay={<>
+      {free && <View pointerEvents="none" style={l.freeBadge}><Text style={l.freeText}>FREE SPIN</Text><Text style={l.freeCount}>{free.spin} / {free.of}</Text><Text style={l.freeText}>WINS ×{FREE_MULTIPLIER}</Text></View>}
       {banner && <Animated.View pointerEvents="none" style={[l.banner, banner === 'MEGA WIN' && l.mega, { transform: [{ scale: slam.interpolate({ inputRange: [0, 1], outputRange: [2.4, 1] }) }], opacity: slam }]}><Text style={[l.bannerText, banner === 'MEGA WIN' && { fontSize: 58 }]}>{banner}</Text></Animated.View>}
       <WinCelebration win={win} /><BigWin win={win} />
     </>}
     info={<>
+      <PayRow label={<View style={l.special}><Image source={ART.KEY} style={{ width: 40, height: 40 }} resizeMode="contain" /><Text style={[s.small, { flexShrink: 1 }]}>Scatter, pays anywhere. 3 / 4 / 5 start {FREE_SPINS.join(' / ')} free spins, every win ×{FREE_MULTIPLIER}.</Text></View>}
+        pays={KEY_PAYS.map(x => cash(x * (pending ? pending.stake : stake))).join(' / ')} />
       <PayRow label={<View style={l.special}><Image source={ART.DOUBLE} style={{ width: 40, height: 40 }} resizeMode="contain" /><Text style={[s.small, { flexShrink: 1 }]}>Wild. Each DOUBLE in a win doubles it; five on a line pay {FIVE_WILDS} line bets.</Text></View>} pays="×2" />
       {Object.entries(PAYS).map(([name, p]) => <PayRow key={name} label={<View style={l.special}><Image source={ART[name]} style={{ width: 40, height: 40 }} resizeMode="contain" /><Text style={s.small}>×3 / ×4 / ×5</Text></View>}
         pays={`${cash(p[0] * perLine)} / ${cash(p[1] * perLine)} / ${cash(p[2] * perLine)}`} />)}
@@ -155,11 +192,11 @@ export function NativeLuxuryLife({ game, token, userId, initialBalance, onClose,
         <Text key={i} style={[l.number, won.has(i) && { backgroundColor: LINE_COLOURS[i % LINE_COLOURS.length], color: '#100418', borderColor: LINE_COLOURS[i % LINE_COLOURS.length] }]}>{i + 1}</Text>)}</View>;
       return <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
         {numbers(false)}
-        <MarqueeFrame colors={['#fff0b0', '#c0187a', '#3a0530']} bulb="#ffe8a0" excited={wins.length > 0} reduced={reduced}>
+        <MarqueeFrame colors={free ? ['#fff6c0', '#e8a81a', '#5a3a04'] : ['#fff0b0', '#c0187a', '#3a0530']} bulb="#ffe8a0" excited={wins.length > 0 || !!free || keysLit} reduced={reduced}>
           <LinearGradient colors={['#3a1048', '#14061c']} style={l.cabinet}>
             <View style={l.reels}>{Array.from({ length: REELS }, (_, reel) => <SpinReel key={reel} index={reel} size={cell} width={cell * 1.08} reduced={reduced}
               strip={STRIP} spinning={busy && stopped <= reel} cells={[0, 1, 2].map(row => screen[row * REELS + reel])} dim={wins.length > 0}
-              lit={row => litBy.get(row * REELS + reel) ?? null}
+              lit={row => litBy.get(row * REELS + reel) ?? (keysLit && screen[row * REELS + reel] === KEY ? '#ffd84a' : null)}
               render={(symbol, size) => <Image source={ART[symbol] ?? ART.COIN} style={{ width: size * .9, height: size * .9 }} resizeMode="contain" accessibilityLabel={symbol.toLowerCase()} />} />)}
               <Paylines geometry={{ left: 0, top: 0, width: cell * 1.08, height: cell, gap: 4 }}
                 lines={drawn.map(line => ({ color: LINE_COLOURS[line.index % LINE_COLOURS.length], cells: line.cells.map(index => [index % REELS, Math.floor(index / REELS)] as [number, number]) }))} />
@@ -178,6 +215,9 @@ const l = StyleSheet.create({
   numbers: { justifyContent: 'space-around' },
   number: { width: 24, textAlign: 'center', fontSize: 11, fontWeight: '900', color: '#ffffff77', borderRadius: 6, borderWidth: 1, borderColor: '#ffffff22', backgroundColor: '#ffffff0c', overflow: 'hidden', paddingVertical: 1 },
   special: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  freeBadge: { position: 'absolute', top: 66, left: 12, maxWidth: 230, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, borderWidth: 2, borderColor: '#ffd84a', backgroundColor: '#000000aa', alignItems: 'center' },
+  freeText: { color: '#ffe58a', fontWeight: '900', letterSpacing: 2, fontSize: 11, textAlign: 'center' },
+  freeCount: { color: '#fff', fontWeight: '900', fontSize: 24, textAlign: 'center' },
   banner: { position: 'absolute', alignSelf: 'center', top: '34%', paddingHorizontal: 30, paddingVertical: 10, borderRadius: 20, borderWidth: 4, borderColor: c.gold, backgroundColor: '#3a0630ee' },
   mega: { backgroundColor: '#5a0a4aee', shadowColor: '#ff5ab4', shadowOpacity: 1, shadowRadius: 30, shadowOffset: { width: 0, height: 0 } },
   bannerText: { color: '#ffe58a', fontWeight: '900', fontStyle: 'italic', fontSize: 44, textShadowColor: '#ff5ab4', textShadowRadius: 18, textShadowOffset: { width: 0, height: 0 } },

@@ -60,7 +60,7 @@ for target in ('assets/firelink', '../frontend/public/art/firelink'):
         trimmed(os.path.join(RENDERS, f'FB_{name}.png'), 320).save(os.path.join(folder, f'{name}.png'), optimize=True)
     print('wrote', target)
 
-LUXURY = ['YACHT', 'JET', 'LIMO', 'RING', 'WATCH', 'GOLD', 'COIN', 'SILVER', 'DOUBLE']
+LUXURY = ['YACHT', 'JET', 'LIMO', 'RING', 'WATCH', 'GOLD', 'COIN', 'SILVER', 'DOUBLE', 'KEY']
 for target in ('assets/luxury', '../frontend/public/art/luxury'):
     folder = os.path.join(ROOT, target); os.makedirs(folder, exist_ok=True)
     for name in LUXURY:
