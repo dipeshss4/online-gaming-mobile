@@ -12,6 +12,7 @@ import { Win, WinCelebration } from './WinCelebration';
 import { BigWin } from './fx/BigWin';
 import { sound } from './sound';
 import { GameShell, PayRow, Rules } from './GameShell';
+import { usePace } from './playControls';
 
 /**
  * Galaxy Keno: mark 1 to 10 of the 80 numbers, play, and the server draws 20. The draw is shown one ball at a time;
@@ -66,13 +67,15 @@ export function NativeKeno({ game, token, userId, initialBalance, onClose, onSet
     setPicks(chosen); setResult(null); setDrawn([]); setWin(null); setError(''); feel('select');
   }
 
+  // The draw's pace follows the player's TURBO and STOP; AUTO replays the same ticket (src/playControls.ts).
+  const pace = usePace(game);
   async function play() {
     if (locked.current || !ready || (pending && pending.gameCode !== game.code)) return;
     const amount = Number(stake), max = Math.min(game.maxStake, 1000);
     if (!pending && !picks.length) { setError('Mark at least one number.'); return; }
     if (!pending && (!/^\d+(\.\d{1,2})?$/.test(stake) || amount < game.minStake || amount > max)) { setError(`Enter a bet between ${game.minStake} and ${max}, with at most 2 decimals.`); return; }
     if (!pending && wallet && amount > wallet.balance) { setError('Insufficient available balance.'); return; }
-    locked.current = true; setBusy(true); setError(''); setResult(null); setDrawn([]); setWin(null);
+    locked.current = true; pace.pace.begin(); setBusy(true); setError(''); setResult(null); setDrawn([]); setWin(null);
     let submitted = false;
     try {
       const bet: PendingBet = pending || { gameCode: game.code, requestId: randomUUID(), stake: amount, selection: [...picks].sort((a, b) => a - b).join('-') };
@@ -89,13 +92,14 @@ export function NativeKeno({ game, token, userId, initialBalance, onClose, onSet
       for (let i = 1; i <= balls.length && alive.current; i++) {
         setDrawn(balls.slice(0, i));
         if (mine.includes(balls[i - 1])) { sound.play('reel-stop'); feel('select'); }
-        if (!fast.current) await pause(140);
+        await pace.pace.wait(140);
       }
       if (!alive.current) return;
       setDrawn(balls); setResult(data);
       setWallet(current => current ? { ...current, balance: data.balance, currency: data.currency } : current);
       feel(data.payout > 0 ? 'win' : 'tap'); sound.result(data.payout > 0 ? data.multiplier : 0);
       if (data.payout > 0) setWin({ payout: data.payout, stake: data.stake, multiplier: data.multiplier, currency: data.currency, id: data.betId });
+      pace.pace.report({ payout: data.payout, stake: data.stake, multiplier: data.multiplier });
       onSettled();
     } catch (e) {
       if (!alive.current) return;
@@ -139,7 +143,7 @@ export function NativeKeno({ game, token, userId, initialBalance, onClose, onSet
   </LinearGradient>;
 
   const status = busy ? 'DRAWING…' : result ? `${hits} ${hits === 1 ? 'HIT' : 'HITS'} · ${result.payout > 0 ? `WIN ${cash(result.payout)}` : 'NO WIN THIS DRAW'}` : 'MARK YOUR NUMBERS';
-  return <GameShell game={game} balance={wallet} onBack={onClose} backDisabled={busy} status={status}
+  return <GameShell game={game} play={{ ...pace, stake: pending ? pending.stake : Number(stake) || game.minStake }} balance={wallet} onBack={onClose} backDisabled={busy} status={status}
     notice={error ? <Text accessibilityRole="alert" style={s.error}>{error}</Text>
       : pending && !busy ? `Pending: ${pending.gameCode} · ${cash(pending.stake)}. ${pending.gameCode !== game.code ? 'Open that game to recover the ticket.' : 'PLAY resends this exact ticket, not a new bet.'}` : undefined}
     bet={<BetBar inline value={pending ? pending.stake : Number(stake)} onChange={value => setStake(value.toFixed(2))} min={game.minStake} max={game.maxStake} disabled={!editable} />}

@@ -637,7 +637,7 @@ await page.getByLabel('Turbo off').click().catch(() => findings.push('controls: 
 await page.getByLabel('Turbo on').waitFor({ timeout: 3000 }).catch(() => findings.push('controls: TURBO did not switch on'))
 const beforeSkip = luxuryRounds
 await page.getByRole('button', { name: 'Spin', exact: true }).click()
-await page.getByLabel('Stop the reels').click({ timeout: 3000 }).catch(() => findings.push('controls: SPIN did not become STOP during the round'))
+await page.getByLabel('Skip to the result').click({ timeout: 3000 }).catch(() => findings.push('controls: SPIN did not become STOP during the round'))
 await page.getByRole('button', { name: 'Spin', exact: true }).waitFor({ timeout: 4000 }).catch(() => findings.push('controls: STOP did not end the round quickly'))
 if (luxuryRounds !== beforeSkip + 1) findings.push(`controls: STOP placed ${luxuryRounds - beforeSkip} bets instead of 1`)
 await page.getByLabel('Autoplay', { exact: true }).click().catch(() => findings.push('controls: no AUTO button'))
@@ -701,6 +701,14 @@ await page.getByText('3 HITS · WIN 4.30').waitFor({ timeout: 20000 }).catch(() 
 if (kenoBets.length !== 1 || kenoBets[0].selection !== '7-19-42' || kenoBets[0].stake !== 0.1 || !/^[0-9a-f-]{36}$/.test(kenoBets[0].requestId)) findings.push(`keno: the bets sent were ${JSON.stringify(kenoBets)}`)
 await audit('26-keno-played')
 console.log(`## keno  (board ${Math.round(board?.width)}x${Math.round(board?.height)}, ticket ${kenoBets[0]?.selection}, 3 hits, return 4.30)`)
+// STOP during the draw: the twenty balls come out at once, still one ticket, still the server's result.
+await page.getByRole('button', { name: /^PLAY$/ }).click()
+await page.getByLabel('Skip to the result').click({ timeout: 3000 }).catch(() => findings.push('keno: PLAY did not become STOP during the draw'))
+const skipped = Date.now()
+await page.getByText('3 HITS · WIN 4.30').waitFor({ timeout: 4000 }).catch(() => findings.push('keno: STOP did not finish the draw quickly'))
+if (Date.now() - skipped > 2500) findings.push(`keno: the draw took ${Date.now() - skipped}ms after STOP`)
+if (kenoBets.length !== 2) findings.push(`keno: STOP placed ${kenoBets.length - 1} tickets instead of 1`)
+console.log('## keno STOP  (the draw finished at once, one ticket)')
 await page.getByLabel('Back to lobby').first().click()
 await page.getByRole('tab', { name: 'ALL GAMES' }).click()
 
