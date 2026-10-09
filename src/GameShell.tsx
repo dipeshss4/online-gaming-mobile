@@ -74,7 +74,7 @@ export function GameShell({ game, balance, onBack, backDisabled, status, notice,
   const auto = autoLeft > 0;
   // While the reels run, SPIN is STOP: it rushes the show (and ends an autoplay run).
   const spinButton = spin && play && (busy || auto)
-    ? { label: auto ? `STOP ${autoLeft}` : 'STOP', disabled: false, busy, accessibilityLabel: auto ? `Stop autoplay, ${autoLeft} rounds left` : 'Stop the reels',
+    ? { label: auto ? `STOP ${autoLeft}` : 'STOP', disabled: false, busy, accessibilityLabel: auto ? `Stop autoplay, ${autoLeft} rounds left` : 'Skip to the result',
         onPress: () => { if (auto) stopAuto(); if (busy) play.pace.hurry(); } }
     : spin;
   return <LinearGradient colors={theme.background} style={g.root}>
