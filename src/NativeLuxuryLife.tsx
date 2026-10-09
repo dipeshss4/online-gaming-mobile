@@ -72,6 +72,8 @@ export function NativeLuxuryLife({ game, token, userId, initialBalance, onClose,
   const [screen, setScreen] = useState<string[]>(() => Array.from({ length: CELLS }, (_, i) => STRIP[(i * 4) % STRIP.length]));
   const [stopped, setStopped] = useState(REELS), [wins, setWins] = useState<LineWin[]>([]), [shown, setShown] = useState<number | null>(null);
   const [free, setFree] = useState<{ spin: number; of: number } | null>(null), [keysLit, setKeysLit] = useState(false);
+  // Near-miss suspense: the reel the feature now hangs on (and every one after it) spins on, slower and glowing.
+  const [teaseFrom, setTeaseFrom] = useState<number | null>(null);
   const [banner, setBanner] = useState<string | null>(null), [meter, setMeter] = useState(0), [win, setWin] = useState<Win | null>(null);
   const [status, setStatus] = useState('DOUBLE WILDS DOUBLE EVERY WIN');
   const alive = useRef(true), lock = useRef(false), fast = useRef(false);
@@ -111,7 +113,15 @@ export function NativeLuxuryLife({ game, token, userId, initialBalance, onClose,
         if (!first) { setStopped(0); sound.play('spin'); }
         setScreen(cells);
         await wait(first ? 700 : 450);
-        for (let reel = 1; reel <= REELS; reel++) { if (!alive.current) return false; setStopped(reel); sound.play('reel-land'); await wait(first ? 200 : 140); }
+        let teasing: number | null = null; setTeaseFrom(null);
+        for (let reel = 1; reel <= REELS; reel++) {
+          if (!alive.current) return false;
+          // Two KEYs already down: the reels still to stop could make three, so they hang on.
+          if (teasing === null && reel >= 3 && cells.filter((cell, i) => i % REELS < reel - 1 && cell === KEY).length >= 2) { teasing = reel - 1; setTeaseFrom(teasing); }
+          if (teasing !== null) { sound.play('tease'); await wait(850); }
+          setStopped(reel); sound.play('reel-land'); await wait(first ? 200 : 140);
+        }
+        setTeaseFrom(null);
         const found = winningLines(cells, lines), keys = keysOn(cells);
         if (keys >= 3 || found.length) await wait(450);   // the last reel lands before anything lights
         if (keys >= 3) {
@@ -195,7 +205,7 @@ export function NativeLuxuryLife({ game, token, userId, initialBalance, onClose,
         <MarqueeFrame colors={free ? ['#fff6c0', '#e8a81a', '#5a3a04'] : ['#fff0b0', '#c0187a', '#3a0530']} bulb="#ffe8a0" excited={wins.length > 0 || !!free || keysLit} reduced={reduced}>
           <LinearGradient colors={['#3a1048', '#14061c']} style={l.cabinet}>
             <View style={l.reels}>{Array.from({ length: REELS }, (_, reel) => <SpinReel key={reel} index={reel} size={cell} width={cell * 1.08} reduced={reduced}
-              strip={STRIP} spinning={busy && stopped <= reel} cells={[0, 1, 2].map(row => screen[row * REELS + reel])} dim={wins.length > 0}
+              strip={STRIP} spinning={busy && stopped <= reel} tease={busy && teaseFrom !== null && reel >= teaseFrom && stopped <= reel} cells={[0, 1, 2].map(row => screen[row * REELS + reel])} dim={wins.length > 0}
               lit={row => litBy.get(row * REELS + reel) ?? (keysLit && screen[row * REELS + reel] === KEY ? '#ffd84a' : null)}
               render={(symbol, size) => <Image source={ART[symbol] ?? ART.COIN} style={{ width: size * .9, height: size * .9 }} resizeMode="contain" accessibilityLabel={symbol.toLowerCase()} />} />)}
               <Paylines geometry={{ left: 0, top: 0, width: cell * 1.08, height: cell, gap: 4 }}

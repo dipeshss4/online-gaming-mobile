@@ -90,6 +90,8 @@ export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, 
   const [feature, setFeature] = useState<{ spin: number; total: number; banner: boolean } | null>(null);
   const [result, setResult] = useState<PlayResult | null>(null), [meter, setMeter] = useState(0);
   const [win, setWin] = useState<Win | null>(null);
+  // Near-miss suspense: the reel the free spins now hang on (and every one after it) spins on, slower and glowing.
+  const [teaseFrom, setTeaseFrom] = useState<number | null>(null);
   const locked = useRef(false), alive = useRef(true), fast = useRef(false);
 
   useEffect(() => {
@@ -108,11 +110,16 @@ export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, 
     setWins([]); setScatterLit(false); setStopped(0);
     await play.pace.wait(spinMs);
     setScreen(next);
+    let teasing: number | null = null; setTeaseFrom(null);
     for (let reel = 1; reel <= REELS; reel++) {
       await play.pace.wait(140);
       if (!alive.current) return;
+      // One scatter short of the free spins with reels still to stop: they hang on.
+      if (teasing === null && reel >= 3 && next.filter((cell, i) => i % REELS < reel - 1 && cell === SCATTER).length >= SCATTERS_FOR_FEATURE - 1) { teasing = reel - 1; setTeaseFrom(teasing); }
+      if (teasing !== null) { sound.play('tease'); await play.pace.wait(850); }
       setStopped(reel); sound.play('reel-land');
     }
+    setTeaseFrom(null);
   }
 
   async function spin() {
@@ -211,7 +218,7 @@ export function NativeVideoSlot({ game, token, userId, initialBalance, onClose, 
       return <MarqueeFrame colors={feature ? ['#c8f4ff', '#1a6ab0', '#062a4a'] : ['#ffd0ec', '#c0187a', '#3a0530']} bulb={feature ? '#c8f4ff' : '#ffe0f0'} excited={!!feature || wins.length > 0} reduced={reduced}>
         <LinearGradient colors={feature ? ['#0b3a6e', '#081a3a'] : ['#4a1478', '#1d0838']} style={v.cabinet}>
           <View style={v.reels}>{Array.from({ length: REELS }, (_, col) => <SpinReel key={col} index={col} size={cell} width={cell * 1.08} reduced={reduced}
-            strip={reelSymbols.length ? reelSymbols : ['7']} spinning={busy && stopped <= col}
+            strip={reelSymbols.length ? reelSymbols : ['7']} spinning={busy && stopped <= col} tease={busy && teaseFrom !== null && col >= teaseFrom && stopped <= col}
             cells={[0, 1, 2].map(row => screen[row * REELS + col])} dim={wins.length > 0}
             lit={row => { const index = row * REELS + col; return litBy.get(index) ?? (scatterLit && screen[index] === SCATTER ? '#22e1ff' : null); }}
             render={(symbol, size) => <VideoSymbol symbol={symbol} art={engine.art} size={size - 10} />} />)}
