@@ -118,6 +118,9 @@ const videoBets = []
 const kenoBets = []
 const scratchBets = []
 const slotBets = []
+// The daily wheel and the free spins it grants: off until its scenario switches it on.
+let wheelOn = false, wheelSpun = 0, freeSpinList = []
+const wheelResult = { segment: 2, spins: 10, stake: 0.1, gameCode: 'HOT_7S', gameName: 'Hot 7s', grantId: 'g-wheel', expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(), nextAt: new Date(Date.now() + 5 * 3600000).toISOString() }
 const devilBets = []
 let fishBalance = 125.5
 let liveUnauthorized = 0
@@ -136,6 +139,14 @@ await page.route('**/api/**', async route => {
   if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers })
   if (path === '/api/site') return json(site)
   if (path === '/api/inbox') return json(inboxView)
+  if (path === '/api/daily-wheel') return json({ enabled: wheelOn, available: wheelOn && !wheelSpun, nextAt: wheelResult.nextAt, gameCode: 'HOT_7S', gameName: 'Hot 7s', stake: 0.1, expiresInDays: 7,
+    segments: [{ spins: 3, weight: 50, chance: 50 }, { spins: 5, weight: 30, chance: 30 }, { spins: 10, weight: 15, chance: 15 }, { spins: 25, weight: 5, chance: 5 }], today: wheelSpun ? wheelResult : null })
+  if (path === '/api/daily-wheel/spin') {
+    wheelSpun++
+    freeSpinList = [{ id: 'g-wheel', gameCode: 'HOT_7S', gameName: 'Hot 7s', stake: 0.1, totalSpins: 10, remainingSpins: 10, expiresAt: wheelResult.expiresAt, status: 'ACTIVE' }]
+    return json(wheelResult)
+  }
+  if (path === '/api/free-spins') return json(freeSpinList)
   if (path.startsWith('/api/inbox/')) { inboxReads.push(path); return route.fulfill({ status: 204, headers }) }
   if (path === '/api/auth/login' || path === '/api/auth/register') return json({ ...identity, accessToken: 'preview-token' })
   if (path === '/api/auth/refresh') {
@@ -462,6 +473,35 @@ await page.getByText('Home', { exact: true }).last().click()
 await page.getByText('All Games').first().waitFor({ timeout: 15000 })
 await page.waitForTimeout(800)
 await audit('07b-landscape-lobby')
+
+// The daily wheel: its button glows above the dock, the wheel stops on the server's segment, the prize opens its
+// game, and that game's spin plays the free spin (the grant's id at the grant's stake, not the bet bar's).
+wheelOn = true
+// Leaving the room and coming back loads the wheel's state afresh.
+await page.getByLabel('Account', { exact: true }).first().click()
+await page.getByText('Home', { exact: true }).last().click()
+await page.getByLabel('Spin the daily wheel').first().waitFor({ timeout: 15000 }).catch(() => findings.push('daily wheel: no button in the lobby'))
+await page.getByLabel('Spin the daily wheel').first().click()
+await page.getByText('BONUS WHEEL', { exact: true }).waitFor({ timeout: 5000 }).catch(() => findings.push('daily wheel: the wheel did not open'))
+await page.waitForTimeout(400)
+await audit('07c-daily-wheel')
+await page.getByLabel('Spin the wheel').click()
+await page.getByText('10 FREE SPINS', { exact: true }).waitFor({ timeout: 12000 }).catch(() => findings.push('daily wheel: the prize was not shown'))
+if (wheelSpun !== 1) findings.push(`daily wheel: ${wheelSpun} spin requests`)
+await page.screenshot({ path: `${OUT}/07d-daily-wheel-won.png` })
+await page.getByLabel('Play Hot 7s now').click()
+await page.getByLabel('Free spin, 10 left').waitFor({ timeout: 15000 }).catch(() => findings.push('free spins: the game did not offer its free spins'))
+await page.getByText('the stake is on us', { exact: false }).first().waitFor({ timeout: 5000 }).catch(() => findings.push('free spins: no banner'))
+await audit('07e-free-spins')
+const beforeFree = slotBets.length
+await page.getByLabel('Free spin, 10 left').click()
+await page.getByLabel(/Free spin, 9 left|Spin$/).first().waitFor({ timeout: 15000 }).catch(() => {})
+const freeBet = slotBets[beforeFree]
+if (!freeBet || freeBet.freeSpinGrantId !== 'g-wheel' || freeBet.stake !== 0.1) findings.push(`free spins: the spin sent ${JSON.stringify(freeBet)}`)
+console.log(`## daily wheel and free spins  (one spin, 10 free spins, played with grant ${freeBet?.freeSpinGrantId} at ${freeBet?.stake})`)
+freeSpinList = []; wheelOn = false
+await page.getByLabel('Back to lobby').first().click()
+await page.getByText('All Games').first().waitFor({ timeout: 15000 }).catch(() => {})
 
 // A phone held sideways is how this app is played. The game must be the larger half of that screen: the two
 // columns were once decided by flex ratios that Android and the browser divided differently, and the game

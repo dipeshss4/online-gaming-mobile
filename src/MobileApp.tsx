@@ -20,6 +20,7 @@ import { LobbySkeleton } from './Skeleton';
 import { sound, Scene } from './sound';
 import { InboxButton, PromoPopup, SoundToggle } from './Popups';
 import { NotificationSettings, PushPrompt } from './PushUI';
+import { DailyWheelButton } from './DailyWheel';
 import * as push from './notifications';
 import { NativeFishTable, supportsFishTable } from './NativeFishTable';
 import { GameLoading } from './GameLoading';
@@ -173,7 +174,7 @@ function Main() {
       <View style={[s.header,landscape&&{paddingVertical:7}]}><Brand site={site}/><View style={{flexDirection:'row',alignItems:'center'}}><SoundToggle/><InboxButton token={token}/></View><Tap haptic="select" accessibilityLabel="Open wallet" onPress={()=>setTab('Wallet')} style={s.pill}><Text style={s.small}>{site.content.brand.creditsLabel}</Text><Text style={s.accent}>{balance ? `${money(balance.balance)} ${balance.currency}` : 'Wallet —'}</Text></Tap></View>
       <View style={{flex:1,flexDirection:landscape?'row-reverse':'column'}}><ScrollView style={{flex:1}} key={tab} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={busy} onRefresh={load} tintColor="#efd49b" />}>
         {!!error && <View style={s.card}><Text accessibilityRole="alert" style={s.error}>{error}</Text><Button title="Retry" onPress={load} disabled={busy} /></View>}
-        {tab === 'Discover' && <>{!!token && <FloorTotals floor={floor} currency={balance?.currency || 'USD'} />}{!games.length && busy ? <LobbySkeleton landscape={landscape}/> : <WebLobby site={site} games={games} onPlay={openGame}/>}{!!identity && games.length > 0 && <PromoPopup promo={site.content.promo} email={identity.email} games={games} onPlay={openGame}/>}{!!token && games.length > 0 && <PushPrompt token={token} />}{!!token && <FloorBoards floor={floor} />}{!landscape&&<Button title="＋ Load funds · Stripe test" onPress={()=>setTab('Wallet')}/>}</>}
+        {tab === 'Discover' && <>{!!token && <FloorTotals floor={floor} currency={balance?.currency || 'USD'} />}{!!token && games.length > 0 && <View style={{ alignItems: 'flex-start' }}><DailyWheelButton token={token} games={games} onPlay={openGame} /></View>}{!games.length && busy ? <LobbySkeleton landscape={landscape}/> : <WebLobby site={site} games={games} onPlay={openGame}/>}{!!identity && games.length > 0 && <PromoPopup promo={site.content.promo} email={identity.email} games={games} onPlay={openGame}/>}{!!token && games.length > 0 && <PushPrompt token={token} />}{!!token && <FloorBoards floor={floor} />}{!landscape&&<Button title="＋ Load funds · Stripe test" onPress={()=>setTab('Wallet')}/>}</>}
         {tab === 'Wallet' && <>
           <Text style={s.title}>Your wallet</Text>
           <View style={[s.hero]}><Text style={s.kicker}>AVAILABLE BALANCE</Text><Text style={s.heroTitle}>{balance ? money(balance.balance) : '—'}</Text><Text style={s.accent}>{balance?.currency || ''} · {balance?.status || 'Account wallet'}</Text>

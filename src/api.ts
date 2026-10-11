@@ -18,7 +18,18 @@ export type Game = { theme?: string; featuredSymbol?: string; engineType?: strin
   settings?: { sound?: { enabled: boolean; music: boolean; effects: boolean; musicVolume: number; effectsVolume: number };
     pacing?: { spinMs: number; reelStopMs: number; turboAllowed: boolean; turboSpinMs: number; turboReelStopMs: number };
     autoplay?: { enabled: boolean; maxRounds: number; stopOnAnyWin: boolean; stopOnBigWin: boolean } } };
-export type PlayResult = { requestId: string; betId: string; gameCode: string; symbols: string[]; stake: number; payout: number; balance: number; currency: string; outcome: string; multiplier: number; walletSequence?: number };
+/** Free spins waiting for the player (staff grants and the daily wheel's prizes), played at their stake. */
+export type FreeSpinGrant = { id: string; gameCode: string; gameName: string; stake: number; totalSpins: number; remainingSpins: number; expiresAt: string; status: string };
+export type WheelSegment = { spins: number; weight: number; chance: number };
+export type WheelResult = { segment: number; spins: number; stake: number; gameCode: string; gameName: string; grantId: string; expiresAt: string | null; nextAt: string };
+export type WheelStatus = { enabled: boolean; available: boolean; nextAt: string | null; gameCode: string | null; gameName: string | null; stake: number | null;
+  expiresInDays: number; segments: WheelSegment[]; today: WheelResult | null };
+export const bonuses = {
+  freeSpins: (token: string) => request<FreeSpinGrant[]>('/api/free-spins', token),
+  wheel: (token: string) => request<WheelStatus>('/api/daily-wheel', token),
+  spinWheel: (token: string) => request<WheelResult>('/api/daily-wheel/spin', token, {}),
+};
+export type PlayResult = { requestId: string; betId: string; gameCode: string; symbols: string[]; stake: number; payout: number; balance: number; currency: string; outcome: string; multiplier: number; walletSequence?: number; freeSpinsRemaining?: number | null };
 export type Transaction = { id: string; type: string; amount: number; description: string; createdAt: string };
 export type Bet = { betId: string; gameCode: string; stake: number; payout: number; status: string; settledAt: string };
 export type Page<T> = { items: T[]; totalPages: number };

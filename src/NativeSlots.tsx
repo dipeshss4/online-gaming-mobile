@@ -6,6 +6,8 @@ import { clearPending, PendingBet, readPending, savePending } from './pendingBet
 import { s } from './styles';
 import { GameShell, PayRow, Rules } from './GameShell';
 import { usePace } from './playControls';
+import { useFreeSpins } from './freeSpins';
+import { FreeSpinBanner } from './FreeSpinBanner';
 import { themeOf } from './GameLogo';
 import { SpinReel } from './fx/SpinReel';
 import { Paylines } from './fx/Paylines';
@@ -42,19 +44,22 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
   }, [userId]);
   // The show's pauses follow the player's TURBO and STOP (src/playControls.ts).
   const play = usePace(game);
+  // Free spins waiting on this game play first (the switch in the banner turns them off).
+  const free = useFreeSpins(token, game.code);
   async function spin() {
     if (locked.current || !ready || (pending && pending.gameCode !== game.code)) return;
     const amount = Number(stake);
-    if (!pending && (!/^\d+(\.\d{1,2})?$/.test(stake) || amount < game.minStake || amount > Math.min(game.maxStake, 1000))) { setError(`Enter a stake between ${game.minStake} and ${Math.min(game.maxStake, 1000)}, with at most 2 decimals.`); return; }
-    if (!pending && wallet && amount > wallet.balance) { setError('Insufficient available balance.'); return; }
+    const grant = pending ? null : free.active ? free.grant : null;
+    if (!pending && !grant && (!/^\d+(\.\d{1,2})?$/.test(stake) || amount < game.minStake || amount > Math.min(game.maxStake, 1000))) { setError(`Enter a stake between ${game.minStake} and ${Math.min(game.maxStake, 1000)}, with at most 2 decimals.`); return; }
+    if (!pending && !grant && wallet && amount > wallet.balance) { setError('Insufficient available balance.'); return; }
     locked.current = true; play.pace.begin(); setBusy(true); setError(''); setResult(null); setStopped(0); setWin(null);
     let submitted = false;
     try {
-      const bet = pending || { gameCode: game.code, requestId: randomUUID(), stake: amount };
+      const bet: PendingBet = pending || (grant ? { gameCode: game.code, requestId: randomUUID(), stake: grant.stake, freeSpinGrantId: grant.id } : { gameCode: game.code, requestId: randomUUID(), stake: amount });
       // Persist before sending; never create a new request ID after an uncertain response.
       await savePending(userId, bet); setPending(bet); submitted = true;
       sound.play('spin');
-      const data = await request<PlayResult>(`/api/games/${encodeURIComponent(game.code)}/play`, token, { requestId: bet.requestId, stake: bet.stake });
+      const data = await request<PlayResult>(`/api/games/${encodeURIComponent(game.code)}/play`, token, { requestId: bet.requestId, stake: bet.stake, ...(bet.freeSpinGrantId ? { freeSpinGrantId: bet.freeSpinGrantId } : {}) });
       if (data.requestId !== bet.requestId || data.gameCode !== game.code || data.symbols.length !== count) throw new Error('Unexpected result. Keep this request for reconciliation.');
       if (!alive.current) return;
       setResult(data);
@@ -72,6 +77,7 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
       setWallet({ ...wallet, balance: data.balance, currency: data.currency });
       feel(data.payout > 0 ? 'win' : 'tap'); sound.result(data.payout > 0 ? data.multiplier : 0);
       if (data.payout > 0) setWin({ payout: data.payout, stake: data.stake, multiplier: data.multiplier, currency: data.currency, id: data.betId });
+      if (bet.freeSpinGrantId) free.spent(bet.freeSpinGrantId, data.freeSpinsRemaining);
       play.pace.report({ payout: data.payout, stake: data.stake, multiplier: data.multiplier });
       onSettled();
     } catch (e) {
@@ -90,10 +96,10 @@ export function NativeSlots({ game, token, userId, initialBalance, onClose, onSe
   const status = busy ? 'GOOD LUCK!' : settled ? (result.payout > 0 ? `WIN ${cash(result.payout)} · ${result.multiplier}×` : 'SO CLOSE · SPIN AGAIN') : grid ? 'CENTER ROW PAYS' : 'ONE PAYLINE · CENTER ROW';
   return <GameShell game={game} play={{ ...play, stake: pending ? pending.stake : Number(stake) || game.minStake }} balance={wallet} onBack={onClose} backDisabled={busy} status={status}
     notice={error ? <Text accessibilityRole="alert" style={s.error}>{error}</Text>
-      : pending && !busy ? `Pending: ${pending.gameCode} · ${cash(pending.stake)}. ${pending.gameCode !== game.code ? 'Open that game to recover the round.' : 'SPIN resends this exact bet, not a new one.'}` : undefined}
-    bet={<BetBar inline label="BET PER SPIN" value={pending ? pending.stake : Number(stake)} onChange={value => setStake(value.toFixed(2))} min={game.minStake} max={game.maxStake} disabled={busy || !!pending} />}
+      : pending && !busy ? `Pending: ${pending.gameCode} · ${cash(pending.stake)}. ${pending.gameCode !== game.code ? 'Open that game to recover the round.' : 'SPIN resends this exact bet, not a new one.'}` : free.grant ? <FreeSpinBanner grant={free.grant} remaining={free.remaining} use={free.use} onUse={free.setUse} disabled={busy} /> : undefined}
+    bet={<BetBar inline label="BET PER SPIN" value={pending ? pending.stake : free.active && free.grant ? free.grant.stake : Number(stake)} onChange={value => setStake(value.toFixed(2))} min={game.minStake} max={game.maxStake} disabled={busy || !!pending || free.active} />}
     win={cash(settled ? result.payout : 0)}
-    spin={{ busy, label: busy ? 'SPIN' : pending ? 'RECOVER' : 'SPIN', accessibilityLabel: pending ? 'Recover bet' : 'Spin', onPress: spin, disabled: busy || !ready || (!!pending && pending.gameCode !== game.code) }}
+    spin={{ busy, label: busy ? 'SPIN' : pending ? 'RECOVER' : free.active ? 'FREE' : 'SPIN', accessibilityLabel: pending ? 'Recover bet' : free.active ? `Free spin, ${free.remaining} left` : 'Spin', onPress: spin, disabled: busy || !ready || (!!pending && pending.gameCode !== game.code) }}
     overlay={<><WinCelebration win={win} /><BigWin win={win} /></>}
     info={<>
       {game.engine?.paytable?.map((line, i) => <PayRow key={i} label={line.label} pays={`${line.multiplier}×`} />)}
