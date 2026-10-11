@@ -26,6 +26,9 @@ export type WheelStatus = { enabled: boolean; available: boolean; nextAt: string
   expiresInDays: number; segments: WheelSegment[]; today: WheelResult | null; vipLevel?: string | null; boost?: number };
 export type VipLevelView = { code: string; name: string; points: number; wheelBoost: number };
 export type VipStatus = { code: string; name: string; rank: number; points: number; next: VipLevelView | null; progress: number; levels: VipLevelView[]; levelUp: boolean; wheelBoosted: boolean };
+export type LeaderboardEntry = { rank: number; name: string | null; gameName: string; multiplier: number; payout: number; you: boolean };
+export type LeaderboardView = { enabled: boolean; weekStart: string; resetsAt: string; entries: LeaderboardEntry[]; you: { rank: number; gameName: string; multiplier: number; payout: number } | null };
+export const leaderboardApi = { read: (token: string) => request<LeaderboardView>('/api/leaderboard', token) };
 export const vipApi = { read: (token: string) => request<VipStatus>('/api/vip', token) };
 export const bonuses = {
   freeSpins: (token: string) => request<FreeSpinGrant[]>('/api/free-spins', token),

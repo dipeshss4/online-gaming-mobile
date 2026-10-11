@@ -151,6 +151,9 @@ await page.route('**/api/**', async route => {
     return json(wheelResult)
   }
   if (path === '/api/free-spins') return json(freeSpinList)
+  if (path === '/api/leaderboard') return json({ enabled: true, weekStart: now, resetsAt: new Date(Date.now() + 3 * 86400000).toISOString(), you: { rank: 14, gameName: 'Hot 7s', multiplier: 6, payout: 0.6 }, entries: [
+    { rank: 1, name: 'Nora', gameName: 'Lucky Fire Blitz', multiplier: 120, payout: 120, you: false }, { rank: 2, name: null, gameName: 'Hot 7s', multiplier: 50, payout: 100, you: false },
+    { rank: 3, name: 'Ravi', gameName: 'Luxury Life', multiplier: 33.5, payout: 10.05, you: false }] })
   if (path === '/api/vip') { const up = vipLevelUp; vipLevelUp = false
     return json({ code: up ? 'GOLD' : 'SILVER', name: up ? 'Gold' : 'Silver', rank: up ? 2 : 1, points: up ? 620 : 240, next: vipLevels[up ? 3 : 2], progress: up ? 6 : 35, levels: vipLevels, levelUp: up, wheelBoosted: true }) }
   if (path.startsWith('/api/inbox/')) { inboxReads.push(path); return route.fulfill({ status: 204, headers }) }
@@ -523,6 +526,14 @@ await page.waitForTimeout(600)
 await audit('07g-vip-ladder')
 await page.getByLabel('Close', { exact: true }).last().click()
 console.log('## vip  (level-up celebrated once, chip, ladder with points to go)')
+
+// This week's top wins: the trophy in the room's top bar opens the board, with the player's own place under it.
+await page.getByLabel("This week's top wins").first().click().catch(() => findings.push('leaderboard: no trophy button'))
+await page.getByText('Your best this week:', { exact: false }).waitFor({ timeout: 5000 }).catch(() => findings.push("leaderboard: the player's place is missing"))
+await page.waitForTimeout(500)
+await audit('07i-leaderboard')
+await page.getByLabel('Close', { exact: true }).last().click()
+console.log('## leaderboard  (trophy, top three with medals, your place)')
 
 // A phone held sideways is how this app is played. The game must be the larger half of that screen: the two
 // columns were once decided by flex ratios that Android and the browser divided differently, and the game

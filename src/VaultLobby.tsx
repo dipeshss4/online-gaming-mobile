@@ -10,6 +10,7 @@ import { c, useReducedMotion } from './theme';
 import { artOf, CASINO } from './casinoArt';
 import { DailyWheelButton } from './DailyWheel';
 import { VipChip } from './Vip';
+import { LeaderboardButton } from './Leaderboard';
 import { Site, SymbolArt } from './WebLook';
 
 /**
@@ -191,7 +192,7 @@ export function VaultLobby({ site, games, balance, playerId, token, floor, loadi
         <Text style={v.brandText} numberOfLines={1}>{logo ? site.platformName.toUpperCase() : <>LOOT<Text style={{ color: c.gold }}>777X</Text></>}</Text>
       </View>
       <View style={v.icons}>
-        <SoundToggle /><InboxButton token={token} />
+        <SoundToggle /><InboxButton token={token} /><LeaderboardButton token={token} round />
         <Tap haptic="select" accessibilityLabel="Game history" onPress={onHistory} style={v.icon}><Text style={v.iconText}>◷</Text></Tap>
         <Tap haptic="select" accessibilityLabel="Account" onPress={onAccount} style={v.icon}><Text style={v.iconText}>⚙</Text></Tap>
       </View>
