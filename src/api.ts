@@ -23,7 +23,10 @@ export type FreeSpinGrant = { id: string; gameCode: string; gameName: string; st
 export type WheelSegment = { spins: number; weight: number; chance: number };
 export type WheelResult = { segment: number; spins: number; stake: number; gameCode: string; gameName: string; grantId: string; expiresAt: string | null; nextAt: string };
 export type WheelStatus = { enabled: boolean; available: boolean; nextAt: string | null; gameCode: string | null; gameName: string | null; stake: number | null;
-  expiresInDays: number; segments: WheelSegment[]; today: WheelResult | null };
+  expiresInDays: number; segments: WheelSegment[]; today: WheelResult | null; vipLevel?: string | null; boost?: number };
+export type VipLevelView = { code: string; name: string; points: number; wheelBoost: number };
+export type VipStatus = { code: string; name: string; rank: number; points: number; next: VipLevelView | null; progress: number; levels: VipLevelView[]; levelUp: boolean; wheelBoosted: boolean };
+export const vipApi = { read: (token: string) => request<VipStatus>('/api/vip', token) };
 export const bonuses = {
   freeSpins: (token: string) => request<FreeSpinGrant[]>('/api/free-spins', token),
   wheel: (token: string) => request<WheelStatus>('/api/daily-wheel', token),

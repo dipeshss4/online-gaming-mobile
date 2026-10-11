@@ -120,6 +120,10 @@ const scratchBets = []
 const slotBets = []
 // The daily wheel and the free spins it grants: off until its scenario switches it on.
 let wheelOn = false, wheelSpun = 0, freeSpinList = []
+// VIP: Silver, with a level-up only when its scenario asks for one.
+let vipLevelUp = false
+const vipLevels = [{ code: 'BRONZE', name: 'Bronze', points: 0, wheelBoost: 1 }, { code: 'SILVER', name: 'Silver', points: 100, wheelBoost: 1.25 }, { code: 'GOLD', name: 'Gold', points: 500, wheelBoost: 1.5 },
+  { code: 'PLATINUM', name: 'Platinum', points: 2500, wheelBoost: 2 }, { code: 'DIAMOND', name: 'Diamond', points: 10000, wheelBoost: 3 }]
 const wheelResult = { segment: 2, spins: 10, stake: 0.1, gameCode: 'HOT_7S', gameName: 'Hot 7s', grantId: 'g-wheel', expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(), nextAt: new Date(Date.now() + 5 * 3600000).toISOString() }
 const devilBets = []
 let fishBalance = 125.5
@@ -147,6 +151,8 @@ await page.route('**/api/**', async route => {
     return json(wheelResult)
   }
   if (path === '/api/free-spins') return json(freeSpinList)
+  if (path === '/api/vip') { const up = vipLevelUp; vipLevelUp = false
+    return json({ code: up ? 'GOLD' : 'SILVER', name: up ? 'Gold' : 'Silver', rank: up ? 2 : 1, points: up ? 620 : 240, next: vipLevels[up ? 3 : 2], progress: up ? 6 : 35, levels: vipLevels, levelUp: up, wheelBoosted: true }) }
   if (path.startsWith('/api/inbox/')) { inboxReads.push(path); return route.fulfill({ status: 204, headers }) }
   if (path === '/api/auth/login' || path === '/api/auth/register') return json({ ...identity, accessToken: 'preview-token' })
   if (path === '/api/auth/refresh') {
@@ -502,6 +508,21 @@ console.log(`## daily wheel and free spins  (one spin, 10 free spins, played wit
 freeSpinList = []; wheelOn = false
 await page.getByLabel('Back to lobby').first().click()
 await page.getByText('All Games').first().waitFor({ timeout: 15000 }).catch(() => {})
+
+// VIP: the chip shows the level; reaching a new one is celebrated once; the chip opens the ladder.
+vipLevelUp = true
+await page.getByLabel('Account', { exact: true }).first().click()
+await page.getByText('Home', { exact: true }).last().click()
+await page.getByLabel('You reached Gold').waitFor({ timeout: 10000 }).catch(() => findings.push('vip: no level-up celebration'))
+await page.waitForTimeout(500)
+await audit('07f-vip-level-up')
+await page.getByLabel('Awesome').click()
+await page.getByLabel(/^VIP Gold, 6% to Platinum/).first().click().catch(() => findings.push('vip: no VIP chip'))
+await page.getByText('1,880', { exact: true }).waitFor({ timeout: 5000 }).catch(() => findings.push('vip: the ladder did not show the points to go'))
+await page.waitForTimeout(600)
+await audit('07g-vip-ladder')
+await page.getByLabel('Close', { exact: true }).last().click()
+console.log('## vip  (level-up celebrated once, chip, ladder with points to go)')
 
 // A phone held sideways is how this app is played. The game must be the larger half of that screen: the two
 // columns were once decided by flex ratios that Android and the browser divided differently, and the game
