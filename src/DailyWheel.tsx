@@ -90,6 +90,7 @@ function WheelDialog({ token, status, games, onClose, onPlay, onWon }: {
           <View style={{ alignItems: 'center' }}>
           {!side && <><Text style={w.kicker}>DAILY</Text><Text style={w.title}>BONUS WHEEL</Text>
           <Text style={w.sub}>One free spin a day · free spins on {status.gameName}</Text></>}
+          {!side && !!status.vipLevel && (status.boost ?? 1) > 1 && <Text style={w.boost}>★ {status.vipLevel} VIP · every prize ×{status.boost}</Text>}
           <View style={{ width: size + 16, height: size + 16, alignItems: 'center', justifyContent: 'center', marginVertical: 8 }}>
             <View style={[w.rim, { width: size + 16, height: size + 16, borderRadius: size }]} />
             <Animated.View accessibilityLabel={`Wheel of ${segments.length} prizes`} style={{ width: size, height: size, borderRadius: r, overflow: 'hidden',
@@ -111,7 +112,8 @@ function WheelDialog({ token, status, games, onClose, onPlay, onWon }: {
           </View>
           <View style={side ? w.sidePanel : { alignSelf: 'stretch', alignItems: 'center' }}>
           {side && <><Text style={w.kicker}>DAILY</Text><Text style={w.title}>BONUS WHEEL</Text>
-          <Text style={w.sub}>One free spin a day · free spins on {status.gameName}</Text></>}
+          <Text style={w.sub}>One free spin a day · free spins on {status.gameName}</Text>
+          {!!status.vipLevel && (status.boost ?? 1) > 1 && <Text style={w.boost}>★ {status.vipLevel} VIP · every prize ×{status.boost}</Text>}</>}
           <View accessibilityLiveRegion="polite" style={{ alignItems: 'center', minHeight: 60, marginTop: side ? 8 : 0 }}>
             {!!error && <Text style={w.error}>{error}</Text>}
             {result && !spinning ? <>
@@ -153,6 +155,7 @@ const w = StyleSheet.create({
   kicker: { color: '#ff9ad6', fontWeight: '900', fontSize: 12, letterSpacing: 8 },
   title: { color: '#ffe58a', fontWeight: '900', fontStyle: 'italic', fontSize: 30, textShadowColor: '#ff3cac', textShadowRadius: 14, textShadowOffset: { width: 0, height: 0 } },
   sub: { color: '#e8dcff', fontSize: 13, marginTop: 4, textAlign: 'center' },
+  boost: { marginTop: 6, paddingHorizontal: 12, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: '#ffd23f88', backgroundColor: '#ffd23f22', color: '#ffe58a', fontWeight: '900', fontSize: 12, overflow: 'hidden' },
   rim: { position: 'absolute', backgroundColor: '#5a2a04', borderWidth: 4, borderColor: c.gold },
   pointer: { position: 'absolute', top: -6, width: 0, height: 0, borderLeftWidth: 15, borderRightWidth: 15, borderTopWidth: 32, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: c.gold },
   hubWrap: { position: 'absolute' },

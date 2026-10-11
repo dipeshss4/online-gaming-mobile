@@ -9,6 +9,7 @@ import { Tap } from './Tap';
 import { c, useReducedMotion } from './theme';
 import { artOf, CASINO } from './casinoArt';
 import { DailyWheelButton } from './DailyWheel';
+import { VipChip } from './Vip';
 import { Site, SymbolArt } from './WebLook';
 
 /**
@@ -183,6 +184,7 @@ export function VaultLobby({ site, games, balance, playerId, token, floor, loadi
             <Text style={v.coin}>$</Text><Text style={v.balance}>{balance ? balance.balance.toFixed(2) : '—'}</Text><Text style={v.plus}>＋</Text>
           </Tap>
         </View>
+        <View style={{ marginTop: 14 }}><VipChip token={token} /></View>
       </View>
       <View style={v.brand}>
         {logo ? <Image source={{ uri: `${API_URL}/api/media/${logo}` }} style={{ width: 36, height: 36, borderRadius: 18 }} /> : <Image source={MARK} style={{ width: 36, height: 36 }} />}
