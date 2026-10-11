@@ -122,6 +122,8 @@ const slotBets = []
 let wheelOn = false, wheelSpun = 0, freeSpinList = []
 // VIP: Silver, with a level-up only when its scenario asks for one.
 let vipLevelUp = false
+// Daily missions: off until their scenario.
+let missionsOn = false, missionClaims = []
 const vipLevels = [{ code: 'BRONZE', name: 'Bronze', points: 0, wheelBoost: 1 }, { code: 'SILVER', name: 'Silver', points: 100, wheelBoost: 1.25 }, { code: 'GOLD', name: 'Gold', points: 500, wheelBoost: 1.5 },
   { code: 'PLATINUM', name: 'Platinum', points: 2500, wheelBoost: 2 }, { code: 'DIAMOND', name: 'Diamond', points: 10000, wheelBoost: 3 }]
 const wheelResult = { segment: 2, spins: 10, stake: 0.1, gameCode: 'HOT_7S', gameName: 'Hot 7s', grantId: 'g-wheel', expiresAt: new Date(Date.now() + 7 * 86400000).toISOString(), nextAt: new Date(Date.now() + 5 * 3600000).toISOString() }
@@ -151,6 +153,12 @@ await page.route('**/api/**', async route => {
     return json(wheelResult)
   }
   if (path === '/api/free-spins') return json(freeSpinList)
+  if (path === '/api/missions') return json({ enabled: missionsOn, gameCode: 'HOT_7S', gameName: 'Hot 7s', stake: 0.1, expiresInDays: 7, resetsAt: new Date(Date.now() + 6 * 3600000).toISOString(), missions: [
+    { index: 0, kind: 'ROUNDS', title: 'Play 20 rounds', target: 20, progress: 12, spins: 3, done: false, claimed: false },
+    { index: 1, kind: 'STAKED', title: 'Stake 10.00 in total', target: 10, progress: 10, spins: 5, done: true, claimed: missionClaims.includes(1) },
+    { index: 2, kind: 'BIG_WIN', title: 'Land a win of 10× or more', target: 1, progress: 1, spins: 10, done: true, claimed: true }] })
+  if (path.startsWith('/api/missions/') && path.endsWith('/claim')) { missionClaims.push(Number(path.split('/')[3]))
+    return json({ index: 1, spins: 5, gameCode: 'HOT_7S', gameName: 'Hot 7s', stake: 0.1, grantId: 'g-mission', expiresAt: new Date(Date.now() + 7 * 86400000).toISOString() }) }
   if (path === '/api/vip') { const up = vipLevelUp; vipLevelUp = false
     return json({ code: up ? 'GOLD' : 'SILVER', name: up ? 'Gold' : 'Silver', rank: up ? 2 : 1, points: up ? 620 : 240, next: vipLevels[up ? 3 : 2], progress: up ? 6 : 35, levels: vipLevels, levelUp: up, wheelBoosted: true }) }
   if (path.startsWith('/api/inbox/')) { inboxReads.push(path); return route.fulfill({ status: 204, headers }) }
@@ -523,6 +531,21 @@ await page.waitForTimeout(600)
 await audit('07g-vip-ladder')
 await page.getByLabel('Close', { exact: true }).last().click()
 console.log('## vip  (level-up celebrated once, chip, ladder with points to go)')
+
+// Daily missions: the button counts the ones ready; the list shows progress; a finished one is claimed for free spins.
+missionsOn = true
+await page.getByLabel('Account', { exact: true }).first().click()
+await page.getByText('Home', { exact: true }).last().click()
+await page.getByLabel('Daily missions, 1 ready to claim').first().click().catch(() => findings.push('missions: no button with the count ready'))
+await page.getByText('12 / 20', { exact: true }).waitFor({ timeout: 5000 }).catch(() => findings.push('missions: progress not shown'))
+await page.waitForTimeout(500)
+await audit('07h-missions')
+await page.getByLabel('Claim 5 free spins').click()
+await page.getByText('+5 free spins on Hot 7s!').waitFor({ timeout: 5000 }).catch(() => findings.push('missions: the claim was not shown'))
+if (missionClaims.join() !== '1') findings.push(`missions: claims sent ${missionClaims.join()}`)
+await page.getByLabel('Close', { exact: true }).last().click()
+missionsOn = false
+console.log('## missions  (count on the button, progress, one claim for 5 free spins)')
 
 // A phone held sideways is how this app is played. The game must be the larger half of that screen: the two
 // columns were once decided by flex ratios that Android and the browser divided differently, and the game
