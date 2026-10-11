@@ -26,6 +26,13 @@ export type WheelStatus = { enabled: boolean; available: boolean; nextAt: string
   expiresInDays: number; segments: WheelSegment[]; today: WheelResult | null; vipLevel?: string | null; boost?: number };
 export type VipLevelView = { code: string; name: string; points: number; wheelBoost: number };
 export type VipStatus = { code: string; name: string; rank: number; points: number; next: VipLevelView | null; progress: number; levels: VipLevelView[]; levelUp: boolean; wheelBoosted: boolean };
+export type MissionView = { index: number; kind: string; title: string; target: number; progress: number; spins: number; done: boolean; claimed: boolean };
+export type MissionStatus = { enabled: boolean; gameCode: string | null; gameName: string | null; stake: number | null; expiresInDays: number; resetsAt: string | null; missions: MissionView[] };
+export type MissionClaimed = { index: number; spins: number; gameCode: string; gameName: string; stake: number; grantId: string; expiresAt: string | null };
+export const missionsApi = {
+  read: (token: string) => request<MissionStatus>('/api/missions', token),
+  claim: (token: string, index: number) => request<MissionClaimed>(`/api/missions/${index}/claim`, token, {}),
+};
 export const vipApi = { read: (token: string) => request<VipStatus>('/api/vip', token) };
 export const bonuses = {
   freeSpins: (token: string) => request<FreeSpinGrant[]>('/api/free-spins', token),

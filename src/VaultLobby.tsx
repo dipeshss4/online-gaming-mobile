@@ -10,6 +10,7 @@ import { c, useReducedMotion } from './theme';
 import { artOf, CASINO } from './casinoArt';
 import { DailyWheelButton } from './DailyWheel';
 import { VipChip } from './Vip';
+import { MissionsButton } from './Missions';
 import { Site, SymbolArt } from './WebLook';
 
 /**
@@ -208,7 +209,7 @@ export function VaultLobby({ site, games, balance, playerId, token, floor, loadi
       {!shown.length && <View style={[v.empty, { width: width - 32 }]}><Text style={v.emptyText}>{loading ? 'Loading games…' : section === 'FAVORITE' ? 'Tap ♡ on a game to keep it here.' : 'No games here yet.'}</Text></View>}
     </ScrollView>
     {/* The daily wheel waits above the dock, bottom right, while today's spin is there. */}
-    <View style={v.wheel} pointerEvents="box-none"><DailyWheelButton token={token} games={games} onPlay={onPlay} /></View>
+    <View style={v.wheel} pointerEvents="box-none"><MissionsButton token={token} games={games} onPlay={onPlay} /><DailyWheelButton token={token} games={games} onPlay={onPlay} /></View>
     <View style={v.dock}>
       {SECTIONS.map(({ key, icon, label }) => {
         const on = key === section;
@@ -269,7 +270,7 @@ const v = StyleSheet.create({
   error: { marginHorizontal: 60, marginTop: 6, padding: 8, borderRadius: 10, backgroundColor: '#5a0d1ecc', borderWidth: 1, borderColor: c.bad },
   errorText: { color: c.bad, fontSize: 12, textAlign: 'center' },
   emptyText: { color: c.muted, fontSize: 15 },
-  wheel: { position: 'absolute', right: 14, bottom: 80, zIndex: 5 },
+  wheel: { position: 'absolute', right: 14, bottom: 80, zIndex: 5, gap: 8, alignItems: 'flex-end' },
   dock: { height: 70, flexDirection: 'row', justifyContent: 'center', gap: 6, paddingHorizontal: 12, borderTopWidth: 1, borderTopColor: '#22e1ff55', backgroundColor: '#071538e8' },
   dockTab: { width: 112, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderTopLeftRadius: 14, borderTopRightRadius: 14 },
   dockIcon: { width: 34, height: 30 },
