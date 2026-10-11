@@ -26,6 +26,7 @@ export type WheelStatus = { enabled: boolean; available: boolean; nextAt: string
   expiresInDays: number; segments: WheelSegment[]; today: WheelResult | null; vipLevel?: string | null; boost?: number };
 export type VipLevelView = { code: string; name: string; points: number; wheelBoost: number };
 export type VipStatus = { code: string; name: string; rank: number; points: number; next: VipLevelView | null; progress: number; levels: VipLevelView[]; levelUp: boolean; wheelBoosted: boolean };
+export const recentApi = { read: (token: string) => request<{ code: string; playedAt: string }[]>('/api/recent-games', token) };
 export const vipApi = { read: (token: string) => request<VipStatus>('/api/vip', token) };
 export const bonuses = {
   freeSpins: (token: string) => request<FreeSpinGrant[]>('/api/free-spins', token),

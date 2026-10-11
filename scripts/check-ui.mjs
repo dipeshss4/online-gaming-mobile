@@ -151,6 +151,7 @@ await page.route('**/api/**', async route => {
     return json(wheelResult)
   }
   if (path === '/api/free-spins') return json(freeSpinList)
+  if (path === '/api/recent-games') return json([{ code: 'LUXURY_LIFE', playedAt: now }, { code: 'GALAXY_KENO', playedAt: now }])
   if (path === '/api/vip') { const up = vipLevelUp; vipLevelUp = false
     return json({ code: up ? 'GOLD' : 'SILVER', name: up ? 'Gold' : 'Silver', rank: up ? 2 : 1, points: up ? 620 : 240, next: vipLevels[up ? 3 : 2], progress: up ? 6 : 35, levels: vipLevels, levelUp: up, wheelBoosted: true }) }
   if (path.startsWith('/api/inbox/')) { inboxReads.push(path); return route.fulfill({ status: 204, headers }) }
@@ -364,6 +365,10 @@ await page.locator('input[type=password], input[secureTextEntry]').first().fill(
 await page.getByText(/^(Sign in|Sign In)$/).first().click().catch(() => {})
 await page.waitForTimeout(2500)
 await audit('02-lobby')
+await page.getByLabel('Continue Luxury Life').first().scrollIntoViewIfNeeded().catch(() => {})
+if (!(await page.getByLabel('Continue Luxury Life').first().isVisible().catch(() => false))) findings.push('recent: no Continue playing row in the upright lobby')
+await page.screenshot({ path: `${OUT}/02c-continue-playing.png` })
+await page.evaluate(() => window.scrollTo(0, 0)).catch(() => {})
 await page.getByLabel('Play Roulette').first().scrollIntoViewIfNeeded().catch(() => {})
 await page.screenshot({ path: `${OUT}/02b-lobby-cards.png` })
 await page.evaluate(() => window.scrollTo(0, 0)).catch(() => {})
@@ -479,6 +484,9 @@ await page.getByText('Home', { exact: true }).last().click()
 await page.getByText('All Games').first().waitFor({ timeout: 15000 })
 await page.waitForTimeout(800)
 await audit('07b-landscape-lobby')
+if (!(await page.getByLabel('Play Luxury Life').first().isVisible().catch(() => false))) findings.push('recent: the last game played is not first in the room')
+if (!(await page.getByText('▶ CONTINUE').first().isVisible().catch(() => false))) findings.push('recent: no CONTINUE ribbon')
+console.log('## recently played  (Luxury Life and Galaxy Keno first, marked CONTINUE)')
 
 // The daily wheel: its button glows above the dock, the wheel stops on the server's segment, the prize opens its
 // game, and that game's spin plays the free spin (the grant's id at the grant's stake, not the bet bar's).
