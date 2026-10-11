@@ -10,6 +10,7 @@ import { c, useReducedMotion } from './theme';
 import { artOf, CASINO } from './casinoArt';
 import { DailyWheelButton } from './DailyWheel';
 import { VipChip } from './Vip';
+import { useRecentGames } from './recentGames';
 import { Site, SymbolArt } from './WebLook';
 
 /**
@@ -60,11 +61,11 @@ function Spotlight({ size }: { size: number }) {
   </View>;
 }
 
-function Cabinet({ game, index, width, height, favorite, float, onPlay, onFavorite }: {
-  game: Game; index: number; width: number; height: number; favorite: boolean; float: Animated.Value; onPlay: () => void; onFavorite: () => void;
+function Cabinet({ game, index, width, height, favorite, float, continuing, onPlay, onFavorite }: {
+  game: Game; index: number; width: number; height: number; favorite: boolean; float: Animated.Value; continuing?: boolean; onPlay: () => void; onFavorite: () => void;
 }) {
   const art = Math.min(height * .27, width * .34), image = game.presentation?.tileImageId, rendered = artOf(game);
-  const badge = game.presentation?.badge?.split('·')[0].trim();
+  const badge = continuing ? '▶ CONTINUE' : game.presentation?.badge?.split('·')[0].trim();
   // Neighbouring cabinets float out of step, so the room breathes rather than bounces.
   const bob = float.interpolate({ inputRange: [0, 1], outputRange: index % 2 ? [-4, 4] : [4, -4] });
   return <View style={[v.frame, { width, height }]}>
@@ -148,7 +149,14 @@ export function VaultLobby({ site, games, balance, playerId, token, floor, loadi
     const next = previous.includes(code) ? previous.filter(c => c !== code) : [...previous, code];
     saveFavorites(next); return next;
   });
-  const shown = useMemo(() => games.filter(game => section === 'ALL' || (section === 'FAVORITE' ? favorites.includes(game.code) : sectionOf(game) === section)), [games, section, favorites]);
+  // The games this player played last come first in ALL GAMES, marked to continue.
+  const recent = useRecentGames(token, games).slice(0, 4);
+  const shown = useMemo(() => {
+    const list = games.filter(game => section === 'ALL' || (section === 'FAVORITE' ? favorites.includes(game.code) : sectionOf(game) === section));
+    if (section !== 'ALL' || !recent.length) return list;
+    const first = recent.map(code => list.find(game => game.code === code)).filter((game): game is Game => !!game);
+    return [...first, ...list.filter(game => !recent.includes(game.code))];
+  }, [games, section, favorites, recent.join()]); // eslint-disable-line react-hooks/exhaustive-deps
   // Two rows fill what the top bar and the dock leave; each cabinet keeps a poster's proportions.
   const rows = height < 300 ? 1 : 2, gap = 12;
   const cabinetHeight = Math.floor((height - 60 - 26 - 70 - 24 - gap * (rows - 1)) / rows);
@@ -202,7 +210,7 @@ export function VaultLobby({ site, games, balance, playerId, token, floor, loadi
       snapToOffsets={columns.map((_, i) => (featured ? Math.round(cabinetWidth * 1.0) + gap : 0) + i * (cabinetWidth + gap))}>
       {featured && <Featured game={featured} width={Math.round(cabinetWidth * 1.0)} height={cabinetHeight * rows + gap * (rows - 1)} float={float} onPlay={() => onPlay(featured)} />}
       {columns.map((column, x) => <View key={x} style={{ gap }}>
-        {column.map((game, y) => <Cabinet key={game.code} game={game} index={x * rows + y} width={cabinetWidth} height={cabinetHeight} float={float}
+        {column.map((game, y) => <Cabinet key={game.code} game={game} index={x * rows + y} width={cabinetWidth} height={cabinetHeight} float={float} continuing={section === 'ALL' && recent.includes(game.code)}
           favorite={favorites.includes(game.code)} onPlay={() => onPlay(game)} onFavorite={() => toggle(game.code)} />)}
       </View>)}
       {!shown.length && <View style={[v.empty, { width: width - 32 }]}><Text style={v.emptyText}>{loading ? 'Loading games…' : section === 'FAVORITE' ? 'Tap ♡ on a game to keep it here.' : 'No games here yet.'}</Text></View>}
