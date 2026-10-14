@@ -1,8 +1,9 @@
 import React from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { Game } from './api';
 import type { Mood } from './fx/Ambience';
+import { LOGO_ART } from './sceneArt';
 
 /**
  * Each game's title as a casino marquee: metallic lettering (a bright upper half over a deeper lower half, on a
@@ -78,6 +79,13 @@ function Diamond({ size, colors }: { size: number; colors: [string, string] }) {
 }
 
 export function GameLogo({ game, height = 40, maxWidth }: { game: Game; height?: number; maxWidth?: number }) {
+  // The game's rendered 3D logo (scripts/render-tiles.py) where it has one: a little taller than the plaque, as big
+  // gold letters read best, and never wider than the room.
+  const art = LOGO_ART[game.code];
+  if (art) {
+    const tall = height * 1.3, wide = Math.min(maxWidth ?? 9999, tall * art.ratio);
+    return <Image source={art.source} accessible accessibilityRole="header" accessibilityLabel={game.name} resizeMode="contain" style={{ width: wide, height: wide / art.ratio }} />;
+  }
   const logo = logoOf(game);
   // Sized so the title fits: about 0.8em a heavy capital, plus the plaque's padding and, with room, the flourishes.
   const flourish = !maxWidth || maxWidth > 360;

@@ -307,8 +307,82 @@ INTROS = {
 }
 
 
+
+# ---------------------------------------------------------------- inside the games
+# Every game is played over its own scene (BG_<CODE>, 16:9): the tile's colours and pieces, moved out to the edges
+# and corners where the reels don't cover them, softly out of focus. Its name is a separate 3D logo with a clear
+# background (LOGO_<CODE>), drawn above the reels in place of the typed one.
+EDGES = [(-6.3, 1.9, 2.6, 8), (6.3, 1.9, 2.6, -8), (-6.5, -2.4, 2.3, -6), (6.5, -2.4, 2.3, 6), (-4.9, 3.6, 1.6, 12), (4.9, 3.6, 1.6, -12)]
+
+def soft_glow(colour, strength):
+    """A disc of light that is brightest in the middle and fades to nothing at its rim, like an out-of-focus bulb."""
+    m = bpy.data.materials.new('SoftGlow'); m.use_nodes = True; m.blend_method = 'BLEND'
+    nt = m.node_tree; n, l = nt.nodes, nt.links
+    for node in list(n):
+        if node.type != 'OUTPUT_MATERIAL': n.remove(node)
+    coords = n.new('ShaderNodeTexCoord'); mapping = n.new('ShaderNodeMapping')
+    mapping.inputs['Location'].default_value = (-1, -1, 0); mapping.inputs['Scale'].default_value = (2, 2, 1)
+    grad = n.new('ShaderNodeTexGradient'); grad.gradient_type = 'SPHERICAL'
+    l.new(coords.outputs['Generated'], mapping.inputs['Vector']); l.new(mapping.outputs['Vector'], grad.inputs['Vector'])
+    soft = n.new('ShaderNodeMath'); soft.operation = 'POWER'; soft.inputs[1].default_value = 2.2; l.new(grad.outputs['Fac'], soft.inputs[0])
+    emit = n.new('ShaderNodeEmission'); emit.inputs['Color'].default_value = (*colour, 1); emit.inputs['Strength'].default_value = strength
+    clear = n.new('ShaderNodeBsdfTransparent'); mix = n.new('ShaderNodeMixShader')
+    l.new(soft.outputs[0], mix.inputs['Fac']); l.new(clear.outputs[0], mix.inputs[1]); l.new(emit.outputs[0], mix.inputs[2])
+    l.new(mix.outputs[0], n['Material Output'].inputs['Surface'])
+    return m
+
+
+def scene_bg(code, spec):
+    w, h = 16.0, 9.0
+    stage(w, h, 1600)
+    scene = bpy.context.scene; scene.cycles.samples = 64
+    hot, mid, edge = spec['bg']
+    # Dimmer than the tile: it sits behind the reels and the buttons.
+    dim = lambda c, k: tuple(v * k for v in c)
+    backdrop(dim(hot, .5), dim(mid, .55), dim(edge, .7), rays=spec.get('rays', 22), ray_strength=spec.get('ray_strength', .22) * .5, centre=(0, .2), reach=9)
+    rng = random.Random(len(code) * 7)
+    glow = GLOW(spec.get('sparkle', (1, .85, .55)), 6)
+    for _ in range(50):
+        r = rng.uniform(.015, .04)
+        sphere((rng.uniform(-w * .6, w * .6), rng.uniform(-h * .6, h * .6), rng.uniform(-2.4, -.6)), (r, r, r), glow, 10)
+    # Casino lights far behind, out of focus: soft glows of the game's colours that fade out at their edges.
+    for _ in range(16):
+        r = rng.uniform(.5, 1.1); colour = (hot, mid, (1, .8, .45))[rng.randrange(3)]
+        bpy.ops.mesh.primitive_circle_add(vertices=48, radius=r, fill_type='NGON', location=(rng.uniform(-w * .75, w * .75), rng.uniform(-h * .7, h * .7), -2.8))
+        add(bpy.context.object, soft_glow(colour, rng.uniform(.35, .8)))
+    pieces = spec['pieces']
+    for i, (x, y, size, turn) in enumerate(EDGES):
+        build = pieces[i % len(pieces)][0]
+        group(build, (x, y, -.4), size, (0, 0, turn))
+    cam = scene.camera.data
+    cam.dof.use_dof = True; cam.dof.focus_distance = scene.camera.location.z - 1.5; cam.dof.aperture_fstop = 1.1
+    scene.render.filepath = os.path.join(OUT, f'BG_{code}.png')
+    bpy.ops.render.render(write_still=True)
+    print('rendered background', code)
+
+
+def scene_logo(code, spec):
+    w, h = 12.0, 4.2
+    stage(w, h, 1200)
+    scene = bpy.context.scene; scene.render.film_transparent = True
+    scene.node_tree.nodes['Glare'].mix = -.75
+    name = spec['name'].replace('\n', ' ') if len(spec['name']) <= 18 else spec['name']
+    top = 1.9
+    if 'kicker' in spec and not spec.get('kicker_below'):
+        _, bottom = kicker(spec['kicker'], top, max_w=w * .5); top = bottom - .08
+    room_bottom = -1.95 + (.55 if spec.get('kicker_below') else 0)
+    t_top, t_bottom = title(name, spec['font'], (top + room_bottom) / 2, w * .94, top - room_bottom, outline=spec.get('outline', (.12, .02, .0)))
+    if spec.get('kicker_below'): kicker(spec['kicker'], t_bottom - .04, max_w=w * .4)
+    scene.render.filepath = os.path.join(OUT, f'LOGO_{code}.png')
+    bpy.ops.render.render(write_still=True)
+    print('rendered logo', code)
+
+
+# Names on the command line pick what to render: a game code (its tile), BG_<CODE> / LOGO_<CODE>, or BG / LOGO /
+# TILES for all of a kind. Nothing renders everything.
 for code, spec in TILES.items():
-    if ONLY and code not in ONLY: continue
-    tile(code, spec)
+    if not ONLY or code in ONLY or 'TILES' in ONLY: tile(code, spec)
+    if not ONLY or f'BG_{code}' in ONLY or 'BG' in ONLY: scene_bg(code, spec)
+    if not ONLY or f'LOGO_{code}' in ONLY or 'LOGO' in ONLY: scene_logo(code, spec)
 for name, (w, h, pieces) in INTROS.items():
     if not ONLY or name in ONLY: intro(name, w, h, pieces)
