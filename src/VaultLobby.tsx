@@ -7,7 +7,7 @@ import type { FloorState } from './FloorNow';
 import { InboxButton, SoundToggle } from './Popups';
 import { Tap } from './Tap';
 import { c, useReducedMotion } from './theme';
-import { artOf, CASINO } from './casinoArt';
+import { artOf, CASINO, TILE_RATIO, tileOf } from './casinoArt';
 import { DailyWheelButton } from './DailyWheel';
 import { VipChip } from './Vip';
 import { Site, SymbolArt } from './WebLook';
@@ -15,9 +15,10 @@ import { Site, SymbolArt } from './WebLook';
 /**
  * The lobby a phone held sideways opens on, laid out the way the big sweepstakes game rooms are: the player's ID
  * and credits top left, the brand in the middle, two rows of large game cabinets that scroll sideways, and the
- * categories docked along the bottom. Wallet, history and account sit behind the icons top right, so the games get
- * the whole screen. The room is dressed in 3D casino art (src/casinoArt.ts): a casino floor behind everything, a
- * rendered centrepiece floating in each cabinet, the featured game's banner first in line, and rendered category icons.
+ * categories down the left. Wallet, history and account sit behind the icons top right, so the games get
+ * the whole screen. The games sit in neon panels (NEW, slots, fish tables, the rest) with marquee titles. The room
+ * is dressed in 3D art (src/casinoArt.ts): a casino floor behind everything, each game's rendered tile (its scene
+ * and gold name; else a centrepiece floating over its colours), the featured game first in line, and rendered icons.
  */
 export type Section = 'SLOTS' | 'FISHING' | 'ALL' | 'OTHER' | 'FAVORITE';
 const SECTIONS: { key: Section; icon: number; label: string }[] = [
@@ -43,6 +44,31 @@ function saveFavorites(codes: string[]) {
   try { if (Platform.OS === 'web') localStorage.setItem(FAVORITES, value); else void SecureStore.setItemAsync(FAVORITES, value); } catch { /* kept for this visit */ }
 }
 
+/** The neon panels' frame and marquee title, above and below the cabinets. */
+const PANEL_CHROME = 34;
+/** A cabinet's frame round its picture: 4pt padding, a 2pt border and the screen's 1pt border, each side. */
+const CABINET_CHROME = 14;
+/** The category rail down the left. */
+const RAIL = 96;
+const PANEL_TITLE: Record<Section, string> = { SLOTS: 'HOT SLOTS', FISHING: 'FISH TABLES', OTHER: 'TABLE & ARCADE', ALL: 'ALL GAMES', FAVORITE: 'YOUR FAVORITES' };
+
+/** All games: the NEW ones first in their own panel, then slots, fishing and the rest. A category is one panel. */
+function panelsOf(games: Game[], section: Section): { key: string; title: string; games: Game[] }[] {
+  if (!games.length) return [];
+  if (section !== 'ALL') return [{ key: section, title: PANEL_TITLE[section], games }];
+  const isNew = (game: Game) => !!game.presentation?.tags?.includes('NEW');
+  const fresh = games.filter(isNew), rest = games.filter(game => !isNew(game));
+  return [
+    { key: 'NEW', title: 'NEW ON LOOT777X', games: fresh },
+    ...(['SLOTS', 'FISHING', 'OTHER'] as Section[]).map(key => ({ key, title: PANEL_TITLE[key], games: rest.filter(game => sectionOf(game) === key) })),
+  ].filter(panel => panel.games.length);
+}
+function columnsOf(games: Game[], rows: number) {
+  const columns: Game[][] = [];
+  for (let i = 0; i < games.length; i += rows) columns.push(games.slice(i, i + rows));
+  return columns;
+}
+
 /** Each kind of game has its own cabinet colours, so the room reads at a glance. */
 function colorsOf(game: Game, index: number): [string, string, string] {
   if (game.engine?.layout === 'FISH') return ['#1fb6e8', '#0b4f8a', '#041630'];
@@ -63,7 +89,7 @@ function Spotlight({ size }: { size: number }) {
 function Cabinet({ game, index, width, height, favorite, float, onPlay, onFavorite }: {
   game: Game; index: number; width: number; height: number; favorite: boolean; float: Animated.Value; onPlay: () => void; onFavorite: () => void;
 }) {
-  const art = Math.min(height * .27, width * .34), image = game.presentation?.tileImageId, rendered = artOf(game);
+  const art = Math.min(height * .27, width * .34), image = game.presentation?.tileImageId, rendered = artOf(game), tile = image ? null : tileOf(game);
   const badge = game.presentation?.badge?.split('·')[0].trim();
   // Neighbouring cabinets float out of step, so the room breathes rather than bounces.
   const bob = float.interpolate({ inputRange: [0, 1], outputRange: index % 2 ? [-4, 4] : [4, -4] });
@@ -71,6 +97,8 @@ function Cabinet({ game, index, width, height, favorite, float, onPlay, onFavori
     <LinearGradient colors={colorsOf(game, index)} start={{ x: .5, y: 0 }} end={{ x: .5, y: 1 }} style={v.screen}>
       <Tap haptic="heavy" accessibilityLabel={`Play ${game.name}`} onPress={onPlay} style={v.press}>
         {image ? <Image source={{ uri: `${API_URL}/api/media/${image}` }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          // Sized outright (the frame's 4pt padding and the screen's border inside it): an image needs a size of its own on the web.
+          : tile ? <Image source={tile} style={{ position: 'absolute', top: 0, left: 0, width: width - CABINET_CHROME, height: height - CABINET_CHROME }} resizeMode="cover" accessibilityIgnoresInvertColors />
           : <View style={[v.art, { height: height * .5 }]}>
             <Spotlight size={art * 1.7} />
             <Animated.View style={{ transform: [{ translateY: bob }] }}>
@@ -81,9 +109,10 @@ function Cabinet({ game, index, width, height, favorite, float, onPlay, onFavori
             <View style={[v.shadow, { width: art * .9, height: art * .12, borderRadius: art }]} />
           </View>}
         <LinearGradient pointerEvents="none" colors={['#ffffff30', '#ffffff00']} style={v.gloss} />
-        <LinearGradient colors={['#00000000', '#000000cc']} style={v.nameBand}>
+        {/* A rendered tile has the name drawn in. */}
+        {!tile && <LinearGradient colors={['#00000000', '#000000cc']} style={v.nameBand}>
           <Text numberOfLines={2} adjustsFontSizeToFit minimumFontScale={.6} style={[v.name, { fontSize: Math.max(15, Math.min(26, height * .13)) }]}>{game.name.toUpperCase()}</Text>
-        </LinearGradient>
+        </LinearGradient>}
       </Tap>
     </LinearGradient>
     {!!badge && <LinearGradient colors={['#5aff9d', '#12a85a']} style={v.badge}><Text style={v.badgeText} numberOfLines={1}>{badge}</Text></LinearGradient>}
@@ -97,7 +126,8 @@ function Cabinet({ game, index, width, height, favorite, float, onPlay, onFavori
 
 /** The featured game (Admin → Site content → Lobby), first in the room: its art over a crown and chips, and PLAY NOW. */
 function Featured({ game, width, height, float, onPlay }: { game: Game; width: number; height: number; float: Animated.Value; onPlay: () => void }) {
-  const art = artOf(game), size = Math.min(width * .5, height * .3);
+  const art = artOf(game), tile = game.presentation?.tileImageId ? null : tileOf(game), size = Math.min(width * .5, height * .3);
+  const tileWidth = Math.min(width - 22, (height - 120) * TILE_RATIO);
   const bob = float.interpolate({ inputRange: [0, 1], outputRange: [-6, 6] });
   const sweep = float.interpolate({ inputRange: [0, 1], outputRange: [-width, width * 1.2] });
   return <View style={[v.featured, { width, height }]}>
@@ -105,7 +135,10 @@ function Featured({ game, width, height, float, onPlay }: { game: Game; width: n
       <LinearGradient colors={['#4a0a5a', '#1e0738', '#0a0320']} style={v.featuredScreen}>
         <Tap haptic="heavy" accessibilityLabel={`Featured: play ${game.name}`} onPress={onPlay} style={v.featuredPress}>
           <Text style={v.featuredKicker}>★ FEATURED ★</Text>
-          <View style={{ alignItems: 'center', justifyContent: 'center', height: size * 1.25 }}>
+          {tile ? <View style={{ alignItems: 'center' }}>
+            <Image source={CASINO.crown} style={{ width: size * .42, height: size * .27, marginBottom: -size * .06, zIndex: 1 }} resizeMode="contain" />
+            <Image source={tile} style={[v.featuredTile, { width: tileWidth, height: tileWidth / TILE_RATIO }]} resizeMode="cover" accessibilityIgnoresInvertColors />
+          </View> : <><View style={{ alignItems: 'center', justifyContent: 'center', height: size * 1.25 }}>
             <Spotlight size={size * 1.5} />
             <Image source={CASINO.crown} style={{ position: 'absolute', top: -size * .12, width: size * .42, height: size * .27 }} resizeMode="contain" />
             <Animated.View style={{ transform: [{ translateY: bob }] }}>
@@ -114,7 +147,7 @@ function Featured({ game, width, height, float, onPlay }: { game: Game; width: n
             <Image source={CASINO.chips} style={{ position: 'absolute', bottom: -size * .1, right: -size * .08, width: size * .5, height: size * .42 }} resizeMode="contain" />
             <Image source={CASINO.coins} style={{ position: 'absolute', bottom: -size * .12, left: -size * .08, width: size * .5, height: size * .4 }} resizeMode="contain" />
           </View>
-          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={.5} style={v.featuredName}>{game.name.toUpperCase()}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={.5} style={v.featuredName}>{game.name.toUpperCase()}</Text></>}
           <LinearGradient colors={['#ffe58a', '#ffb01f', '#e0700a']} style={v.playNow}><Text style={v.playNowText} numberOfLines={1}>PLAY NOW</Text></LinearGradient>
         </Tap>
         <Animated.View pointerEvents="none" style={[v.sheen, { transform: [{ translateX: sweep }, { rotate: '20deg' }] }]}>
@@ -149,12 +182,19 @@ export function VaultLobby({ site, games, balance, playerId, token, floor, loadi
     saveFavorites(next); return next;
   });
   const shown = useMemo(() => games.filter(game => section === 'ALL' || (section === 'FAVORITE' ? favorites.includes(game.code) : sectionOf(game) === section)), [games, section, favorites]);
-  // Two rows fill what the top bar and the dock leave; each cabinet keeps a poster's proportions.
-  const rows = height < 300 ? 1 : 2, gap = 12;
-  const cabinetHeight = Math.floor((height - 60 - 26 - 70 - 24 - gap * (rows - 1)) / rows);
-  const cabinetWidth = Math.round(Math.min(cabinetHeight * 1.45, (width - 48) / 2.2));
-  const columns: Game[][] = [];
-  for (let i = 0; i < shown.length; i += rows) columns.push(shown.slice(i, i + rows));
+  // Two rows fill what the top bar and the panels' frames leave; each cabinet keeps a poster's proportions.
+  // Two rows on a phone; a tablet's height takes a third, so its tiles stay a sensible size.
+  const rows = height < 300 ? 1 : height >= 700 ? 3 : 2, gap = 12;
+  // Cabinets take the rendered tiles' 6:5 shape (plus the 4pt frame), narrowed on small screens.
+  // The winners' ticker shows when there is height to spare (tablets); a phone held sideways gives it to the games.
+  const tall = height >= 480;
+  // The games' own band, as laid out (a phone's status and navigation bars take some of the window), estimated until measured.
+  const [band, setBand] = useState<number | null>(null);
+  const space = band ?? height - 60 - (tall ? 26 : 0);
+  const roomHeight = Math.floor((space - 30 - PANEL_CHROME - gap * (rows - 1)) / rows);
+  const cabinetWidth = Math.round(Math.min((roomHeight - CABINET_CHROME) * TILE_RATIO + CABINET_CHROME, (width - RAIL - 48) / 2.2));
+  const cabinetHeight = Math.round(Math.min(roomHeight, (cabinetWidth - CABINET_CHROME) / TILE_RATIO + CABINET_CHROME));
+  const panels = useMemo(() => panelsOf(shown, section), [shown, section]);
   const id = playerId.replace(/-/g, '').slice(0, 8).toUpperCase();
   const logo = site.content.brand.logoImageId;
   // The admin's featured game (or the first one, if it is not on this floor); the lobby's hero switch hides it.
@@ -196,30 +236,37 @@ export function VaultLobby({ site, games, balance, playerId, token, floor, loadi
         <Tap haptic="select" accessibilityLabel="Account" onPress={onAccount} style={v.icon}><Text style={v.iconText}>⚙</Text></Tap>
       </View>
     </View>
-    <Ticker floor={floor} />
+    {tall && <Ticker floor={floor} />}
     {!!error && <Tap haptic="select" accessibilityRole="button" onPress={onRetry} style={v.error}><Text style={v.errorText} numberOfLines={2}>{error}  ·  Tap to retry</Text></Tap>}
-    <ScrollView key={section} horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={v.rows} decelerationRate="fast"
-      snapToOffsets={columns.map((_, i) => (featured ? Math.round(cabinetWidth * 1.0) + gap : 0) + i * (cabinetWidth + gap))}>
-      {featured && <Featured game={featured} width={Math.round(cabinetWidth * 1.0)} height={cabinetHeight * rows + gap * (rows - 1)} float={float} onPlay={() => onPlay(featured)} />}
-      {columns.map((column, x) => <View key={x} style={{ gap }}>
-        {column.map((game, y) => <Cabinet key={game.code} game={game} index={x * rows + y} width={cabinetWidth} height={cabinetHeight} float={float}
-          favorite={favorites.includes(game.code)} onPlay={() => onPlay(game)} onFavorite={() => toggle(game.code)} />)}
-      </View>)}
-      {!shown.length && <View style={[v.empty, { width: width - 32 }]}><Text style={v.emptyText}>{loading ? 'Loading games…' : section === 'FAVORITE' ? 'Tap ♡ on a game to keep it here.' : 'No games here yet.'}</Text></View>}
-    </ScrollView>
-    {/* The daily wheel waits above the dock, bottom right, while today's spin is there. */}
-    <View style={v.wheel} pointerEvents="box-none"><DailyWheelButton token={token} games={games} onPlay={onPlay} /></View>
-    <View style={v.dock}>
-      {SECTIONS.map(({ key, icon, label }) => {
-        const on = key === section;
-        return <Tap key={key} haptic="select" accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={label} onPress={() => setSection(key)} style={v.dockTab}>
-          {on && <LinearGradient colors={['#ff3cac00', '#ff3cac88']} style={StyleSheet.absoluteFill} />}
-          <Image source={icon} style={[v.dockIcon, on && { transform: [{ scale: 1.18 }, { translateY: -2 }] }]} resizeMode="contain" />
-          <Text style={[v.dockLabel, on && { color: '#ffffff' }]}>{label}</Text>
-          <View style={[v.dockBar, on && { backgroundColor: c.pink }]} />
-        </Tap>;
-      })}
+    <View style={{ flex: 1, flexDirection: 'row' }} onLayout={event => { const next = Math.round(event.nativeEvent.layout.height); setBand(previous => previous === next ? previous : next); }}>
+      {/* The categories down the left, as the big game rooms keep them, so the games get the full height. */}
+      <View style={v.rail}>
+        {SECTIONS.map(({ key, icon, label }) => {
+          const on = key === section;
+          return <Tap key={key} haptic="select" accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={label} onPress={() => setSection(key)} style={v.railTab}>
+            {on && <LinearGradient colors={['#ff3cac99', '#7a2cff66']} start={{ x: 0, y: .5 }} end={{ x: 1, y: .5 }} style={StyleSheet.absoluteFill} />}
+            <Image source={icon} style={[v.railIcon, on && { transform: [{ scale: 1.15 }] }]} resizeMode="contain" />
+            <Text style={[v.railLabel, on && { color: '#ffffff' }]} numberOfLines={1}>{label}</Text>
+          </Tap>;
+        })}
+      </View>
+      <ScrollView key={section} horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={v.rows} decelerationRate="fast">
+        {featured && <Featured game={featured} width={Math.round(cabinetWidth * 1.0)} height={cabinetHeight * rows + gap * (rows - 1) + PANEL_CHROME} float={float} onPlay={() => onPlay(featured)} />}
+        {/* The games in neon panels, a marquee title on each, as the big game rooms group them. */}
+        {panels.map(panel => <View key={panel.key} style={v.panel} accessibilityRole="summary" accessibilityLabel={panel.title}>
+          <View style={v.panelHead} pointerEvents="none"><Text style={v.panelTitle} numberOfLines={1}>★ {panel.title} ★</Text></View>
+          <View style={{ flexDirection: 'row', gap }}>
+            {columnsOf(panel.games, rows).map((column, x) => <View key={x} style={{ gap }}>
+              {column.map((game, y) => <Cabinet key={game.code} game={game} index={x * rows + y} width={cabinetWidth} height={cabinetHeight} float={float}
+                favorite={favorites.includes(game.code)} onPlay={() => onPlay(game)} onFavorite={() => toggle(game.code)} />)}
+            </View>)}
+          </View>
+        </View>)}
+        {!shown.length && <View style={[v.empty, { width: width - 32 - RAIL }]}><Text style={v.emptyText}>{loading ? 'Loading games…' : section === 'FAVORITE' ? 'Tap ♡ on a game to keep it here.' : 'No games here yet.'}</Text></View>}
+      </ScrollView>
     </View>
+    {/* The daily wheel waits bottom right while today's spin is there. */}
+    <View style={v.wheel} pointerEvents="box-none"><DailyWheelButton token={token} games={games} onPlay={onPlay} /></View>
   </View>;
 }
 
@@ -242,7 +289,14 @@ const v = StyleSheet.create({
   iconText: { color: '#bfe9ff', fontSize: 20 },
   ticker: { height: 26, marginHorizontal: 60, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 13, backgroundColor: '#04122dcc', borderWidth: 1, borderColor: '#22e1ff44' },
   tickerText: { color: '#fff6c2', fontSize: 12, textAlign: 'center' },
-  rows: { gap: 12, paddingHorizontal: 16, paddingVertical: 12, alignItems: 'center' },
+  // Room above for the panels' marquee titles, which sit across their top edge.
+  rows: { gap: 14, paddingHorizontal: 16, paddingTop: 22, paddingBottom: 8, alignItems: 'center' },
+  panel: { paddingTop: 20, paddingBottom: 10, paddingHorizontal: 10, borderRadius: 18, borderWidth: 2, borderColor: '#22e1ffcc', backgroundColor: '#06123acc',
+    shadowColor: '#22e1ff', shadowOpacity: .7, shadowRadius: 10, shadowOffset: { width: 0, height: 0 }, elevation: 8 },
+  // Hung from the panel's left, where it starts on screen (a long panel's middle can be far off to the right).
+  panelHead: { position: 'absolute', top: -13, left: 24, right: -200, alignItems: 'flex-start' },
+  panelTitle: { paddingHorizontal: 14, paddingVertical: 3, borderRadius: 12, overflow: 'hidden', backgroundColor: '#0b0626', borderWidth: 1.5, borderColor: '#ff3cac',
+    color: '#ffe45c', fontSize: 14, fontWeight: '900', fontStyle: 'italic', letterSpacing: 1.5, textShadowColor: '#ff3cac', textShadowRadius: 10, textShadowOffset: { width: 0, height: 0 } },
   frame: { borderRadius: 14, padding: 4, borderWidth: 2, borderColor: '#22e1ff', backgroundColor: '#0e2a52', shadowColor: '#22e1ff', shadowOpacity: .6, shadowRadius: 8, shadowOffset: { width: 0, height: 0 }, elevation: 6 },
   screen: { flex: 1, borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: '#ffffff30' },
   press: { flex: 1, justifyContent: 'flex-end' },
@@ -254,6 +308,7 @@ const v = StyleSheet.create({
   featured: { borderRadius: 18, shadowColor: '#ffb01f', shadowOpacity: .8, shadowRadius: 14, shadowOffset: { width: 0, height: 0 }, elevation: 10 },
   featuredRim: { flex: 1, borderRadius: 18, padding: 3 },
   featuredScreen: { flex: 1, borderRadius: 15, overflow: 'hidden', alignItems: 'stretch' },
+  featuredTile: { borderRadius: 12, borderWidth: 2, borderColor: '#ffe58a' },
   featuredKicker: { marginTop: 4, textAlign: 'center', color: '#ffe58a', fontWeight: '900', fontSize: 12, letterSpacing: 3 },
   featuredName: { marginHorizontal: 10, textAlign: 'center', color: '#ffffff', fontWeight: '900', fontStyle: 'italic', fontSize: 24, letterSpacing: .5, textShadowColor: '#ff3cac', textShadowRadius: 12, textShadowOffset: { width: 0, height: 0 } },
   playNow: { alignSelf: 'center', marginBottom: 6, minHeight: 44, paddingHorizontal: 18, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff3c0' },
@@ -269,10 +324,10 @@ const v = StyleSheet.create({
   error: { marginHorizontal: 60, marginTop: 6, padding: 8, borderRadius: 10, backgroundColor: '#5a0d1ecc', borderWidth: 1, borderColor: c.bad },
   errorText: { color: c.bad, fontSize: 12, textAlign: 'center' },
   emptyText: { color: c.muted, fontSize: 15 },
-  wheel: { position: 'absolute', right: 14, bottom: 80, zIndex: 5 },
-  dock: { height: 70, flexDirection: 'row', justifyContent: 'center', gap: 6, paddingHorizontal: 12, borderTopWidth: 1, borderTopColor: '#22e1ff55', backgroundColor: '#071538e8' },
-  dockTab: { width: 112, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderTopLeftRadius: 14, borderTopRightRadius: 14 },
-  dockIcon: { width: 34, height: 30 },
-  dockLabel: { color: '#9fc8e8', fontSize: 11, fontWeight: '900', letterSpacing: 1.5, marginTop: 2 },
-  dockBar: { position: 'absolute', bottom: 0, left: 18, right: 18, height: 3, borderRadius: 2, backgroundColor: 'transparent' },
+  wheel: { position: 'absolute', right: 14, bottom: 10, zIndex: 5 },
+  rail: { width: RAIL, marginLeft: 10, marginVertical: 8, paddingVertical: 6, borderRadius: 22, borderWidth: 2, borderColor: '#22e1ffaa', backgroundColor: '#071538e8', justifyContent: 'space-evenly',
+    shadowColor: '#22e1ff', shadowOpacity: .5, shadowRadius: 8, shadowOffset: { width: 0, height: 0 }, elevation: 6 },
+  railTab: { flex: 1, maxHeight: 80, minHeight: 44, alignItems: 'center', justifyContent: 'center', marginHorizontal: 6, borderRadius: 14, overflow: 'hidden' },
+  railIcon: { width: 34, height: 28 },
+  railLabel: { color: '#9fc8e8', fontSize: 11, fontWeight: '900', letterSpacing: .5, marginTop: 2 },
 });

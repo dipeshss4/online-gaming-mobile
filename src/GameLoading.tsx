@@ -3,6 +3,7 @@ import { AccessibilityInfo, Animated, Easing, Image, StyleSheet, Text, View, use
 import { LinearGradient } from 'expo-linear-gradient';
 import type { Game } from './api';
 import { SymbolArt } from './WebLook';
+import { TILE_RATIO, tileOf } from './casinoArt';
 
 /**
  * The screen a game opens behind, as on the website: the Loot777x logo, the game's poster, a progress bar and a tip.
@@ -50,6 +51,8 @@ export function GameLoading({ game, legal, onDone }: { game: Game; legal?: strin
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const poster = landscape ? Math.min(120, height * .3) : Math.min(170, width * .42);
+  // The game's rendered tile when it has one (wider, its name drawn in), else its symbol on a poster.
+  const tile = game.presentation?.tileImageId ? null : tileOf(game), tileWidth = landscape ? Math.min(200, height * .36) : Math.min(260, width * .66);
   const barWidth = progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
   return <Animated.View style={[st.root, { opacity: fade, transform: [{ scale: fade.interpolate({ inputRange: [0, 1], outputRange: [1.04, 1] }) }] }]}>
     <View style={st.fill100} accessible role="progressbar" aria-label={`Loading ${game.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} testID="game-loading">
@@ -60,11 +63,13 @@ export function GameLoading({ game, legal, onDone }: { game: Game; legal?: strin
         <Text style={[st.word, landscape && { fontSize: 30 }]}>LOOT<Text style={st.wordGold}>777X</Text></Text>
       </Animated.View>
       <View style={[st.body, landscape && st.bodyWide]}>
-        <Animated.View style={[st.poster, { width: poster, height: poster, transform: [{ scale: pop }] }]}>
+        {tile ? <Animated.View style={[st.poster, { width: tileWidth, height: tileWidth / TILE_RATIO, transform: [{ scale: pop }] }]}>
+          <Image source={tile} style={{ width: tileWidth, height: tileWidth / TILE_RATIO }} resizeMode="cover" accessibilityIgnoresInvertColors />
+        </Animated.View> : <Animated.View style={[st.poster, { width: poster, height: poster, transform: [{ scale: pop }] }]}>
           <LinearGradient colors={['#ff3c7a', '#b0105a', '#3a0730']} style={StyleSheet.absoluteFill} />
           <Text style={st.glyphFallback}>{kind === 'FISH' ? '🐉' : kind === 'CRASH' ? '🚀' : kind === 'KENO' ? '🎱' : ''}</Text>
           {!['FISH', 'CRASH', 'KENO'].includes(kind) && <SymbolArt symbol={game.featuredSymbol || '7'} size={poster * .72} />}
-        </Animated.View>
+        </Animated.View>}
         <View style={[st.info, landscape && { alignItems: 'flex-start' }]}>
           <Text style={[st.name, landscape && { fontSize: 24 }]} numberOfLines={1}>{game.name}</Text>
           <View style={st.bar}>
