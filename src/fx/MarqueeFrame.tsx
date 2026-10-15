@@ -3,8 +3,9 @@ import { Animated, Easing, LayoutChangeEvent, StyleSheet, View, ViewStyle } from
 import { LinearGradient } from 'expo-linear-gradient';
 
 /**
- * A cabinet frame with marquee bulbs running round it: a metal bezel in the game's colours, bulbs that chase
- * slowly while the game waits and race (and flash together) on a win. Wraps the reels, board or table.
+ * A cabinet frame with marquee bulbs running round it: a heavy polished bezel in the game's colours (lit along the
+ * top, shaded at the bottom, inside a thin gold rim), bulbs that chase slowly while the game waits and race (and flash
+ * together) on a win. Wraps the reels, board or table.
  */
 export function MarqueeFrame({ colors, bulb = '#ffe9a0', excited = false, reduced, style, children }: {
   colors: [string, string, string]; bulb?: string; excited?: boolean; reduced?: boolean; style?: ViewStyle | ViewStyle[]; children: React.ReactNode;
@@ -35,6 +36,8 @@ export function MarqueeFrame({ colors, bulb = '#ffe9a0', excited = false, reduce
   });
   return <View style={[f.root, style]} onLayout={measure}>
     <LinearGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[StyleSheet.absoluteFill, f.bezel]} />
+    {/* The polish: light catching the top of the bezel, shadow under it. */}
+    <LinearGradient pointerEvents="none" colors={['#ffffff70', '#ffffff00', '#00000000', '#00000066']} locations={[0, .35, .6, 1]} style={[StyleSheet.absoluteFill, f.polish]} />
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       {bulbs.map((b, i) => <Animated.View key={i} style={[f.bulb, { left: b.x - 3.5, top: b.y - 3.5, backgroundColor: bulb, shadowColor: bulb, opacity: phaseOpacity(b.phase) }]} />)}
     </View>
@@ -43,8 +46,9 @@ export function MarqueeFrame({ colors, bulb = '#ffe9a0', excited = false, reduce
 }
 
 const f = StyleSheet.create({
-  root: { padding: 10, borderRadius: 20 },
-  bezel: { borderRadius: 22, borderWidth: 2, borderColor: '#ffffff40' },
+  root: { padding: 12, borderRadius: 22, shadowColor: '#000', shadowOpacity: .7, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 12 },
+  bezel: { borderRadius: 22, borderWidth: 2.5, borderColor: '#ffe58a' },
+  polish: { borderRadius: 22 },
   bulb: { position: 'absolute', width: 7, height: 7, borderRadius: 4, shadowOpacity: 1, shadowRadius: 5, shadowOffset: { width: 0, height: 0 }, elevation: 2 },
-  inner: { borderRadius: 12, overflow: 'hidden', backgroundColor: '#05010c', padding: 2, borderWidth: 2, borderColor: '#00000088' },
+  inner: { borderRadius: 12, overflow: 'hidden', backgroundColor: '#05010c', padding: 2, borderWidth: 3, borderColor: '#2a1604' },
 });

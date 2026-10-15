@@ -1,8 +1,9 @@
 import React from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { Game } from './api';
 import type { Mood } from './fx/Ambience';
+import { LOGO_ART } from './sceneArt';
 
 /**
  * Each game's title as a casino marquee: metallic lettering (a bright upper half over a deeper lower half, on a
@@ -78,6 +79,13 @@ function Diamond({ size, colors }: { size: number; colors: [string, string] }) {
 }
 
 export function GameLogo({ game, height = 40, maxWidth }: { game: Game; height?: number; maxWidth?: number }) {
+  // The game's rendered 3D logo (scripts/render-tiles.py) where it has one: a little taller than the plaque, as big
+  // gold letters read best, and never wider than the room.
+  const art = LOGO_ART[game.code];
+  if (art) {
+    const tall = height * 1.3, wide = Math.min(maxWidth ?? 9999, tall * art.ratio);
+    return <Image source={art.source} accessible accessibilityRole="header" accessibilityLabel={game.name} resizeMode="contain" style={{ width: wide, height: wide / art.ratio }} />;
+  }
   const logo = logoOf(game);
   // Sized so the title fits: about 0.8em a heavy capital, plus the plaque's padding and, with room, the flourishes.
   const flourish = !maxWidth || maxWidth > 360;
@@ -102,6 +110,10 @@ export function GameLogo({ game, height = 40, maxWidth }: { game: Game; height?:
 export function themeOf(game: Game): GameTheme {
   const layout = game.engine?.layout;
   if (game.code === 'VEGAS_JACKPOT_DEVIL_HEART' || layout === 'CLASSIC_5L') return { background: ['#4a0a06', '#250404', '#120102'], frame: '#ff7a1a', accent: '#ffd23f', reels: '#1a0204', mood: 'embers' };
+  if (game.code === 'STARS_STRIPES_7S') return { background: ['#14245a', '#0a1440', '#030820'], frame: '#e8ecf5', accent: '#ffe58a', reels: '#060c2a', mood: 'sparkle' };
+  if (game.code === 'DIAMOND_WILDS') return { background: ['#12306a', '#081638', '#020818'], frame: '#9ae0ff', accent: '#ffe58a', reels: '#040a20', mood: 'sparkle' };
+  if (game.code === 'INFERNO_JACKPOT') return { background: ['#5a1206', '#250402', '#0e0101'], frame: '#ff8a2a', accent: '#ffd23f', reels: '#120201', mood: 'embers' };
+  if (layout === 'CASH_5X3') return { background: ['#0a4a36', '#04201a', '#020c0a'], frame: '#f2c14a', accent: '#ffe58a', reels: '#04201a', mood: 'sparkle' };
   if (layout === 'LINES_5X3') return { background: ['#4a0a4a', '#1e0628', '#0a0310'], frame: '#e8c45a', accent: '#ffe58a', reels: '#14061c', mood: 'sparkle' };
   if (layout === 'FIRE_LINK') return { background: ['#5a1206', '#250402', '#0e0101'], frame: '#ff8a2a', accent: '#ffd23f', reels: '#120201', mood: 'embers' };
   if (layout === 'GRID_3X3') return { background: ['#5a1a06', '#2a0803', '#140402'], frame: '#ffb01f', accent: '#ffd23f', reels: '#1a0703', mood: 'embers' };
