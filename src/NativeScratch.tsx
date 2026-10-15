@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, PanResponder, StyleSheet, Text, View } from 'react-native';
+import { ScratchFoil, rubbedPath } from './ScratchFoil';
 import { LinearGradient } from 'expo-linear-gradient';
 import { randomUUID } from 'expo-crypto';
 import { ApiError, Balance, Game, PlayResult, request } from './api';
@@ -15,7 +16,8 @@ import { GameShell, PayRow, Rules } from './GameShell';
 /**
  * The scratch tickets in the app: Triple Match (nine prize spots and a Tripler box) and Lotería (a 4x4 tabla and ten
  * called cards). Buying a ticket is one bet, settled by the server at once; the ticket arrives covered in silver and
- * the player rubs the spots off with a finger (any spot the finger passes over clears) or reveals it all.
+ * the player rubs the silver off with a finger: it clears where the finger goes, and once most of a spot is rubbed
+ * away the rest falls off. OPEN reveals it all.
  */
 export const supportsScratch = (game: Game) => ['SCRATCH_MATCH3', 'SCRATCH_LOTERIA'].includes(game.engine?.layout ?? '');
 const LOTERIA: Record<string, [string, string]> = {
@@ -29,15 +31,22 @@ const CHARM: Record<string, string> = { STAR: '★', CLOVER: '☘', HORSESHOE: '
 const LINES = [[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15], [0, 4, 8, 12], [1, 5, 9, 13], [2, 6, 10, 14], [3, 7, 11, 15], [0, 5, 10, 15], [3, 6, 9, 12]];
 const cash = (n: number) => n.toFixed(2);
 
-/** A spot under silver coating; it fades away when {@code revealed} turns true. */
-function Spot({ revealed, width, height, lit, children }: { revealed: boolean; width: number; height: number; lit?: boolean; children: React.ReactNode }) {
+/** How wide the finger rubs, and how much of a spot must be rubbed before the rest of its silver falls away. */
+const BRUSH = 12, CLEARS_AT = .55, GRID = 6;
+type Point = { x: number; y: number };
+
+/**
+ * A spot under silver foil. The foil is drawn with Skia and the finger's path is cut out of it ({@code marks}, in the
+ * spot's own coordinates); when {@code revealed} turns true the rest of the foil fades away.
+ */
+function Spot({ revealed, width, height, lit, marks, children }: { revealed: boolean; width: number; height: number; lit?: boolean; marks?: Point[][]; children: React.ReactNode }) {
   const coat = useRef(new Animated.Value(revealed ? 0 : 1)).current;
   useEffect(() => { Animated.timing(coat, { toValue: revealed ? 0 : 1, duration: revealed ? 260 : 0, useNativeDriver: true }).start(); }, [revealed]); // eslint-disable-line react-hooks/exhaustive-deps
+  const rubbed = React.useMemo(() => rubbedPath(marks ?? []), [marks]);
   return <View style={[n.spot, { width, height }, lit && n.lit]}>
     <View style={n.under}>{children}</View>
-    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: coat }]}>
-      <LinearGradient colors={['#e2e6ee', '#9aa1b2', '#f2f4f8', '#8a91a3']} locations={[0, .45, .55, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-      <Text style={[n.coatText, { fontSize: Math.max(11, Math.min(height * .14, width * .13)) }]}>SCRATCH</Text>
+    <Animated.View pointerEvents="none" accessibilityLabel={revealed ? undefined : 'Scratch spot'} style={[StyleSheet.absoluteFill, { opacity: coat }]}>
+      <ScratchFoil width={width} height={height} rubbed={rubbed} brush={BRUSH} />
     </Animated.View>
   </View>;
 }
@@ -58,6 +67,9 @@ export function NativeScratch({ game, token, userId, initialBalance, onClose, on
   const [pending, setPending] = useState<PendingBet | null>(null), [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [ticket, setTicket] = useState<PlayResult | null>(null), [revealed, setRevealed] = useState<Set<number>>(new Set());
+  // The finger's strokes on each spot (spot coordinates), and which cells of a GRID x GRID net over it they have rubbed.
+  const [marks, setMarks] = useState<Map<number, Point[][]>>(new Map());
+  const rubbed = useRef<Map<number, Set<number>>>(new Map()), stroking = useRef<number | null>(null);
   const [win, setWin] = useState<Win | null>(null);
   const alive = useRef(true), lock = useRef(false), settled = useRef<PlayResult | null>(null);
   // Where each spot is on screen (page coordinates), so a finger dragged across the ticket clears what it touches.
@@ -80,13 +92,38 @@ export function NativeScratch({ game, token, userId, initialBalance, onClose, on
     onSettled();
   }, [all]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const reveal = (i: number) => setRevealed(previous => previous.has(i) ? previous : (sound.play('tap'), new Set(previous).add(i)));
-  const measureAll = () => refs.current.forEach((view, i) => view?.measure((_x, _y, w, h, px, py) => frames.current.set(i, { x: px, y: py, w, h })));
-  const touch = (x: number, y: number) => frames.current.forEach((f, i) => { if (x >= f.x && x <= f.x + f.w && y >= f.y && y <= f.y + f.h) reveal(i); });
+  const reveal = (i: number) => setRevealed(previous => previous.has(i) ? previous : (sound.play('coins'), feel('select'), new Set(previous).add(i)));
+  // Spots are measured as they lay out (and again when a rub starts), so the very first touch already finds them.
+  const measure = (i: number) => refs.current.get(i)?.measure((_x, _y, w, h, px, py) => { if (w > 0) frames.current.set(i, { x: px, y: py, w, h }); });
+  const measureAll = () => refs.current.forEach((_view, i) => measure(i));
+  const live = useRef({ ticket, revealed }); live.current = { ticket, revealed };
+  // A finger at a page point: on a covered spot it extends the stroke there and rubs the cells under the brush.
+  const touch = (x: number, y: number, start: boolean) => {
+    if (!live.current.ticket) return;
+    frames.current.forEach((f, i) => {
+      if (live.current.revealed.has(i) || x < f.x - BRUSH / 2 || x > f.x + f.w + BRUSH / 2 || y < f.y - BRUSH / 2 || y > f.y + f.h + BRUSH / 2) { if (stroking.current === i) stroking.current = null; return; }
+      const point = { x: x - f.x, y: y - f.y };
+      setMarks(previous => {
+        const next = new Map(previous), strokes = [...(next.get(i) ?? [])];
+        if (start || stroking.current !== i || !strokes.length) strokes.push([point]); else strokes[strokes.length - 1] = [...strokes[strokes.length - 1], point];
+        next.set(i, strokes); return next;
+      });
+      if (stroking.current !== i) sound.play('tick');
+      stroking.current = i;
+      const cells = rubbed.current.get(i) ?? new Set<number>();
+      for (let row = 0; row < GRID; row++) for (let col = 0; col < GRID; col++) {
+        const cx = (col + .5) * f.w / GRID, cy = (row + .5) * f.h / GRID;
+        if (Math.hypot(cx - point.x, cy - point.y) <= BRUSH * 1.1) cells.add(row * GRID + col);
+      }
+      rubbed.current.set(i, cells);
+      if (cells.size >= GRID * GRID * CLEARS_AT) reveal(i);
+    });
+  };
   const pan = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => true, onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: event => { measureAll(); touch(event.nativeEvent.pageX, event.nativeEvent.pageY); },
-    onPanResponderMove: event => touch(event.nativeEvent.pageX, event.nativeEvent.pageY),
+    onPanResponderGrant: event => { measureAll(); stroking.current = null; touch(event.nativeEvent.pageX, event.nativeEvent.pageY, true); },
+    onPanResponderMove: event => touch(event.nativeEvent.pageX, event.nativeEvent.pageY, false),
+    onPanResponderRelease: () => { stroking.current = null; },
   })).current;
 
   async function buy() {
@@ -102,7 +139,9 @@ export function NativeScratch({ game, token, userId, initialBalance, onClose, on
       if (data.requestId !== bet.requestId || data.gameCode !== game.code || data.symbols.length !== (loteria ? 26 : 10)) throw new Error('Unexpected result. Keep this request for reconciliation.');
       await clearPending(userId); setPending(null);
       if (!alive.current) return;
-      settled.current = data; setTicket(data); setRevealed(new Set());
+      settled.current = data; setTicket(data); setRevealed(new Set()); setMarks(new Map()); rubbed.current = new Map();
+      // The ticket is paid for now: the balance drops by its price, and the win (if any) lands when it is scratched.
+      setWallet(current => current ? { ...current, balance: Math.round((data.balance - data.payout) * 100) / 100, currency: data.currency } : current);
     } catch (e) {
       if (!alive.current) return;
       if (!pending && e instanceof ApiError && [400, 401, 403, 404, 422, 429].includes(e.status)) await clearPending(userId).then(() => setPending(null)).catch(() => {});
@@ -118,6 +157,7 @@ export function NativeScratch({ game, token, userId, initialBalance, onClose, on
   const lit = all ? new Set(LINES.filter(line => line.every(cell => marked.has(cell))).flat()) : new Set<number>();
   const status = !ticket ? 'BUY A TICKET TO PLAY' : !all ? 'RUB THE SILVER TO SCRATCH' : ticket.payout > 0 ? `YOU WON ${cash(ticket.payout)}!` : 'NOT A WINNER · TRY AGAIN';
   const setRef = (i: number) => (view: View | null) => { refs.current.set(i, view); };
+  const spotProps = (i: number) => ({ marks: marks.get(i), onLayout: () => measure(i) });
 
   return <GameShell game={game} balance={wallet} onBack={onClose} backDisabled={busy} status={status}
     notice={error ? <Text accessibilityRole="alert" style={s.error}>{error}</Text>
@@ -140,11 +180,11 @@ export function NativeScratch({ game, token, userId, initialBalance, onClose, on
         return <LinearGradient colors={['#2a63e8', '#1a46bd']} style={n.ticket} {...pan.panHandlers}>
           <View style={n.art}><Text style={n.artSmall}>INSTANT</Text><Text style={[n.artTitle, { fontSize: cell * .42 }]}>TRIPLE</Text><Text style={[n.artTitle, n.artGold, { fontSize: cell * .42 }]}>MATCH</Text>
             <Text style={n.artNote}>Find a 3X to win{'\n'}TRIPLE the prize</Text><Text style={n.upTo}>WIN UP TO {cash(300 * (ticket?.stake ?? stake))}</Text></View>
-          <View style={[n.grid, { width: cell * 1.15 * 3 + 6 * 2 + 16 + 6 }]}>{Array.from({ length: 9 }, (_, i) => <View key={i} ref={setRef(i)} collapsable={false}>
-            <Spot revealed={!ticket || revealed.has(i)} width={cell * 1.15} height={cell} lit={!!matched && symbols[i] === matched}>
+          <View style={[n.grid, { width: cell * 1.15 * 3 + 6 * 2 + 16 + 6 }]}>{Array.from({ length: 9 }, (_, i) => <View key={i} ref={setRef(i)} collapsable={false} onLayout={spotProps(i).onLayout}>
+            <Spot revealed={!ticket || revealed.has(i)} width={cell * 1.15} height={cell} lit={!!matched && symbols[i] === matched} marks={spotProps(i).marks}>
               <Text style={[n.prize, { fontSize: cell * .26 }]}>{ticket ? cash(Number(symbols[i].slice(1)) * ticket.stake) : '$'}</Text></Spot></View>)}</View>
           <View style={{ alignItems: 'center', gap: 4 }}><Text style={n.boxLabel}>TRIPLER BOX</Text>
-            <View ref={setRef(9)} collapsable={false}><Spot revealed={!ticket || revealed.has(9)} width={cell * 1.1} height={cell * 1.1} lit={!!matched && symbols[9] === 'X3'}>
+            <View ref={setRef(9)} collapsable={false} onLayout={spotProps(9).onLayout}><Spot revealed={!ticket || revealed.has(9)} width={cell * 1.1} height={cell * 1.1} lit={!!matched && symbols[9] === 'X3'} marks={spotProps(9).marks}>
               <LinearGradient colors={['#ffb01f', '#ff7a1a']} style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center' }]}>
                 <Text style={[n.x3, { fontSize: cell * .4 }]}>{!ticket || symbols[9] === 'X3' ? '3X' : CHARM[symbols[9]] ?? '★'}</Text></LinearGradient></Spot></View>
             <Text style={n.boxNote}>Match 3 to win</Text></View>
@@ -158,8 +198,8 @@ export function NativeScratch({ game, token, userId, initialBalance, onClose, on
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: cardW * 4 + 12, gap: 4 }}>{Array.from({ length: 16 }, (_, i) => <View key={i} style={lit.has(i) ? n.lit : undefined}>
             {ticket ? <LoteriaCard card={tabla[i]} width={cardW} height={cardW * 1.3} marked={marked.has(i)} /> : <View style={[n.card, { width: cardW, height: cardW * 1.3 }]}><Text style={n.back}>?</Text></View>}</View>)}</View></View>
         <View style={{ gap: 6, alignItems: 'center' }}><Text style={n.callsLabel}>CALLED CARDS</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: callW * 5 + 24, gap: 6 }}>{Array.from({ length: 10 }, (_, i) => <View key={i} ref={setRef(i)} collapsable={false}>
-            <Spot revealed={!ticket || revealed.has(i)} width={callW} height={callW * 1.3}>{ticket ? <LoteriaCard card={calls[i]} width={callW} height={callW * 1.3} called /> : <Text style={n.back}>¡L!</Text>}</Spot></View>)}</View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: callW * 5 + 24, gap: 6 }}>{Array.from({ length: 10 }, (_, i) => <View key={i} ref={setRef(i)} collapsable={false} onLayout={spotProps(i).onLayout}>
+            <Spot revealed={!ticket || revealed.has(i)} width={callW} height={callW * 1.3} marks={spotProps(i).marks}>{ticket ? <LoteriaCard card={calls[i]} width={callW} height={callW * 1.3} called /> : <Text style={n.back}>¡L!</Text>}</Spot></View>)}</View>
           <Text style={n.loPays}>Corners 2x · Line 4x · Diagonal 10x · Two lines 25x · Big X 100x</Text></View>
       </LinearGradient>;
     }}
@@ -177,7 +217,6 @@ const n = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, padding: 8, borderRadius: 14, borderWidth: 3, borderColor: '#ffb01f', backgroundColor: '#0b2a7a' },
   spot: { borderRadius: 10, overflow: 'hidden', backgroundColor: '#fff8e6', borderWidth: 2, borderColor: '#ffffff55' },
   under: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
-  coatText: { position: 'absolute', alignSelf: 'center', top: '42%', color: '#6a7184', fontWeight: '900' },
   lit: { borderColor: c.gold, borderWidth: 3, borderRadius: 10, shadowColor: c.gold, shadowOpacity: 1, shadowRadius: 10, shadowOffset: { width: 0, height: 0 }, elevation: 6 },
   prize: { color: '#b0105a', fontWeight: '900' },
   boxLabel: { color: c.gold, fontWeight: '900', letterSpacing: 2, fontSize: 11 },
