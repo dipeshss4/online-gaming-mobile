@@ -6,11 +6,13 @@ import { sound } from './sound';
 
 /**
  * The intro the app opens with, played like a short film over the app while it loads (about 3.5 s, tap to skip):
- * light rays spin up on a dark stage, the Loot777x coin drops in with a ring of light, LOOT and 777X slide in from
+ * the rendered casino (chips, cards, a roulette wheel, a slot machine) fades up while light rays spin over it, the Loot777x coin drops in with a ring of light, LOOT and 777X slide in from
  * either side in gold, a sheen sweeps across them, coins burst out and the tagline and a loading bar settle in;
  * then the whole thing fades into the lobby. Reduced motion gets a still card and a short fade instead.
  */
 const MARK = require('../assets/brand/loot777x-mark.png');
+// The stage: the casino bursting out of a glowing centre (scripts/render-tiles.py), wide or tall to suit the screen.
+const STAGE_WIDE = require('../assets/intro/INTRO_WIDE.jpg'), STAGE_TALL = require('../assets/intro/INTRO_TALL.jpg');
 const DURATION = 3500, RAYS = 16, COINS = 14, SPARKS = 18;
 
 export function AppIntro({ onStart, onDone }: { onStart?: () => void; onDone: () => void }) {
@@ -52,9 +54,13 @@ export function AppIntro({ onStart, onDone }: { onStart?: () => void; onDone: ()
   return <Animated.View onLayout={() => onStart?.()} style={[StyleSheet.absoluteFill, z.root, { opacity: fade }]} accessibilityLabel="Loot777x" accessibilityRole="image">
     <Pressable style={StyleSheet.absoluteFill} onPress={finish} accessibilityRole="button" accessibilityLabel="Skip intro">
       <LinearGradient colors={['#3a0f6e', '#14052e', '#06010f']} start={{ x: .5, y: .3 }} end={{ x: .5, y: 1 }} style={StyleSheet.absoluteFill} />
+      {/* The rendered casino fades up and settles from a slight zoom, behind everything else. */}
+      <Animated.Image source={width > height ? STAGE_WIDE : STAGE_TALL} resizeMode="cover" accessibilityIgnoresInvertColors
+        style={[StyleSheet.absoluteFill, { width, height, opacity: at(0, 700), transform: [{ scale: at(0, DURATION, [1.12, 1]) }] }]} />
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#06010f55' }]} />
 
       {/* Light rays behind the mark, turning slowly and opening out as the mark lands. */}
-      <Animated.View style={[z.center, { opacity: at(150, 900, [0, .55]), transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }, { scale: at(150, 1100, [.4, 1]) }] }]} pointerEvents="none">
+      <Animated.View style={[z.center, { opacity: at(150, 900, [0, .35]), transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }, { scale: at(150, 1100, [.4, 1]) }] }]} pointerEvents="none">
         {rays.map(i => <View key={i} style={[z.ray, { height: Math.max(width, height) * 1.3, transform: [{ rotate: `${(i * 180) / RAYS}deg` }] }]}>
           <LinearGradient colors={['#ffd23f00', i % 2 ? '#ffd23f33' : '#ff3cac2a', '#ffd23f00']} style={StyleSheet.absoluteFill} />
         </View>)}
