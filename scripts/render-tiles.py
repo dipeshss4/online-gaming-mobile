@@ -181,6 +181,58 @@ def coin_pile(loc, size, seed=1):
     return group(build, loc, size)
 
 
+
+# ---------------------------------------------------------------- Money Monsoon's pieces
+STEEL = lambda: mat('Steel', (.55, .57, .62), metallic=1, rough=.22)
+DARK_STEEL = lambda: mat('DarkSteel', (.12, .13, .16), metallic=1, rough=.3)
+
+def vault_parts():
+    """A bank vault door: a steel body, a round gold-rimmed door with a three-spoke wheel and a dial."""
+    rounded_box((2.4, 2.4, .7), .16, DARK_STEEL(), loc=(0, 0, -.3))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=96, radius=1.0, depth=.3, location=(0, 0, .15)); door = bpy.context.object
+    b = door.modifiers.new('Bevel', 'BEVEL'); b.width = .05; b.segments = 4; bpy.ops.object.shade_smooth(); add(door, STEEL())
+    bpy.ops.mesh.primitive_torus_add(major_radius=1.02, minor_radius=.07, major_segments=96, location=(0, 0, .3)); add(bpy.context.object, GOLD()); bpy.ops.object.shade_smooth()
+    for i in range(12):
+        a = i * math.pi / 6
+        sphere((.86 * math.cos(a), .86 * math.sin(a), .33), (.05, .05, .04), GOLD(), 16)
+    for i in range(3):
+        a = i * math.tau / 3 + .3
+        bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=.06, depth=1.2, location=(.3 * math.cos(a), .3 * math.sin(a), .45))
+        o = bpy.context.object; o.rotation_euler = (0, math.pi / 2, a); add(o, GOLD()); bpy.ops.object.shade_smooth()
+        sphere((.62 * math.cos(a), .62 * math.sin(a), .45), (.1, .1, .1), GOLD(), 24)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=.2, depth=.16, location=(0, 0, .5)); add(bpy.context.object, GOLD()); bpy.ops.object.shade_smooth()
+
+def vault(): tilted(vault_parts, (-12, 14, 0))
+
+def cash_coin():
+    """A plain gold coin, face on, whose prize the game prints on it."""
+    bpy.ops.mesh.primitive_cylinder_add(vertices=96, radius=1.0, depth=.2, location=(0, 0, 0)); coin = bpy.context.object
+    b = coin.modifiers.new('Bevel', 'BEVEL'); b.width = .05; b.segments = 4
+    bpy.ops.object.shade_smooth(); add(coin, GOLD())
+    # The face is painted bright gold (not mirror metal), so the prize printed over it always reads.
+    bpy.ops.mesh.primitive_cylinder_add(vertices=96, radius=.82, depth=.02, location=(0, 0, .105)); add(bpy.context.object, mat('CoinFace', (.95, .58, .08), rough=.45, coat=.25, emission=(1, .5, .05), strength=.12)); bpy.ops.object.shade_smooth()
+    bpy.ops.mesh.primitive_torus_add(major_radius=.84, minor_radius=.05, major_segments=96, location=(0, 0, .11)); add(bpy.context.object, DARK_GOLD()); bpy.ops.object.shade_smooth()
+    for i in range(24):
+        a = i * math.tau / 24
+        sphere((.93 * math.cos(a), .93 * math.sin(a), .1), (.03, .03, .02), DARK_GOLD(), 10)
+
+def cloud(colour=(.85, .88, .95)):
+    m = mat('Cloud', colour, rough=.8, sss=.3)
+    for x, y, r in ((-.9, 0, .55), (-.3, .25, .75), (.4, .2, .7), (1.0, -.05, .5), (0, -.2, .6)):
+        sphere((x, y, 0), (r, r * .8, r * .7), m, 32)
+
+def rain_cloud():
+    """A storm cloud with gold coins falling out of it."""
+    cloud((.45, .5, .6))
+    for i, (x, y) in enumerate(((-.7, -1.0), (.1, -1.4), (.8, -1.05), (-.3, -1.9), (.5, -2.2))):
+        lux_coin_at((x, y, 0), (60 + i * 7, 10 * (i % 3), i * 40))
+
+MONSOON = {'CROWN': crown, 'DIAMOND': lux_ring, 'GOLD': lambda: lux_bars(GOLD()), 'WATCH': lux_watch, 'CHIPS': chips, 'DICE': dice,
+           'CARDS': cards, 'WILD': video_wild, 'CASH': cash_coin, 'VAULT': vault}
+
+def monsoon_symbol(name, build):
+    reset(); build(); render(f'MM_{name}')
+
 # ---------------------------------------------------------------- the tiles
 # Each tile: its backdrop (hot centre, middle, edge), its pieces (model, centre, size, turn) and its name.
 EMBER = ((1, .62, .16), (.62, .05, .02), (.07, .0, .02))
@@ -251,6 +303,9 @@ TILES = {
     'BREAK_THE_BANK': dict(bg=EMBER, name='BREAK\nTHE BANK', font='titan', pieces=[
         (lambda: lux_bars(GOLD()), (0, .85, .5), 2.1, (0, 0, 0)), (fire('MAJOR'), (-1.95, 1.15, 0), 1.6, (0, 0, 0)), (fire('FIRE'), (1.95, 1.15, 0), 1.6, (0, 0, 0)),
         (lux('COIN'), (0, 1.9, -.4), 1.2, (0, 0, 0))]),
+    'MONEY_MONSOON': dict(bg=((.7, 1, .75), (.05, .38, .3), (.0, .05, .05)), name='MONEY\nMONSOON', font='titan', outline=(.0, .07, .04), sparkle=(1, .9, .5), pieces=[
+        (vault, (0, 1.05, .3), 2.4, (0, 0, 0)), (rain_cloud, (-2.0, 1.4, 0), 1.9, (0, 0, 6)), (rain_cloud, (2.05, 1.45, 0), 1.8, (0, 0, -6)),
+        (lambda: lux_bars(GOLD()), (0, .1, .6), 1.3, (0, 0, 0))]),
     'LUXURY_LIFE': dict(bg=BLACK_GOLD, name='LUXURY\nLIFE', font='abril', pieces=[
         (lux('YACHT'), (-1.75, 1.2, 0), 2.3, (0, 0, 0)), (lux('JET'), (1.8, 1.55, 0), 2.1, (0, 0, 0)), (lux('GOLD'), (.1, .75, .5), 1.9, (0, 0, 0)),
         (lux('RING'), (0, 1.75, .2), 1.1, (0, 0, 0))]),
@@ -377,6 +432,10 @@ def scene_logo(code, spec):
     bpy.ops.render.render(write_still=True)
     print('rendered logo', code)
 
+
+# Money Monsoon's reel symbols (MM_<NAME>, 512px, clear background); MM picks them all.
+for name, build in MONSOON.items():
+    if (ONLY and f'MM_{name}' in ONLY) or 'MM' in ONLY: monsoon_symbol(name, build)
 
 # Names on the command line pick what to render: a game code (its tile), BG_<CODE> / LOGO_<CODE>, or BG / LOGO /
 # TILES for all of a kind. Nothing renders everything.

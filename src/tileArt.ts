@@ -14,6 +14,7 @@ export const TILE_ART: Record<string, number> = {
   LUCKY_FIRE_BLITZ: require('../assets/tiles/LUCKY_FIRE_BLITZ.jpg'),
   LUXURY_LIFE: require('../assets/tiles/LUXURY_LIFE.jpg'),
   MIDNIGHT_BARS: require('../assets/tiles/MIDNIGHT_BARS.jpg'),
+  MONEY_MONSOON: require('../assets/tiles/MONEY_MONSOON.jpg'),
   ORANGE_RUSH: require('../assets/tiles/ORANGE_RUSH.jpg'),
   QUICK_HIT: require('../assets/tiles/QUICK_HIT.jpg'),
   ROULETTE: require('../assets/tiles/ROULETTE.jpg'),

@@ -17,6 +17,7 @@ const BY_KIND: Record<string, string[]> = {
   CRASH: ['Cash out before the flight ends.'],
   ROULETTE: ['Tap chips onto the table, then spin.'],
   CLASSIC_5L: ['A WILD or 2X fills its reel and locks it for a free respin.', 'Three JACKPOTs on a line pay 10x to 30x your bet.'],
+  CASH_5X3: ['CASH coins land on reels one to four, each with a prize.', 'The VAULT on reel five collects every coin on the screen.'],
   LINES_5X3: ['Fifteen lines pay left to right from the first reel.', 'Every DOUBLE wild in a win doubles it: two make it 4x.'],
   FIRE_LINK: ['Six or more fireballs start the Fire Link.', 'Fill all twenty cells for the GRAND: 1,000x your bet.'],
   KENO: ['Mark up to 10 numbers. Quick pick chooses for you.', 'More numbers marked: rarer, bigger wins, up to 10,000x.'],
