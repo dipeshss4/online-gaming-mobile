@@ -73,6 +73,12 @@ const games = [
   { code: 'BREAK_THE_BANK', name: 'Break the Bank', description: 'Fire Link.', minStake: 0.2, maxStake: 10, engineType: 'FIRE_LINK', featuredSymbol: '7',
     engine: { layout: 'FIRE_LINK', symbols: ['SEVEN', 'BAR', 'BELL', 'STAR', 'ORANGE', 'CHERRY', 'WILD', 'F1', 'F2', 'MINI'], payline: [], rules: ['Six fireballs start the Fire Link.'], paytable: [] },
     presentation: { badge: 'NEW · FIRE LINK', tileSubtitle: 'GRAND 1,000X' } },
+  { code: 'SHERIFFS_GOLD', name: "Sheriff's Gold", description: 'Hold and win in the West.', minStake: 0.2, maxStake: 10, engineType: 'FIRE_LINK', featuredSymbol: 'STAR',
+    engine: { layout: 'FIRE_LINK', symbols: ['SEVEN', 'BAR', 'BELL', 'STAR', 'ORANGE', 'CHERRY', 'WILD', 'F1', 'F2', 'MINI'], payline: [], rules: ['Six sheriff stars start the Gold Rush.'], paytable: [] },
+    presentation: { badge: 'NEW · HOLD & WIN', tileSubtitle: 'GRAND 1,000X' } },
+  { code: 'MONEY_MONSOON', name: 'Money Monsoon', description: 'Cash rains; the vault collects.', minStake: 0.15, maxStake: 30, engineType: 'CASH_5X3', featuredSymbol: 'STAR',
+    engine: { layout: 'CASH_5X3', symbols: ['CROWN', 'DIAMOND', 'GOLD', 'WATCH', 'CHIPS', 'DICE', 'CARDS', 'WILD', 'CASH', 'VAULT'], payline: [], rules: ['The VAULT collects every CASH coin.'], paytable: [] },
+    presentation: { badge: 'NEW · CASH COLLECT', tileSubtitle: 'THE VAULT COLLECTS' } },
   { code: 'LUXURY_LIFE', name: 'Luxury Life', description: 'Fifteen lines, DOUBLE wilds.', minStake: 0.15, maxStake: 30, engineType: 'LINES_5X3', featuredSymbol: 'STAR',
     engine: { layout: 'LINES_5X3', symbols: ['YACHT', 'JET', 'LIMO', 'RING', 'WATCH', 'GOLD', 'COIN', 'SILVER', 'DOUBLE'], payline: [], rules: ['DOUBLE wilds double every win.'], paytable: [],
       lines: [[5, 6, 7, 8, 9], [0, 1, 2, 3, 4], [10, 11, 12, 13, 14], [0, 6, 12, 8, 4], [10, 6, 2, 8, 14], [0, 1, 7, 13, 14], [10, 11, 7, 3, 4], [5, 1, 2, 3, 9],
@@ -230,6 +236,12 @@ await page.route('**/api/**', async route => {
       return json({ requestId: body.requestId, betId: 'd2', gameCode: 'VEGAS_JACKPOT_DEVIL_HEART', symbols: [...screen, 'JP20'], stake: body.stake,
         payout: 2, balance: 127.78, currency: 'USD', outcome: 'JACKPOT', multiplier: 20 })
     }
+    if (path === '/api/games/MONEY_MONSOON/play') {
+      // Three coins (5x, 2x and 25x the bet) and the VAULT on reel five: it collects 32 bets; no line pays.
+      const screen = ['CASH:5', 'DICE', 'CARDS', 'CHIPS', 'GOLD', 'WATCH', 'CASH:2', 'DICE', 'CARDS', 'VAULT', 'CHIPS', 'GOLD', 'WATCH', 'CASH:25', 'DICE']
+      return json({ requestId: body.requestId, betId: 'mm1', gameCode: 'MONEY_MONSOON', symbols: screen, stake: body.stake,
+        payout: Math.round(32 * body.stake * 100) / 100, balance: 174.8, currency: 'USD', outcome: 'JACKPOT', multiplier: 32 })
+    }
     if (path === '/api/games/LUXURY_LIFE/play' && luxuryFree) {
       // Three KEYs (2x the bet) start 8 free spins; the third pays three coins on the top line, tripled: 2.80x.
       luxuryFree = false
@@ -249,6 +261,12 @@ await page.route('**/api/**', async route => {
       const screen = ['COIN', 'COIN', 'COIN', 'JET', 'RING', 'YACHT', 'DOUBLE', 'YACHT', 'YACHT', 'YACHT', 'SILVER', 'GOLD', 'WATCH', 'LIMO', 'GOLD']
       return json({ requestId: body.requestId, betId: 'll1', gameCode: 'LUXURY_LIFE', symbols: screen, stake: body.stake,
         payout: 10.12, balance: 177.07, currency: 'USD', outcome: 'JACKPOT', multiplier: 67.47 })
+    }
+    if (path === '/api/games/SHERIFFS_GOLD/play') {
+      // The same round as Break the Bank's below, in the West: seven stars start the Gold Rush and a MAJOR drops in.
+      const base = ['F2', 'BELL', 'F5', 'CHERRY', 'MINI', 'ORANGE', 'F1', 'STAR', 'F3', 'BAR', 'CHERRY', 'F10', 'BELL', 'SEVEN', 'ORANGE', 'STAR', 'BAR', 'F8', 'CHERRY', 'BELL']
+      return json({ requestId: body.requestId, betId: 'sg1', gameCode: 'SHERIFFS_GOLD', symbols: [...base, 'LINK', 'R', '13:MAJOR', '1:F5', 'R', 'R', 'R'], stake: body.stake,
+        payout: 41.8, balance: 167.1, currency: 'USD', outcome: 'JACKPOT', multiplier: 209 })
     }
     if (path === '/api/games/BREAK_THE_BANK/play') {
       // Seven fireballs start the Fire Link; one respin lands two more (a MAJOR among them), then three blanks.
@@ -695,6 +713,22 @@ await audit('33-fire-link-done')
 console.log('## fire link  (seven fireballs, a MAJOR drops in, respins run out, 41.80)')
 await page.getByLabel('Back to lobby').first().click()
 
+// Sheriff's Gold: the same hold-and-spin in the West: the stars start the Gold Rush, a MAJOR star drops in, 41.80.
+await page.getByLabel("Play Sheriff's Gold").first().click()
+await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {})
+await page.getByLabel(/^Reel 5:/).waitFor({ timeout: 15000 }).catch(() => findings.push("sheriff's gold: the five reels did not show"))
+await audit('41-sheriffs-gold')
+await page.getByRole('button', { name: 'Spin', exact: true }).click()
+await page.getByText('GOLD RUSH!').waitFor({ timeout: 15000 }).catch(() => findings.push("sheriff's gold: no GOLD RUSH banner"))
+await page.getByLabel('MAJOR jackpot').first().waitFor({ timeout: 15000 }).catch(() => findings.push("sheriff's gold: the MAJOR never dropped in"))
+await page.screenshot({ path: `${OUT}/41a-sheriffs-gold-rush.png` })
+await page.getByText('WIN 41.80').waitFor({ timeout: 20000 }).catch(() => findings.push("sheriff's gold: the round never showed the server's 41.80"))
+await page.getByRole('button', { name: /Tap to skip the count/ }).click({ timeout: 8000 }).catch(() => {})
+await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
+await audit('42-sheriffs-gold-done')
+console.log("## sheriff's gold  (seven stars, the Gold Rush, a MAJOR star, 41.80)")
+await page.getByLabel('Back to lobby').first().click()
+
 // Luxury Life: five yachts and a DOUBLE on the middle line; each paying line is drawn in turn, then MEGA WIN and 10.12.
 await page.getByRole('tab', { name: 'SLOTS' }).click()
 await page.getByLabel('Play Luxury Life').first().click()
@@ -751,6 +785,23 @@ await page.getByText('WIN 0.42').waitFor({ timeout: 60000 }).catch(() => finding
 await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
 await audit('38-free-spins-done')
 console.log('## luxury life free spins  (three KEYs, 8 free spins, a tripled line, 0.42)')
+await page.getByLabel('Back to lobby').first().click()
+
+// Money Monsoon: three coins on reels one to four and the VAULT on reel five; it takes each coin and the round pays 4.80.
+await page.getByRole('tab', { name: 'SLOTS' }).click()
+await page.getByLabel('Play Money Monsoon').first().click()
+await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {})
+await page.getByLabel('Spin').first().waitFor({ timeout: 15000 }).catch(() => findings.push('money monsoon: the game did not open'))
+await audit('39-money-monsoon')
+await page.getByRole('button', { name: 'Spin', exact: true }).click()
+await page.getByText('VAULT COLLECT!').first().waitFor({ timeout: 15000 }).catch(() => findings.push('money monsoon: the vault never collected'))
+await page.waitForTimeout(900)
+await page.screenshot({ path: `${OUT}/39a-money-monsoon-collect.png` })
+await page.getByText('WIN 4.80').waitFor({ timeout: 20000 }).catch(() => findings.push("money monsoon: the round never showed the server's 4.80"))
+await page.getByRole('button', { name: /Tap to skip the count/ }).click({ timeout: 8000 }).catch(() => {})
+await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
+await audit('40-money-monsoon-done')
+console.log('## money monsoon  (three coins, the VAULT collects 32 bets, 4.80)')
 await page.getByLabel('Back to lobby').first().click()
 await page.getByRole('tab', { name: 'OTHER' }).click()
 

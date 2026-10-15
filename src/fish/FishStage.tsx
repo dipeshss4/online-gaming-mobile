@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { ApiError, type Balance, type Game, type PlayResult, request } from '../api';
 import { sound } from '../sound';
 import { Tap } from '../Tap';
+import { GameLogo } from '../GameLogo';
 import { Ctx2D } from './skiaCtx';
 import { CANNON, DRAGON_TRAIL, H, SPECIES, TAU, TRAIL_GAP, W, byCode, drawCannon, drawDragonBody, paintSeabed, type Fish, type Species } from './art';
 
@@ -267,7 +268,7 @@ export default function FishStage({ game, token, initialBalance, onClose, onSett
       </View>
       <View style={st.top} pointerEvents="box-none">
         <Tap onPress={onClose} style={st.chip} accessibilityLabel="Back to games"><Text style={st.chipText}>‹ Lobby</Text></Tap>
-        <Text style={st.title}>{game.name}</Text>
+        <GameLogo game={game} height={30} maxWidth={Math.max(120, stageW - 360)} />
         <View style={st.topRight}>
           <View style={st.credits}><Text style={st.creditsLabel}>CREDITS</Text><Text style={st.creditsValue} testID="fish-balance">{money(wallet)}</Text></View>
           <Tap onPress={() => setInfo(true)} style={st.round} accessibilityLabel="Paytable and rules"><Text style={st.chipText}>i</Text></Tap>
@@ -322,7 +323,6 @@ const st = StyleSheet.create({
   chip: { minHeight: 44, paddingHorizontal: 14, borderRadius: 22, backgroundColor: panel, borderWidth: 1, borderColor: 'rgba(255,255,255,.3)', justifyContent: 'center' },
   chipText: { color: ink, fontWeight: '800', fontSize: 14 },
   round: { width: 44, height: 44, borderRadius: 22, backgroundColor: panel, borderWidth: 1, borderColor: 'rgba(255,255,255,.3)', alignItems: 'center', justifyContent: 'center' },
-  title: { color: gold, fontWeight: '900', fontSize: 18, letterSpacing: 1.5, textShadowColor: '#6b21a8', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 0 },
   credits: { paddingHorizontal: 12, paddingVertical: 3, borderRadius: 12, backgroundColor: panel, borderWidth: 1, borderColor: 'rgba(255,213,74,.6)', alignItems: 'flex-end' },
   creditsLabel: { color: dim, fontSize: 11, letterSpacing: 1.2, fontWeight: '700' },
   creditsValue: { color: gold, fontSize: 17, fontWeight: '900', fontVariant: ['tabular-nums'] },

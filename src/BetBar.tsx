@@ -38,7 +38,7 @@ export function BetBar({ value, onChange, min, max, disabled = false, label = 'B
     <View style={b.row} onLayout={event => setNarrow(event.nativeEvent.layout.width < 300)}>
       {!narrow && limits && <>
       <Tap haptic="select" accessibilityLabel="Minimum bet" disabled={disabled || (!off && cents(value) === cents(min))} onPress={() => onChange(min)} style={[b.limit, (disabled || (!off && cents(value) === cents(min))) && b.dim]}>
-        <LinearGradient colors={['#1b6fd1', '#0b2f6e']} style={StyleSheet.absoluteFill} /><Text style={b.limitText}>MIN</Text>
+        <LinearGradient colors={MIN_METAL} style={StyleSheet.absoluteFill} /><Text style={b.limitText}>MIN</Text>
       </Tap>
       </>}
       <Tap haptic="select" accessibilityLabel="Decrease bet" disabled={disabled || atMin} onPress={down} style={[b.step, (disabled || atMin) && b.dim]}><Text style={b.stepText}>−</Text></Tap>
@@ -48,16 +48,16 @@ export function BetBar({ value, onChange, min, max, disabled = false, label = 'B
       <Tap haptic="select" accessibilityLabel="Increase bet" disabled={disabled || atMax} onPress={up} style={[b.step, (disabled || atMax) && b.dim]}><Text style={b.stepText}>+</Text></Tap>
       {!narrow && limits && <>
       <Tap haptic="select" accessibilityLabel="Maximum bet" disabled={disabled || atMax} onPress={() => onChange(top)} style={[b.limit, (disabled || atMax) && b.dim]}>
-        <LinearGradient colors={['#ff3c7a', '#a8105a']} style={StyleSheet.absoluteFill} /><Text style={b.limitText}>MAX</Text>
+        <LinearGradient colors={MAX_GOLD} style={StyleSheet.absoluteFill} /><Text style={b.limitText}>MAX</Text>
       </Tap>
       </>}
     </View>
     {narrow && <View style={b.row}>
       <Tap haptic="select" accessibilityLabel="Minimum bet" disabled={disabled || (!off && cents(value) === cents(min))} onPress={() => onChange(min)} style={[b.limit, b.wide, (disabled || (!off && cents(value) === cents(min))) && b.dim]}>
-        <LinearGradient colors={['#1b6fd1', '#0b2f6e']} style={StyleSheet.absoluteFill} /><Text style={b.limitText}>MIN</Text>
+        <LinearGradient colors={MIN_METAL} style={StyleSheet.absoluteFill} /><Text style={b.limitText}>MIN</Text>
       </Tap>
       <Tap haptic="select" accessibilityLabel="Maximum bet" disabled={disabled || atMax} onPress={() => onChange(top)} style={[b.limit, b.wide, (disabled || atMax) && b.dim]}>
-        <LinearGradient colors={['#ff3c7a', '#a8105a']} style={StyleSheet.absoluteFill} /><Text style={b.limitText}>MAX</Text>
+        <LinearGradient colors={MAX_GOLD} style={StyleSheet.absoluteFill} /><Text style={b.limitText}>MAX</Text>
       </Tap>
     </View>}
     <Modal visible={open} transparent animationType="fade" supportedOrientations={['landscape-left', 'landscape-right', 'portrait']} onRequestClose={() => setOpen(false)}>
@@ -65,8 +65,8 @@ export function BetBar({ value, onChange, min, max, disabled = false, label = 'B
         <Pressable style={b.sheet} onPress={() => undefined} accessibilityLabel="Choose your bet">
           <View style={b.sheetHead}><Text style={b.sheetTitle}>CHOOSE YOUR BET</Text><Text style={b.sheetRange}>{min.toFixed(2)} – {top.toFixed(2)}</Text></View>
           <View style={b.row}>
-            <Tap haptic="select" accessibilityLabel="Minimum bet, from the picker" onPress={() => { onChange(min); setOpen(false); }} style={[b.limit, b.wide]}><LinearGradient colors={['#1b6fd1', '#0b2f6e']} style={StyleSheet.absoluteFill} /><Text style={b.limitText}>MIN {min.toFixed(2)}</Text></Tap>
-            <Tap haptic="select" accessibilityLabel="Maximum bet, from the picker" onPress={() => { onChange(top); setOpen(false); }} style={[b.limit, b.wide]}><LinearGradient colors={['#ff3c7a', '#a8105a']} style={StyleSheet.absoluteFill} /><Text style={b.limitText}>MAX {top.toFixed(2)}</Text></Tap>
+            <Tap haptic="select" accessibilityLabel="Minimum bet, from the picker" onPress={() => { onChange(min); setOpen(false); }} style={[b.limit, b.wide]}><LinearGradient colors={MIN_METAL} style={StyleSheet.absoluteFill} /><Text style={b.limitText}>MIN {min.toFixed(2)}</Text></Tap>
+            <Tap haptic="select" accessibilityLabel="Maximum bet, from the picker" onPress={() => { onChange(top); setOpen(false); }} style={[b.limit, b.wide]}><LinearGradient colors={MAX_GOLD} style={StyleSheet.absoluteFill} /><Text style={b.limitText}>MAX {top.toFixed(2)}</Text></Tap>
           </View>
           <ScrollView contentContainerStyle={b.grid}>
             {allowOff && <Tap haptic="select" accessibilityLabel="Bet off" onPress={() => { onChange(0); setOpen(false); }} style={[b.option, off && b.optionOn]}><Text style={[b.optionText, off && b.optionTextOn]}>OFF</Text></Tap>}
@@ -83,17 +83,20 @@ export function BetBar({ value, onChange, min, max, disabled = false, label = 'B
   </View>;
 }
 
+// Dark steel for MIN, deep gold for MAX, gold for the steps, and the amount in gold on black like a machine's meter.
+const MIN_METAL = ['#4a4658', '#1c1a26', '#0c0b12'] as const, MAX_GOLD = ['#f2c14a', '#a8660c', '#5a3204'] as const;
+
 const b = StyleSheet.create({
   root: { alignItems: 'center', gap: 4 },
   label: { color: '#ffe68a', fontSize: 11, fontWeight: '900', letterSpacing: 1.8 },
   labelInline: { fontSize: 11, letterSpacing: 1 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'stretch', justifyContent: 'center' },
-  limit: { minWidth: 48, minHeight: 44, paddingHorizontal: 8, borderRadius: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#22e1ff' },
+  limit: { minWidth: 48, minHeight: 44, paddingHorizontal: 8, borderRadius: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#e0a22a' },
   wide: { flex: 1 },
-  limitText: { color: '#ffffff', fontWeight: '900', fontSize: 13, letterSpacing: 1 },
-  step: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#c79bff', backgroundColor: '#6a2ad1' },
-  stepText: { color: '#ffffff', fontSize: 24, fontWeight: '900', lineHeight: 28 },
-  amount: { flexGrow: 1, flexShrink: 1, minWidth: 76, maxWidth: 140, minHeight: 44, flexDirection: 'row', gap: 4, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 2, borderColor: c.gold, backgroundColor: '#1a0b3d', paddingHorizontal: 6 },
+  limitText: { color: '#fff4d6', fontWeight: '900', fontSize: 13, letterSpacing: 1, textShadowColor: '#000000aa', textShadowRadius: 2, textShadowOffset: { width: 0, height: 1 } },
+  step: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff1b0', backgroundColor: '#d8961c' },
+  stepText: { color: '#3a1c00', fontSize: 24, fontWeight: '900', lineHeight: 28 },
+  amount: { flexGrow: 1, flexShrink: 1, minWidth: 76, maxWidth: 140, minHeight: 44, flexDirection: 'row', gap: 4, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 2, borderColor: '#e0a22a', backgroundColor: '#05020a', paddingHorizontal: 6 },
   amountText: { color: '#ffe45c', fontSize: 18, fontWeight: '900', flexShrink: 1 },
   caret: { color: c.gold, fontSize: 12 },
   dim: { opacity: 0.4 },
