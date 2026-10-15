@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { BlendMode, ClipOp, PaintStyle, Skia, StrokeCap, TileMode, matchFont, type SkCanvas, type SkColor, type SkFont, type SkPaint, type SkPath, type SkPicture, type SkShader } from '@shopify/react-native-skia';
+import { BlendMode, ClipOp, PaintStyle, Skia, StrokeCap, TileMode, matchFont, type SkCanvas, type SkColor, type SkFont, type SkImage, type SkPaint, type SkPath, type SkPicture, type SkShader } from '@shopify/react-native-skia';
 
 /**
  * The part of the browser's CanvasRenderingContext2D that the fish table draws with, on a Skia canvas. The creature
@@ -49,6 +49,17 @@ export class Ctx2D {
   restore() { const s = this.stack.pop(); if (s) this.state = s; this.canvas.restore(); }
   /** An offscreen layer, so "source-atop" tints only what was drawn inside it (the browser composites per canvas). */
   saveLayer() { this.stack.push({ ...this.state }); this.canvas.saveLayer(); }
+  /** A layer whose colours go through a 4x5 colour matrix when it is drawn (the browser's CSS filters). */
+  saveLayerFiltered(matrix: number[]) {
+    this.stack.push({ ...this.state });
+    const paint = Skia.Paint(); paint.setColorFilter(Skia.ColorFilter.MakeMatrix(matrix));
+    this.canvas.saveLayer(paint);
+  }
+  /** An image scaled into a rectangle, at the current alpha. */
+  drawImage(image: SkImage, x: number, y: number, w: number, h: number) {
+    const paint = Skia.Paint(); paint.setAlphaf(this.state.alpha);
+    this.canvas.drawImageRect(image, Skia.XYWHRect(0, 0, image.width(), image.height()), Skia.XYWHRect(x, y, w, h), paint);
+  }
   translate(x: number, y: number) { this.canvas.translate(x, y); }
   rotate(radians: number) { this.canvas.rotate(radians * 180 / Math.PI, 0, 0); }
   scale(x: number, y: number) { this.canvas.scale(x, y); }

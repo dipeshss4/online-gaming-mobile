@@ -1,4 +1,5 @@
 import type { Game } from './api';
+import { TILE_ART } from './tileArt';
 
 /**
  * The lobby's 3D casino art (scripts/render-casino.py, packed by scripts/pack-symbols.py): each game's tile
@@ -19,6 +20,11 @@ const BY_CODE: Record<string, number> = {
   WILD_BUFFALO: require('../assets/video/WILD.png'), SIMPLE_DOLLAR: CASINO.coins, QUICK_HIT: CASINO.slot, TEN_X_TRIPLE: CASINO.chips,
   LOTERIA_SCRATCH: CASINO.cards, TRIPLE_MATCH_SCRATCH: CASINO.scratch,
 };
+
+/** A game's rendered lobby tile (scripts/render-tiles.py): a 6:5 picture with its name drawn in, or null. */
+export const tileOf = (game: Game): number | null => TILE_ART[game.code] ?? null;
+/** The shape of a rendered tile, width over height. */
+export const TILE_RATIO = 6 / 5;
 
 /** The rendered centrepiece for a game's tile, or null when its slot symbol art suits it better. */
 export function artOf(game: Game): number | null {
