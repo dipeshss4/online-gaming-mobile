@@ -20,16 +20,17 @@ import { usePace } from './playControls';
  * The classic three-reel games in the app (layout CLASSIC_3X3, ClassicThreeEngine): three reels of three rows, one or
  * five lines and, for some, a fourth reel of multipliers. What pays comes from the server's engine info: the lines,
  * the paytable (patterns of symbols, "A|B" meaning either; WILD<n> stands in and multiplies) and the multiplier reel.
+ * Games with FREE SPINS scatters play the round's free spins in turn (FREE:n, then each spin's screen), wins doubled.
  */
 export const supportsClassicThree = (game: Game) => game.engine?.layout === 'CLASSIC_3X3';
 const REELS = 3, ROWS = 3, CELLS = 9;
 const ART: Record<string, Record<string, number>> = {
-  STARS_STRIPES_7S: { RED7: require('../assets/stars-stripes/RED7.png'), WHITE7: require('../assets/stars-stripes/WHITE7.png'), BLUE7: require('../assets/stars-stripes/BLUE7.png'),
+  STARS_STRIPES_7S: { SCATTER: require('../assets/stars-stripes/SCATTER.png'), RED7: require('../assets/stars-stripes/RED7.png'), WHITE7: require('../assets/stars-stripes/WHITE7.png'), BLUE7: require('../assets/stars-stripes/BLUE7.png'),
     BAR1: require('../assets/stars-stripes/BAR1.png'), BAR2: require('../assets/stars-stripes/BAR2.png'), BAR3: require('../assets/stars-stripes/BAR3.png') },
-  DIAMOND_WILDS: { SEVEN: require('../assets/diamond-wilds/SEVEN.png'), CHERRY: require('../assets/diamond-wilds/CHERRY.png'), BAR1: require('../assets/diamond-wilds/BAR1.png'),
+  DIAMOND_WILDS: { SCATTER: require('../assets/diamond-wilds/SCATTER.png'), SEVEN: require('../assets/diamond-wilds/SEVEN.png'), CHERRY: require('../assets/diamond-wilds/CHERRY.png'), BAR1: require('../assets/diamond-wilds/BAR1.png'),
     BAR2: require('../assets/diamond-wilds/BAR2.png'), BAR3: require('../assets/diamond-wilds/BAR3.png'), WILD2: require('../assets/diamond-wilds/WILD2.png'),
     WILD3: require('../assets/diamond-wilds/WILD3.png'), WILD5: require('../assets/diamond-wilds/WILD5.png') },
-  INFERNO_JACKPOT: { JACKPOT: require('../assets/inferno/JACKPOT.png'), FIRE7: require('../assets/inferno/FIRE7.png'), SEVEN: require('../assets/inferno/SEVEN.png'),
+  INFERNO_JACKPOT: { SCATTER: require('../assets/inferno/SCATTER.png'), JACKPOT: require('../assets/inferno/JACKPOT.png'), FIRE7: require('../assets/inferno/FIRE7.png'), SEVEN: require('../assets/inferno/SEVEN.png'),
     BAR1: require('../assets/inferno/BAR1.png'), BAR2: require('../assets/inferno/BAR2.png'), BAR3: require('../assets/inferno/BAR3.png') },
 };
 const LOOKS: Record<string, { frame: [string, string, string]; board: [string, string]; idle: string }> = {
@@ -41,6 +42,13 @@ const cash = (n: number) => n.toFixed(2);
 const wildOf = (cell: string) => { const m = /^WILD(\d+)$/.exec(cell); return m ? Number(m[1]) : 0; };
 const fits = (token: string, cell: string) => token.split('|').includes(cell) || (wildOf(cell) > 0 && !token.includes('JACKPOT') && !token.includes('BLANK'));
 type Entry = { label: string; pattern: string[]; multiplier: number };
+/** A round's screens: the base spin and each free spin, each its nine cells and multiplier (1 without the reel). */
+function parseRound(symbols: string[], hasReel: boolean) {
+  const size = CELLS + (hasReel ? 1 : 0);
+  const screen = (from: number) => ({ cells: symbols.slice(from, from + CELLS), x: hasReel ? Number(symbols[from + CELLS]?.slice(2) || 1) : 1 });
+  const token = symbols[size], count = token?.startsWith('FREE:') ? Number(token.slice(5)) : 0;
+  return { base: screen(0), free: Array.from({ length: count }, (_, s) => screen(size + 1 + s * size)) };
+}
 type LineWin = { index: number; cells: number[]; pays: number; label: string; jackpot: boolean };
 /** A line's best paytable entry and its pay in line bets (wilds multiplied in), read as the server reads it. */
 function linePay(line: string[], paytable: Entry[]) {
@@ -54,6 +62,7 @@ export function NativeClassicThree({ game, token, userId, initialBalance, onClos
   const engine = game.engine, lines = engine?.lines?.length ? engine.lines : [[3, 4, 5]];
   const paytable: Entry[] = (engine?.paytable ?? []).map(row => ({ label: row.label, pattern: row.pattern ?? [], multiplier: Number(row.multiplier) }));
   const multipliers = engine?.art?.multipliers?.split(',').map(Number) ?? [];
+  const freeMultiplier = Number(engine?.art?.freeMultiplier ?? 2);
   const strip = (engine?.symbols ?? Object.keys(art));
   const [stake, setStake] = useState(game.minStake), [wallet, setWallet] = useState(initialBalance);
   const [pending, setPending] = useState<PendingBet | null>(null), [ready, setReady] = useState(false);
@@ -63,6 +72,7 @@ export function NativeClassicThree({ game, token, userId, initialBalance, onClos
   const [multiplier, setMultiplier] = useState(multipliers[0] ?? 1), [rolling, setRolling] = useState(false), [teasing, setTeasing] = useState(false);
   const [banner, setBanner] = useState<string | null>(null), [meter, setMeter] = useState(0), [win, setWin] = useState<Win | null>(null);
   const [status, setStatus] = useState(look.idle);
+  const [free, setFree] = useState<{ spin: number; of: number } | null>(null), [scattersLit, setScattersLit] = useState(false);
   const alive = useRef(true), lock = useRef(false);
   const slam = useRef(new Animated.Value(0)).current, roll = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -99,30 +109,47 @@ export function NativeClassicThree({ game, token, userId, initialBalance, onClos
       if (data.requestId !== bet.requestId || data.gameCode !== game.code || data.symbols.length < CELLS) throw new Error('Unexpected result. Keep this request for reconciliation.');
       await clearPending(userId); setPending(null);
       if (!alive.current) return;
-      const cells = data.symbols.slice(0, CELLS), x = data.symbols[CELLS]?.startsWith('X:') ? Number(data.symbols[CELLS].slice(2)) : 1;
-      setScreen(cells);
-      await wait(650);
-      for (let reel = 1; reel <= REELS; reel++) { if (!alive.current) return; setStopped(reel); sound.play('reel-land'); await wait(220); }
-      const found: LineWin[] = lines.map((line, index) => ({ index, cells: line, hit: linePay(line.map(cell => cells[cell]), paytable) }))
-        .filter(f => f.hit).map(f => ({ index: f.index, cells: f.cells, pays: f.hit!.pays, label: f.hit!.entry.label, jackpot: f.hit!.jackpot }));
-      if (multipliers.length) {
-        // A win waiting on it: the multiplier reel rolls on slower before it lands.
-        if (found.some(line => !line.jackpot)) { setTeasing(true); sound.play('tease'); await wait(900); }
-        setTeasing(false); setRolling(false); setMultiplier(x); sound.play('reel-land'); await wait(300);
-      }
-      let running = 0;
-      const perLine = data.stake / lines.length;
-      if (found.length) {
-        await wait(300); setWins(found);
-        for (const line of found) {
-          if (!alive.current) return;
-          setShown(line.index); running += line.pays * perLine * (line.jackpot ? 1 : x); setMeter(running);
-          setStatus(`${line.label.toUpperCase()} · ${cash(line.pays * perLine)}`); feel('select'); sound.play('reel-land'); await wait(850);
+      const round = parseRound(data.symbols, multipliers.length > 0), perLine = data.stake / lines.length;
+      let running = 0, anyJackpot = false;
+      // One screen: the reels (and the multiplier reel) land on it, its lines are drawn and the meter climbs.
+      const playScreen = async ({ cells, x }: { cells: string[]; x: number }, factor: number, first: boolean) => {
+        setWins([]); setShown(null); setScattersLit(false);
+        if (!first) { setStopped(0); if (multipliers.length) setRolling(true); sound.play('spin'); }
+        setScreen(cells);
+        await wait(first ? 650 : 450);
+        for (let reel = 1; reel <= REELS; reel++) { if (!alive.current) return false; setStopped(reel); sound.play('reel-land'); await wait(first ? 220 : 150); }
+        const found: LineWin[] = lines.map((line, index) => ({ index, cells: line, hit: linePay(line.map(cell => cells[cell]), paytable) }))
+          .filter(f => f.hit).map(f => ({ index: f.index, cells: f.cells, pays: f.hit!.pays * factor, label: f.hit!.entry.label, jackpot: f.hit!.jackpot }));
+        if (multipliers.length) {
+          // A win waiting on it: the multiplier reel rolls on slower before it lands.
+          if (found.some(line => !line.jackpot)) { setTeasing(true); sound.play('tease'); await wait(900); }
+          setTeasing(false); setRolling(false); setMultiplier(x); sound.play('reel-land'); await wait(300);
         }
-        setShown(null);
-        if (x > 1 && found.some(line => !line.jackpot)) { sound.play('coins'); await show(`×${x} MULTIPLIER!`, 1200); }
+        if (found.length) {
+          await wait(300); setWins(found);
+          for (const line of found) {
+            if (!alive.current) return false;
+            setShown(line.index); running += line.pays * perLine * (line.jackpot ? 1 : x); setMeter(running);
+            setStatus(`${line.label.toUpperCase()} · ${cash(line.pays * perLine)}${factor > 1 ? ` (×${factor})` : ''}`); feel('select'); sound.play('reel-land'); await wait(850);
+          }
+          setShown(null);
+          if (x > 1 && found.some(line => !line.jackpot)) { sound.play('coins'); await show(`×${x} MULTIPLIER!`, 1200); }
+        }
+        anyJackpot ||= found.some(line => line.jackpot);
+        return true;
+      };
+      if (!await playScreen(round.base, 1, true)) return;
+      if (round.free.length) {
+        setScattersLit(true); sound.play('bigwin'); feel('heavy'); await show(`${round.free.length} FREE SPINS`, 1800); setScattersLit(false);
+        for (let spin = 0; spin < round.free.length; spin++) {
+          if (!alive.current) return;
+          setFree({ spin: spin + 1, of: round.free.length }); setStatus(`FREE SPIN ${spin + 1} / ${round.free.length} · EVERY WIN ×${freeMultiplier}`);
+          if (!await playScreen(round.free[spin], freeMultiplier, false)) return;
+          await wait(300);
+        }
+        setFree(null); await show('FREE SPINS COMPLETE', 1500);
       }
-      if (found.some(line => line.jackpot)) { sound.play('bigwin'); await show('JACKPOT!', 2200); }
+      if (anyJackpot) { sound.play('bigwin'); await show('JACKPOT!', 2200); }
       else if (data.multiplier >= 25) { sound.play('bigwin'); await show('MEGA WIN', 2000); }
       else if (data.multiplier >= 3) { sound.play('bigwin'); await show('BIG WIN', 1500); }
       if (!alive.current) return;
@@ -137,7 +164,7 @@ export function NativeClassicThree({ game, token, userId, initialBalance, onClos
       if (!pending && e instanceof ApiError && [400, 401, 403, 404, 422, 429].includes(e.status)) await clearPending(userId).then(() => setPending(null)).catch(() => {});
       feel('warn'); setStatus(look.idle);
       setError(`${e instanceof Error ? e.message : 'Unable to play'}${submitted ? ' If a bet is pending, use Recover with the same request ID.' : ''}`);
-    } finally { lock.current = false; if (alive.current) { setBusy(false); setStopped(REELS); setRolling(false); setTeasing(false); } }
+    } finally { lock.current = false; if (alive.current) { setBusy(false); setStopped(REELS); setRolling(false); setTeasing(false); setFree(null); } }
   }
 
   const drawn = shown === null ? wins : wins.filter(line => line.index === shown);
@@ -153,11 +180,14 @@ export function NativeClassicThree({ game, token, userId, initialBalance, onClos
     win={cash(meter)}
     spin={{ busy, label: pending ? 'RECOVER' : 'SPIN', accessibilityLabel: pending ? 'Recover bet' : 'Spin', onPress: spin, disabled: busy || !ready || (!!pending && pending.gameCode !== game.code) }}
     overlay={<>
+      {free && <View pointerEvents="none" style={[k.freeBadge, { borderColor: look.frame[0] }]}><Text style={k.freeText}>FREE SPIN</Text><Text style={k.freeCount}>{free.spin} / {free.of}</Text><Text style={k.freeText}>WINS ×{freeMultiplier}</Text></View>}
       {banner && <Animated.View pointerEvents="none" style={[k.banner, (banner === 'MEGA WIN' || banner === 'JACKPOT!') && k.mega, { borderColor: look.frame[0], transform: [{ scale: slam.interpolate({ inputRange: [0, 1], outputRange: [2.4, 1] }) }], opacity: slam }]}>
         <Text style={[k.bannerText, (banner === 'MEGA WIN' || banner === 'JACKPOT!') && { fontSize: 58 }]}>{banner}</Text></Animated.View>}
       <WinCelebration win={win} /><BigWin win={win} />
     </>}
     info={<>
+      {!!engine?.art?.freeSpins && <PayRow label={<View style={k.special}><Image source={art.SCATTER} style={{ width: 40, height: 40 }} resizeMode="contain" />
+        <Text style={[s.small, { flexShrink: 1 }]}>FREE SPINS scatter: 3 / 4 / 5+ anywhere start {engine.art.freeSpins.split(',').join(' / ')} free spins, every win ×{freeMultiplier}.</Text></View>} pays="FREE" />}
       {paytable.map(row => <PayRow key={row.label} label={<View style={k.special}>
         <View style={{ flexDirection: 'row' }}>{row.pattern.map((token, i) => <View key={i} style={{ width: 30, height: 30, alignItems: 'center', justifyContent: 'center' }}>{symbolArt(token.split('|')[0], 34)}</View>)}</View>
         <Text style={[s.small, { flexShrink: 1 }]}>{row.label}</Text></View>} pays={cash(row.multiplier * perLine)} />)}
@@ -172,7 +202,7 @@ export function NativeClassicThree({ game, token, userId, initialBalance, onClos
           <LinearGradient colors={look.board} style={k.cabinet}>
             <View style={k.reels}>{Array.from({ length: REELS }, (_, reel) => <SpinReel key={reel} index={reel} size={cell} width={width} reduced={reduced}
               strip={strip} spinning={busy && stopped <= reel} cells={[0, 1, 2].map(row => screen[row * REELS + reel])} dim={wins.length > 0}
-              lit={row => lit.has(row * REELS + reel) ? c.gold : lines.length === 1 && row === 1 && !wins.length ? '#ffffff22' : null}
+              lit={row => lit.has(row * REELS + reel) ? c.gold : scattersLit && screen[row * REELS + reel] === 'SCATTER' ? '#ffd84a' : lines.length === 1 && row === 1 && !wins.length ? '#ffffff22' : null}
               render={(symbol, size) => symbolArt(symbol, size)} />)}
               <Paylines geometry={{ left: 0, top: 0, width, height: cell, gap: 4 }}
                 lines={drawn.map(line => ({ color: c.gold, cells: line.cells.map(index => [index % REELS, Math.floor(index / REELS)] as [number, number]) }))} />
@@ -200,6 +230,9 @@ const k = StyleSheet.create({
   multiplier: { borderRadius: 16, borderWidth: 3, alignItems: 'center', justifyContent: 'center', gap: 6, overflow: 'hidden' },
   multiplierLabel: { color: '#ffe58a', fontWeight: '900', fontSize: 11, letterSpacing: 1, paddingHorizontal: 4 },
   multiplierValue: { color: '#ffe58a', fontWeight: '900', fontStyle: 'italic', textAlign: 'center', textShadowColor: '#ff5a00', textShadowRadius: 14, textShadowOffset: { width: 0, height: 0 } },
+  freeBadge: { position: 'absolute', top: 66, left: 12, maxWidth: 230, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14, borderWidth: 2, backgroundColor: '#000000aa', alignItems: 'center' },
+  freeText: { color: '#ffe58a', fontWeight: '900', letterSpacing: 2, fontSize: 11, textAlign: 'center' },
+  freeCount: { color: '#fff', fontWeight: '900', fontSize: 24, textAlign: 'center' },
   banner: { position: 'absolute', alignSelf: 'center', top: '34%', paddingHorizontal: 30, paddingVertical: 10, borderRadius: 20, borderWidth: 4, backgroundColor: '#0a0418ee' },
   mega: { shadowColor: '#ffd23f', shadowOpacity: 1, shadowRadius: 30, shadowOffset: { width: 0, height: 0 } },
   bannerText: { color: '#ffe58a', fontWeight: '900', fontStyle: 'italic', fontSize: 44, textShadowColor: '#ff5ab4', textShadowRadius: 18, textShadowOffset: { width: 0, height: 0 } },

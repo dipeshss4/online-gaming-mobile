@@ -380,6 +380,8 @@ DIAMOND = {'SEVEN': seven, 'BAR1': lambda: classic_bars(1, (.05, .05, .07)), 'BA
            'WILD2': lambda: diamond_wild('2X', (.4, .85, 1)), 'WILD3': lambda: diamond_wild('3X', (.85, .3, 1)), 'WILD5': lambda: diamond_wild('5X', (1, .25, .4))}
 INFERNO = {'JACKPOT': jackpot_flame, 'FIRE7': devil_seven, 'SEVEN': lambda: colour_seven((.95, .55, .02)),
            'BAR1': lambda: classic_bars(1, (.7, .06, .01)), 'BAR2': lambda: classic_bars(2, (.85, .35, .02)), 'BAR3': lambda: classic_bars(3, (.55, .0, .05))}
+# Each classic game's FREE SPINS scatter: the star coin with its ribbon (Seven Stars' scatter).
+for builds in (STARS_STRIPES, DIAMOND, INFERNO): builds['SCATTER'] = video_scatter
 CLASSIC_SETS = {'SS': STARS_STRIPES, 'DW': DIAMOND, 'IJ': INFERNO}
 
 # ---------------------------------------------------------------- the tiles

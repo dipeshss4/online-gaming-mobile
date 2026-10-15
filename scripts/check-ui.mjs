@@ -22,7 +22,7 @@ catch { defaults = { brand: { logoGlyph: '7', tagline: 'THE ORIGINAL COLLECTION'
   signIn: { formKicker: "MEMBERS' ENTRANCE", loginTitle: 'Welcome back.', loginSubtitle: 'Your next game is waiting.', registerTitle: 'Join the floor.', registerSubtitle: 'Create your demo player account.', registrationClosed: 'New accounts are paused right now.' },
   lobby: { welcomeLabel: 'THE ORIGINAL COLLECTION', heroEnabled: true, featuredGameCode: 'HOT_7S', heroEyebrow: 'IN THE SPOTLIGHT', heroHeadline: 'A classic feeling.', heroAccent: 'A fresh spin.', heroBody: 'Discover {game} and find your rhythm.', heroNote: 'PLAY WITH DEMO CREDITS · NO CASH VALUE', heroArtLabel: 'ONLINE GAME ORIGINAL', quickLinkTitle: 'Your game. Your pace.', quickLinkBody: 'Original games, one demo wallet.', libraryEyebrow: 'FIND YOUR NEXT FAVORITE', defaultBadge: 'ONLINE GAME ORIGINAL' } } }
 const findings = []
-let luxuryRounds = 0, luxuryFree = false
+let luxuryRounds = 0, luxuryFree = false, diamondRounds = 0
 const now = new Date().toISOString()
 
 // The welcome pop-up and new-message pop-up are switched off until their own scenario, so they do not cover the
@@ -275,6 +275,14 @@ await page.route('**/api/**', async route => {
       // Red, white and blue in order on the line: 250x.
       return json({ requestId: body.requestId, betId: 'ss1', gameCode: 'STARS_STRIPES_7S', symbols: ['BLANK', 'BAR1', 'BLANK', 'RED7', 'WHITE7', 'BLUE7', 'BAR2', 'BLANK', 'BAR3'], stake: body.stake,
         payout: Math.round(250 * body.stake * 100) / 100, balance: 150.5, currency: 'USD', outcome: 'JACKPOT', multiplier: 250 })
+    }
+    if (path === '/api/games/DIAMOND_WILDS/play' && diamondRounds++ > 0) {
+      // Three scatters start eight free spins; the first lands three 7s (50 line bets, a fifth of the bet, doubled): 20x.
+      const blank = Array(9).fill('BLANK')
+      const symbols = ['SCATTER', 'BAR1', 'BLANK', 'BLANK', 'BLANK', 'SCATTER', 'BAR2', 'SCATTER', 'BLANK', 'FREE:8',
+        'BLANK', 'BAR1', 'BLANK', 'SEVEN', 'SEVEN', 'SEVEN', 'BAR2', 'BLANK', 'BLANK', ...Array.from({ length: 7 }, () => blank).flat()]
+      return json({ requestId: body.requestId, betId: `dw${diamondRounds}`, gameCode: 'DIAMOND_WILDS', symbols, stake: body.stake,
+        payout: Math.round(20 * body.stake * 100) / 100, balance: 129.4, currency: 'USD', outcome: 'BIG_WIN', multiplier: 20 })
     }
     if (path === '/api/games/DIAMOND_WILDS/play') {
       // A 2X diamond between two 7s on the middle line: 50 line bets doubled, a fifth of the bet each: 20x.
@@ -781,6 +789,16 @@ await page.getByRole('button', { name: /Tap to skip the count/ }).click({ timeou
 await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
 await audit('44-diamond-wilds-done')
 console.log('## diamond wilds  (a 2X diamond doubles three 7s, 2.00)')
+// Free spins (the next round, same game): three scatters start eight, the first pays three 7s doubled, 2.00.
+await page.getByRole('button', { name: 'Spin', exact: true }).click({ timeout: 15000 })
+await page.getByText('8 FREE SPINS').first().waitFor({ timeout: 15000 }).catch(() => findings.push('diamond wilds: the free spins were never announced'))
+await page.getByText(/^FREE SPIN 1 \/ 8|^THREE 7S · .*\(×2\)/).first().waitFor({ timeout: 15000 }).catch(() => findings.push('diamond wilds: free spin 1 never played'))
+await page.screenshot({ path: `${OUT}/44b-diamond-free-spins.png` })
+await page.getByText('WIN 2.00').waitFor({ timeout: 40000 }).catch(() => findings.push("diamond wilds: the free spins never showed the server's 2.00"))
+await page.getByRole('button', { name: /Tap to skip the count/ }).click({ timeout: 8000 }).catch(() => {})
+await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
+await audit('44c-diamond-free-spins-done')
+console.log('## diamond wilds free spins  (three scatters, 8 free spins, three 7s doubled, 2.00)')
 await page.getByLabel('Back to lobby').first().click()
 
 await page.getByRole('tab', { name: 'SLOTS' }).click()
