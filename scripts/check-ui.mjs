@@ -915,7 +915,7 @@ await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 150
 await page.getByLabel('Buy ticket').waitFor({ timeout: 15000 })
 await page.getByLabel('Buy ticket').click()
 await page.getByText('RUB THE SILVER TO SCRATCH').waitFor({ timeout: 10000 }).catch(() => findings.push('scratch: the ticket did not arrive covered'))
-const ticketBox = await page.getByText('SCRATCH', { exact: true }).first().boundingBox()
+const ticketBox = await page.getByLabel('Scratch spot').first().boundingBox()
 if (ticketBox) { await page.mouse.move(ticketBox.x - 30, ticketBox.y + 10); await page.mouse.down(); for (let i = 0; i <= 10; i++) await page.mouse.move(ticketBox.x - 30 + i * 40, ticketBox.y + 10 + (i % 2) * 30); await page.mouse.up() }
 await page.screenshot({ path: `${OUT}/30a-scratching.png` })
 await page.getByLabel('Reveal all').click({ timeout: 3000 }).catch(() => {})   // the drag may already have cleared it all
