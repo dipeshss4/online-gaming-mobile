@@ -331,6 +331,57 @@ SHERIFF = {'SEVEN': cowboy_hat, 'BAR': boot, 'BELL': horseshoe, 'STAR': cactus, 
 def sheriff_symbol(name, build):
     reset(); build(); render(f'SG_{name}')
 
+
+# ---------------------------------------------------------------- the classic trio's pieces
+def colour_seven(colour, edge=None):
+    """A classic 7 in glossy enamel over a polished rim ({edge}: the rim's metal, gold by default)."""
+    text('7', 2.6, .16, .05, mat('Enamel7', colour, rough=.08, coat=1, sss=.05), loc=(0, 0, .05))
+    text('7', 2.6, .1, .04, (edge or GOLD)(), offset=.13, loc=(0, 0, -.1))
+
+def classic_bars(count, colour):
+    """One, two or three stacked BAR plaques in an enamel colour, gold-rimmed."""
+    enamel = mat('BarEnamel', colour, rough=.1, coat=1)
+    gap, h = .12, .5
+    top = (count * h + (count - 1) * gap) / 2
+    for i in range(count):
+        y = top - h / 2 - i * (h + gap)
+        rounded_box((2.3, h, .24), .08, GOLD(), loc=(0, y, -.04))
+        rounded_box((2.12, h - .12, .24), .06, enamel, loc=(0, y, .02))
+        text('BAR', .36, .05, .012, mat('BarInk', (1, 1, 1) if sum(colour) < 2 else (.08, .1, .3), rough=.3, coat=.5), loc=(0, y - .01, .15))
+
+def diamond_wild(label, colour):
+    """A faceted gem with its multiplier (2X, 3X, 5X) in front of it."""
+    gem = mat('WildGem', colour, rough=.0)
+    p = gem.node_tree.nodes['Principled BSDF']; p.inputs['Transmission Weight'].default_value = .85; p.inputs['IOR'].default_value = 2.2
+    bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=1.0, radius2=.6, depth=.4, location=(0, .35, 0)); crown = bpy.context.object
+    bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=1.0, radius2=0, depth=1.1, location=(0, -.4, 0)); pav = bpy.context.object
+    crown.rotation_euler = (math.radians(-90), 0, math.radians(22.5)); pav.rotation_euler = (math.radians(90), 0, math.radians(22.5))
+    add(crown, gem); add(pav, gem)
+    # The multiplier stands in front of the gem: bright gold over a dark outline, so it reads on any colour.
+    text(label, .95, .08, .02, mat('WildGold', (1, .8, .3), rough=.2, coat=.6, emission=(1, .62, .12), strength=.35), loc=(0, -.05, .95))
+    text(label, .95, .04, .0, mat('WildEdge', (.03, .01, .05), rough=.4), offset=.07, loc=(0, -.05, .86))
+
+def jackpot_flame():
+    """JACKPOT on a gold plaque wrapped in fire."""
+    for x, s, lean in ((-1.0, .7, -.3), (-.35, .95, -.08), (.35, 1.0, .1), (1.0, .72, .3)):
+        prism([(px + x, py + .3 * s) for px, py in flame_shape(.4 * s, 1.5 * s, lean)], .08, -.3, FLAME(), .02)
+        prism([(px + x, py + .25 * s) for px, py in flame_shape(.26 * s, 1.1 * s, lean)], .08, -.22, FLAME_MID(), .02)
+        prism([(px + x, py + .2 * s) for px, py in flame_shape(.13 * s, .7 * s, lean)], .08, -.14, FLAME_CORE(), .015)
+    rounded_box((2.6, .8, .26), .1, GOLD(), loc=(0, -.25, 0))
+    rounded_box((2.42, .64, .26), .08, mat('JackpotRed', (.45, .0, .02), rough=.1, coat=1), loc=(0, -.25, .05))
+    text('JACKPOT', .42, .06, .014, GOLD(), loc=(0, -.27, .2))
+
+RED_ENAMEL, WHITE_ENAMEL, BLUE_ENAMEL = (.6, .0, .02), (.92, .93, .96), (.02, .1, .55)
+STARS_STRIPES = {'RED7': lambda: colour_seven(RED_ENAMEL), 'WHITE7': lambda: colour_seven(WHITE_ENAMEL, SILVER_METAL),
+                 'BLUE7': lambda: colour_seven(BLUE_ENAMEL), 'BAR1': lambda: classic_bars(1, RED_ENAMEL),
+                 'BAR2': lambda: classic_bars(2, WHITE_ENAMEL), 'BAR3': lambda: classic_bars(3, BLUE_ENAMEL)}
+DIAMOND = {'SEVEN': seven, 'BAR1': lambda: classic_bars(1, (.05, .05, .07)), 'BAR2': lambda: classic_bars(2, (.05, .05, .07)),
+           'BAR3': lambda: classic_bars(3, (.05, .05, .07)), 'CHERRY': cherry,
+           'WILD2': lambda: diamond_wild('2X', (.4, .85, 1)), 'WILD3': lambda: diamond_wild('3X', (.85, .3, 1)), 'WILD5': lambda: diamond_wild('5X', (1, .25, .4))}
+INFERNO = {'JACKPOT': jackpot_flame, 'FIRE7': devil_seven, 'SEVEN': lambda: colour_seven((.95, .55, .02)),
+           'BAR1': lambda: classic_bars(1, (.7, .06, .01)), 'BAR2': lambda: classic_bars(2, (.85, .35, .02)), 'BAR3': lambda: classic_bars(3, (.55, .0, .05))}
+CLASSIC_SETS = {'SS': STARS_STRIPES, 'DW': DIAMOND, 'IJ': INFERNO}
+
 # ---------------------------------------------------------------- the tiles
 # Each tile: its backdrop (hot centre, middle, edge), its pieces (model, centre, size, turn) and its name.
 EMBER = ((1, .62, .16), (.62, .05, .02), (.07, .0, .02))
@@ -401,6 +452,13 @@ TILES = {
     'BREAK_THE_BANK': dict(bg=EMBER, name='BREAK\nTHE BANK', font='titan', pieces=[
         (lambda: lux_bars(GOLD()), (0, .85, .5), 2.1, (0, 0, 0)), (fire('MAJOR'), (-1.95, 1.15, 0), 1.6, (0, 0, 0)), (fire('FIRE'), (1.95, 1.15, 0), 1.6, (0, 0, 0)),
         (lux('COIN'), (0, 1.9, -.4), 1.2, (0, 0, 0))]),
+    'STARS_STRIPES_7S': dict(bg=((1, .9, .95), (.6, .05, .12), (.02, .03, .2)), name='STARS &\nSTRIPES 7s', font='titan', outline=(.02, .03, .2), sparkle=(1, 1, 1), rays=26, pieces=[
+        (STARS_STRIPES['RED7'], (-1.85, 1.0, 0), 1.8, (0, 0, 10)), (STARS_STRIPES['WHITE7'], (0, 1.15, .3), 2.0, (0, 0, 0)), (STARS_STRIPES['BLUE7'], (1.85, 1.0, 0), 1.8, (0, 0, -10)),
+        (star, (-2.6, 2.1, -.3), .9, (0, 0, 12)), (star, (2.6, 2.1, -.3), .9, (0, 0, -12))]),
+    'DIAMOND_WILDS': dict(bg=((.75, .95, 1), (.15, .2, .6), (.0, .02, .1)), name='DIAMOND\nWILDS', font='abril', outline=(.0, .03, .12), sparkle=(.85, .95, 1), pieces=[
+        (DIAMOND['WILD5'], (0, 1.15, .3), 2.1, (0, 0, 0)), (DIAMOND['WILD2'], (-2.0, .95, 0), 1.6, (0, 0, 12)), (DIAMOND['WILD3'], (2.0, .95, 0), 1.6, (0, 0, -12))]),
+    'INFERNO_JACKPOT': dict(bg=EMBER, name='INFERNO\nJACKPOT', font='titan', pieces=[
+        (jackpot_flame, (0, 1.2, .3), 2.4, (0, 0, 0)), (devil_seven, (-2.0, .95, 0), 1.6, (0, 0, 12)), (devil_seven, (2.0, .95, 0), 1.6, (0, 0, -12))]),
     'SHERIFFS_GOLD': dict(bg=SUNSET, name="SHERIFF'S\nGOLD", font='titan', outline=(.14, .04, .0), pieces=[
         (prize_star, (0, 1.1, .35), 2.3, (0, 0, 8)), (cowboy_hat, (-2.0, 1.0, 0), 2.0, (0, 0, 10)), (horseshoe, (2.05, 1.05, 0), 1.5, (0, 0, -14)),
         (cactus, (-2.6, 2.1, -.4), 1.4, (0, 0, 0)), (cactus, (2.7, 2.15, -.4), 1.2, (0, 0, 0))]),
@@ -541,6 +599,11 @@ for name, build in MONSOON.items():
 # Sheriff's Gold's reel symbols (SG_<NAME>, named by the engine's symbols: SEVEN is the hat, BADGE the prize star); SG picks them all.
 for name, build in SHERIFF.items():
     if (ONLY and f'SG_{name}' in ONLY) or 'SG' in ONLY: sheriff_symbol(name, build)
+
+# The classic trio's symbols (SS_ / DW_ / IJ_<NAME>); SS, DW or IJ picks a set.
+for prefix, builds in CLASSIC_SETS.items():
+    for name, build in builds.items():
+        if (ONLY and f'{prefix}_{name}' in ONLY) or prefix in ONLY: reset(); build(); render(f'{prefix}_{name}')
 
 # Names on the command line pick what to render: a game code (its tile), BG_<CODE> / LOGO_<CODE>, or BG / LOGO /
 # TILES for all of a kind. Nothing renders everything.

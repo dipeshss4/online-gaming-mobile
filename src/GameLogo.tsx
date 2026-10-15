@@ -110,6 +110,9 @@ export function GameLogo({ game, height = 40, maxWidth }: { game: Game; height?:
 export function themeOf(game: Game): GameTheme {
   const layout = game.engine?.layout;
   if (game.code === 'VEGAS_JACKPOT_DEVIL_HEART' || layout === 'CLASSIC_5L') return { background: ['#4a0a06', '#250404', '#120102'], frame: '#ff7a1a', accent: '#ffd23f', reels: '#1a0204', mood: 'embers' };
+  if (game.code === 'STARS_STRIPES_7S') return { background: ['#14245a', '#0a1440', '#030820'], frame: '#e8ecf5', accent: '#ffe58a', reels: '#060c2a', mood: 'sparkle' };
+  if (game.code === 'DIAMOND_WILDS') return { background: ['#12306a', '#081638', '#020818'], frame: '#9ae0ff', accent: '#ffe58a', reels: '#040a20', mood: 'sparkle' };
+  if (game.code === 'INFERNO_JACKPOT') return { background: ['#5a1206', '#250402', '#0e0101'], frame: '#ff8a2a', accent: '#ffd23f', reels: '#120201', mood: 'embers' };
   if (layout === 'CASH_5X3') return { background: ['#0a4a36', '#04201a', '#020c0a'], frame: '#f2c14a', accent: '#ffe58a', reels: '#04201a', mood: 'sparkle' };
   if (layout === 'LINES_5X3') return { background: ['#4a0a4a', '#1e0628', '#0a0310'], frame: '#e8c45a', accent: '#ffe58a', reels: '#14061c', mood: 'sparkle' };
   if (layout === 'FIRE_LINK') return { background: ['#5a1206', '#250402', '#0e0101'], frame: '#ff8a2a', accent: '#ffd23f', reels: '#120201', mood: 'embers' };

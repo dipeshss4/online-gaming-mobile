@@ -65,7 +65,7 @@ for folder, longest in (('assets/logos', 560), ('../frontend/public/art/logos', 
         logos[code] = round(art.width / art.height, 3)
     if logos: print('wrote', folder, len(logos), 'logos,', sum(os.path.getsize(os.path.join(out, f'{c}.png')) for c in logos) // 1024, 'KB')
 # Each game's own reel symbols, by render prefix and folder (MM_<NAME> to monsoon/, ...), trimmed to their art.
-SYMBOL_SETS = {'MM': 'monsoon', 'SG': 'sheriff'}
+SYMBOL_SETS = {'MM': 'monsoon', 'SG': 'sheriff', 'SS': 'stars-stripes', 'DW': 'diamond-wilds', 'IJ': 'inferno'}
 packed = 0
 for prefix, name in SYMBOL_SETS.items():
     symbols = sorted(f[len(prefix) + 1:-4] for f in os.listdir(RENDERS) if f.startswith(prefix + '_') and f.endswith('.png'))
