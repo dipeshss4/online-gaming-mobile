@@ -22,7 +22,7 @@ catch { defaults = { brand: { logoGlyph: '7', tagline: 'THE ORIGINAL COLLECTION'
   signIn: { formKicker: "MEMBERS' ENTRANCE", loginTitle: 'Welcome back.', loginSubtitle: 'Your next game is waiting.', registerTitle: 'Join the floor.', registerSubtitle: 'Create your demo player account.', registrationClosed: 'New accounts are paused right now.' },
   lobby: { welcomeLabel: 'THE ORIGINAL COLLECTION', heroEnabled: true, featuredGameCode: 'HOT_7S', heroEyebrow: 'IN THE SPOTLIGHT', heroHeadline: 'A classic feeling.', heroAccent: 'A fresh spin.', heroBody: 'Discover {game} and find your rhythm.', heroNote: 'PLAY WITH DEMO CREDITS · NO CASH VALUE', heroArtLabel: 'ONLINE GAME ORIGINAL', quickLinkTitle: 'Your game. Your pace.', quickLinkBody: 'Original games, one demo wallet.', libraryEyebrow: 'FIND YOUR NEXT FAVORITE', defaultBadge: 'ONLINE GAME ORIGINAL' } } }
 const findings = []
-let luxuryRounds = 0, luxuryFree = false, diamondRounds = 0
+let luxuryRounds = 0, luxuryFree = false, diamondRounds = 0, monsoonRounds = 0
 const now = new Date().toISOString()
 
 // The welcome pop-up and new-message pop-up are switched off until their own scenario, so they do not cover the
@@ -244,6 +244,12 @@ await page.route('**/api/**', async route => {
       const screen = ['JACKPOT', 'JACKPOT', 'JACKPOT', 'BAR1', 'SEVEN', 'BAR2', 'BLANK', 'BAR3', 'BLANK']
       return json({ requestId: body.requestId, betId: 'd2', gameCode: 'VEGAS_JACKPOT_DEVIL_HEART', symbols: [...screen, 'JP20'], stake: body.stake,
         payout: 2, balance: 127.78, currency: 'USD', outcome: 'JACKPOT', multiplier: 20 })
+    }
+    if (path === '/api/games/MONEY_MONSOON/play' && monsoonRounds++ > 0) {
+      // Six coins start the storm; the first respin drops two more on reel four, then three empty respins: 29 bets.
+      const screen = ['CASH:1', 'DICE', 'CASH:2', 'CARDS', 'VAULT', 'CASH:5', 'CASH:1', 'CHIPS', 'CASH:3', 'GOLD', 'WATCH', 'CASH:2', 'DICE', 'CARDS', 'CROWN']
+      return json({ requestId: body.requestId, betId: 'mm2', gameCode: 'MONEY_MONSOON', symbols: [...screen, 'STORM', 'R', '3:CASH:10', '13:CASH:5', 'R', 'R', 'R'], stake: body.stake,
+        payout: Math.round(29 * body.stake * 100) / 100, balance: 179.15, currency: 'USD', outcome: 'JACKPOT', multiplier: 29 })
     }
     if (path === '/api/games/MONEY_MONSOON/play') {
       // Three coins (5x, 2x and 25x the bet) and the VAULT on reel five: it collects 32 bets; no line pays.
@@ -889,6 +895,17 @@ await page.getByRole('button', { name: /Tap to skip the count/ }).click({ timeou
 await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
 await audit('40-money-monsoon-done')
 console.log('## money monsoon  (three coins, the VAULT collects 32 bets, 4.80)')
+// The next round is a storm: six coins lock, two drop in, the respins run out and the vault takes the board, 4.35.
+await page.getByRole('button', { name: 'Spin', exact: true }).click({ timeout: 15000 })
+await page.getByText('MONEY STORM!').first().waitFor({ timeout: 15000 }).catch(() => findings.push('money monsoon: the storm was never announced'))
+await page.getByText(/^RESPINS LEFT · /).first().waitFor({ timeout: 10000 }).catch(() => findings.push('money monsoon: the storm respins did not show'))
+await page.waitForTimeout(1500)
+await page.screenshot({ path: `${OUT}/40b-money-storm.png` })
+await page.getByText('WIN 4.35').waitFor({ timeout: 40000 }).catch(() => findings.push("money monsoon: the storm never showed the server's 4.35"))
+await page.getByRole('button', { name: /Tap to skip the count/ }).click({ timeout: 8000 }).catch(() => {})
+await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
+await audit('40c-money-storm-done')
+console.log('## money storm  (six coins lock, two drop in, the vault takes 29 bets, 4.35)')
 await page.getByLabel('Back to lobby').first().click()
 await page.getByRole('tab', { name: 'OTHER' }).click()
 
