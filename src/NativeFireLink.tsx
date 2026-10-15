@@ -50,20 +50,39 @@ function parseRound(symbols: string[]) {
   return { base, link: symbols.includes('LINK'), respins, grand: symbols.includes('GRAND') };
 }
 
-/** A cell's art: a fireball with its prize, the wild, or a classic symbol. */
-function Cell({ cell, size, stake }: { cell: string; size: number; stake: number }) {
+/**
+ * The hold-and-spin games share this player and FireLinkEngine's rounds; each brings its own look. Break the Bank draws
+ * the shared slot symbols and fireballs; Sheriff's Gold draws the West (assets/sheriff, named by the engine's symbols:
+ * SEVEN is the hat, BADGE the prize star) and calls the feature the Gold Rush.
+ */
+type Look = { art?: Record<string, number>; ball: number; jackpots: Record<string, number>; balls: string; feature: string; frame: [string, string, string]; board: [string, string]; ink: string };
+const LOOKS: Record<string, Look> = {
+  BREAK_THE_BANK: { ball: ART.FIRE, jackpots: { MINI: ART.MINI, MINOR: ART.MINOR, MAJOR: ART.MAJOR }, balls: 'FIREBALLS', feature: 'FIRE LINK',
+    frame: ['#ffd08a', '#c0300f', '#3a0802'], board: ['#2a0a06', '#120201'], ink: '#ffffff' },
+  SHERIFFS_GOLD: {
+    art: { SEVEN: require('../assets/sheriff/SEVEN.png'), BAR: require('../assets/sheriff/BAR.png'), BELL: require('../assets/sheriff/BELL.png'), STAR: require('../assets/sheriff/STAR.png'),
+      ORANGE: require('../assets/sheriff/ORANGE.png'), CHERRY: require('../assets/sheriff/CHERRY.png'), WILD: require('../assets/sheriff/WILD.png') },
+    ball: require('../assets/sheriff/BADGE.png'), jackpots: { MINI: require('../assets/sheriff/MINI.png'), MINOR: require('../assets/sheriff/MINOR.png'), MAJOR: require('../assets/sheriff/MAJOR.png') },
+    balls: 'SHERIFF STARS', feature: 'GOLD RUSH', frame: ['#ffe8a0', '#a8660c', '#3a1c02'], board: ['#3a2210', '#140a03'], ink: '#3a1c00' },
+};
+const lookOf = (game: Game) => LOOKS[game.code] ?? LOOKS.BREAK_THE_BANK;
+
+/** A cell's art: a prize ball (fireball, star) with its prize, the wild, or a symbol. */
+function Cell({ cell, size, stake, look }: { cell: string; size: number; stake: number; look: Look }) {
   if (isBall(cell)) {
     const jackpot = ['MINI', 'MINOR', 'MAJOR'].includes(cell);
-    return <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel={jackpot ? `${cell} jackpot` : `fireball ${cash(BALLS[cell] * stake)}`}>
-      <Image source={ART[jackpot ? cell : 'FIRE']} style={{ width: size * 1.1, height: size * 1.1 }} resizeMode="contain" />
-      <Text style={[f.ballText, { fontSize: Math.max(11, size * (jackpot ? .17 : .26)) }, jackpot && { color: c.gold }]} numberOfLines={1} adjustsFontSizeToFit>{jackpot ? cell : short(BALLS[cell] * stake)}</Text>
+    return <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel={jackpot ? `${cell} jackpot` : `${look.balls.toLowerCase().replace(/s$/, '')} ${cash(BALLS[cell] * stake)}`}>
+      <Image source={jackpot ? look.jackpots[cell] : look.ball} style={{ width: size * 1.1, height: size * 1.1 }} resizeMode="contain" />
+      <Text style={[f.ballText, { fontSize: Math.max(11, size * (jackpot ? .17 : .26)) }, jackpot ? { color: c.gold } : { color: look.ink }]} numberOfLines={1} adjustsFontSizeToFit>{jackpot ? cell : short(BALLS[cell] * stake)}</Text>
     </View>;
   }
+  if (look.art?.[cell]) return <Image source={look.art[cell]} style={{ width: size, height: size }} resizeMode="contain" accessibilityLabel={cell.toLowerCase()} />;
   if (cell === 'WILD') return <Image source={require('../assets/video/WILD.png')} style={{ width: size, height: size }} resizeMode="contain" accessibilityLabel="wild" />;
   return <SymbolArt symbol={cell === 'SEVEN' ? '7' : cell} size={size} />;
 }
 
 export function NativeFireLink({ game, token, userId, initialBalance, onClose, onSettled }: { game: Game; token: string; userId: string; initialBalance: Balance | null; onClose: () => void; onSettled: () => void }) {
+  const look = lookOf(game), idle = `SIX ${look.balls} START THE ${look.feature}`;
   const [stake, setStake] = useState(game.minStake), [wallet, setWallet] = useState(initialBalance);
   const [pending, setPending] = useState<PendingBet | null>(null), [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [reduced, setReduced] = useState(false);
@@ -73,7 +92,7 @@ export function NativeFireLink({ game, token, userId, initialBalance, onClose, o
   const [left, setLeft] = useState(3), [linkTotal, setLinkTotal] = useState(0), [banner, setBanner] = useState<string | null>(null);
   // Near-miss suspense: the reel the feature now hangs on (and every one after it) spins on, slower and glowing.
   const [teaseFrom, setTeaseFrom] = useState<number | null>(null);
-  const [meter, setMeter] = useState(0), [win, setWin] = useState<Win | null>(null), [status, setStatus] = useState('SIX FIREBALLS START THE FIRE LINK');
+  const [meter, setMeter] = useState(0), [win, setWin] = useState<Win | null>(null), [status, setStatus] = useState(idle);
   const alive = useRef(true), lock = useRef(false), fast = useRef(false);
   const drop = useRef(new Animated.Value(1)).current, slam = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -123,7 +142,7 @@ export function NativeFireLink({ game, token, userId, initialBalance, onClose, o
       if (round.link && alive.current) {
         const held = new Set(round.base.map((cell, i) => isBall(cell) ? i : -1).filter(i => i >= 0));
         const cells = [...round.base]; let total = [...held].reduce((sum, i) => sum + BALLS[cells[i]], 0);
-        feel('win'); sound.play('bigwin'); await show('FIRE LINK!', 1500);
+        feel('win'); sound.play('bigwin'); await show(`${look.feature}!`, 1500);
         setRows([]); setLink(true); setLocked(new Set(held)); setLinkTotal(total * data.stake); setLeft(3);
         let remaining = 3;
         for (const landed of round.respins) {
@@ -140,7 +159,7 @@ export function NativeFireLink({ game, token, userId, initialBalance, onClose, o
       }
       if (!alive.current) return;
       setMeter(data.payout); setWallet(current => current ? { ...current, balance: data.balance, currency: data.currency } : current);
-      setStatus(data.payout > 0 ? `WIN ${cash(data.payout)}` : 'SIX FIREBALLS START THE FIRE LINK');
+      setStatus(data.payout > 0 ? `WIN ${cash(data.payout)}` : idle);
       feel(data.payout > 0 ? 'win' : 'tap'); sound.result(data.payout > 0 ? data.multiplier : 0);
       if (data.payout > 0) setWin({ payout: data.payout, stake: data.stake, multiplier: data.multiplier, currency: data.currency, id: data.betId });
       play.pace.report({ payout: data.payout, stake: data.stake, multiplier: data.multiplier });
@@ -148,7 +167,7 @@ export function NativeFireLink({ game, token, userId, initialBalance, onClose, o
     } catch (e) {
       if (!alive.current) return;
       if (!pending && e instanceof ApiError && [400, 401, 403, 404, 422, 429].includes(e.status)) await clearPending(userId).then(() => setPending(null)).catch(() => {});
-      feel('warn'); setStatus('SIX FIREBALLS START THE FIRE LINK');
+      feel('warn'); setStatus(idle);
       setError(`${e instanceof Error ? e.message : 'Unable to play'}${submitted ? ' If a bet is pending, use Recover with the same request ID.' : ''}`);
     } finally { lock.current = false; if (alive.current) { setBusy(false); setStopped(REELS); } }
   }
@@ -174,23 +193,23 @@ export function NativeFireLink({ game, token, userId, initialBalance, onClose, o
       const size = Math.max(36, Math.floor(Math.min((stage.height - 34) / ROWS, (stage.width - 230) / (REELS * 1.2))));
       return <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         <View style={f.jackpots}>{jackpots.map(([name, x]) => <View key={name} style={[f.jp, name === 'GRAND' && f.jpGrand]}><Text style={[f.jpName, { color: name === 'MINI' ? '#5aff9d' : name === 'MINOR' ? '#5ac8ff' : name === 'MAJOR' ? '#ff8aff' : c.gold }]}>{name}</Text><Text style={f.jpValue}>{cash(x * stake)}</Text></View>)}</View>
-        <MarqueeFrame colors={['#ffd08a', '#c0300f', '#3a0802']} bulb="#ffcf80" excited={link || rows.length > 0} reduced={reduced}>
-          <View style={[f.board, link && { backgroundColor: '#050000' }]}>
+        <MarqueeFrame colors={look.frame} bulb="#ffcf80" excited={link || rows.length > 0} reduced={reduced}>
+          <View style={[f.board, { backgroundColor: look.board[1] }, link && { backgroundColor: '#050000' }]}>
             {Array.from({ length: REELS }, (_, reel) => link
               ? <View key={reel} style={{ width: size * 1.2, gap: 0 }}>{Array.from({ length: ROWS }, (_, row) => { const i = row * REELS + reel;
                 return <View key={row} style={[f.linkCell, { height: size }, locked.has(i) && f.lockedCell]}>
-                  {locked.has(i) && <Animated.View style={fresh.has(i) ? { transform: [{ scale: drop.interpolate({ inputRange: [0, 1], outputRange: [1.8, 1] }) }], opacity: drop } : undefined}><Cell cell={board[i]} size={size * .92} stake={stake} /></Animated.View>}
+                  {locked.has(i) && <Animated.View style={fresh.has(i) ? { transform: [{ scale: drop.interpolate({ inputRange: [0, 1], outputRange: [1.8, 1] }) }], opacity: drop } : undefined}><Cell cell={board[i]} size={size * .92} stake={stake} look={look} /></Animated.View>}
                 </View>; })}</View>
               : <SpinReel key={reel} index={reel} size={size} width={size * 1.2} reduced={reduced} strip={STRIP} spinning={busy && stopped <= reel} tease={busy && teaseFrom !== null && reel >= teaseFrom && stopped <= reel}
                 cells={Array.from({ length: ROWS }, (_, row) => board[row * REELS + reel])}
                 lit={row => rows.includes(row) ? c.gold : null} dim={rows.length > 0}
-                render={(cell, cellSize) => <Cell cell={cell} size={cellSize * .86} stake={stake} />} />)}
+                render={(cell, cellSize) => <Cell cell={cell} size={cellSize * .86} stake={stake} look={look} />} />)}
           </View>
         </MarqueeFrame>
         <View style={[f.linkBar, !link && { opacity: 0 }]} accessibilityElementsHidden={!link}>
           <Text style={f.linkLabel}>RESPINS</Text>
           <View style={f.respins}>{[1, 2, 3].map(n => <View key={n} style={[f.light, n <= left && f.lightOn]} />)}</View>
-          <Text style={f.linkLabel}>FIRE LINK</Text><Text style={f.linkTotal} numberOfLines={1} adjustsFontSizeToFit>{cash(linkTotal)}</Text>
+          <Text style={f.linkLabel}>{look.feature}</Text><Text style={f.linkTotal} numberOfLines={1} adjustsFontSizeToFit>{cash(linkTotal)}</Text>
         </View>
       </View>;
     }}

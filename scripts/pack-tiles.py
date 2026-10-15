@@ -64,18 +64,22 @@ for folder, longest in (('assets/logos', 560), ('../frontend/public/art/logos', 
         art.save(os.path.join(out, f'{code}.png'), optimize=True)
         logos[code] = round(art.width / art.height, 3)
     if logos: print('wrote', folder, len(logos), 'logos,', sum(os.path.getsize(os.path.join(out, f'{c}.png')) for c in logos) // 1024, 'KB')
-# Money Monsoon's reel symbols (MM_<NAME>), trimmed to their art.
-monsoon = sorted(f[3:-4] for f in os.listdir(RENDERS) if f.startswith('MM_') and f.endswith('.png'))
-for folder in ('assets/monsoon', '../frontend/public/art/monsoon'):
-    out = os.path.join(ROOT, folder); os.makedirs(out, exist_ok=True)
-    for name in monsoon:
-        art = Image.open(os.path.join(RENDERS, f'MM_{name}.png')).convert('RGBA')
-        box = art.getchannel('A').point(lambda a: 255 if a > 8 else 0).getbbox(); pad = int(max(box[2] - box[0], box[3] - box[1]) * .04)
-        art = art.crop((max(0, box[0] - pad), max(0, box[1] - pad), min(art.width, box[2] + pad), min(art.height, box[3] + pad)))
-        k = 300 / max(art.size); art.resize((round(art.width * k), round(art.height * k)), Image.LANCZOS).save(os.path.join(out, f'{name}.png'), optimize=True)
-    if monsoon: print('wrote', folder, len(monsoon), 'symbols')
+# Each game's own reel symbols, by render prefix and folder (MM_<NAME> to monsoon/, ...), trimmed to their art.
+SYMBOL_SETS = {'MM': 'monsoon', 'SG': 'sheriff'}
+packed = 0
+for prefix, name in SYMBOL_SETS.items():
+    symbols = sorted(f[len(prefix) + 1:-4] for f in os.listdir(RENDERS) if f.startswith(prefix + '_') and f.endswith('.png'))
+    for folder in (f'assets/{name}', f'../frontend/public/art/{name}'):
+        out = os.path.join(ROOT, folder); os.makedirs(out, exist_ok=True)
+        for symbol in symbols:
+            art = Image.open(os.path.join(RENDERS, f'{prefix}_{symbol}.png')).convert('RGBA')
+            box = art.getchannel('A').point(lambda a: 255 if a > 8 else 0).getbbox(); pad = int(max(box[2] - box[0], box[3] - box[1]) * .04)
+            art = art.crop((max(0, box[0] - pad), max(0, box[1] - pad), min(art.width, box[2] + pad), min(art.height, box[3] + pad)))
+            k = 300 / max(art.size); art.resize((round(art.width * k), round(art.height * k)), Image.LANCZOS).save(os.path.join(out, f'{symbol}.png'), optimize=True)
+        if symbols: print('wrote', folder, len(symbols), 'symbols')
+    packed += len(symbols)
 
-if not (codes or scenes or logos or monsoon): sys.exit(f'no renders in {RENDERS}')
+if not (codes or scenes or logos or packed): sys.exit(f'no renders in {RENDERS}')
 if scenes or logos:
     with open(os.path.join(ROOT, 'src/sceneArt.ts'), 'w') as f:
         f.write(HEADER + '/** Each game\'s rendered scene, drawn behind its reels (16:9). */\n')

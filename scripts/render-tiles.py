@@ -233,6 +233,104 @@ MONSOON = {'CROWN': crown, 'DIAMOND': lux_ring, 'GOLD': lambda: lux_bars(GOLD())
 def monsoon_symbol(name, build):
     reset(); build(); render(f'MM_{name}')
 
+
+# ---------------------------------------------------------------- Sheriff's Gold's pieces (the old West)
+FELT = lambda: mat('Felt', (.09, .045, .015), rough=.75, bump=.08, bump_scale=120)
+LEATHER = lambda: mat('Leather', (.13, .045, .012), rough=.4, coat=.5, bump=.06, bump_scale=60)
+ROPE = lambda: mat('Rope', (.3, .18, .06), rough=.8, bump=.3, bump_scale=90)
+CACTUS_GREEN = lambda: mat('Cactus', (.015, .13, .035), rough=.5, coat=.3, bump=.12, bump_scale=40)
+PAPER = lambda: mat('Paper', (.86, .74, .5), rough=.9, bump=.05, bump_scale=30)
+INK = lambda: mat('Ink', (.18, .07, .02), rough=.7)
+
+def hat_parts():
+    """A cowboy hat: a pinched crown over a wide brim that curls up at the sides, with a band."""
+    lathe([(0, .95), (.3, .98), (.5, .9), (.56, .6), (.58, .25), (.6, .2), (1.05, .16), (1.3, .26), (1.42, .42)], FELT(), thickness=.05)
+    bpy.ops.mesh.primitive_torus_add(major_radius=.585, minor_radius=.06, location=(0, 0, .3)); add(bpy.context.object, LEATHER()); bpy.ops.object.shade_smooth()
+    star_badge((.0, -.62, .34), .14, SATIN_GOLD())
+    for o in bpy.context.scene.objects:
+        if o.name.startswith('Lathe'): o.scale = (1, .82, 1)
+def cowboy_hat(): tilted(hat_parts, (-62, 0, 0))
+
+def boot():
+    """A cowboy boot side on, with a heel, a pointed toe and a gold star on the shaft."""
+    outline = [(-.45, 1.2), (.15, 1.2), (.2, .2), (.55, .05), (1.05, -.15), (1.1, -.35), (.4, -.42), (.2, -.62), (-.15, -.62), (-.2, -.42), (-.45, -.4)]
+    prism(outline, .45, .22, LEATHER(), .06)
+    prism([(-.47, 1.22), (.17, 1.22), (.17, 1.05), (-.47, 1.05)], .5, .25, mat('Trim', (.15, .05, .02), rough=.4, coat=.6), .03)
+    star_badge((-.15, .55, .26), .22, SATIN_GOLD())
+
+def horseshoe():
+    """A gold horseshoe, open end up, with its nail holes."""
+    pts = [(math.cos(a) * .85, math.sin(a) * .95 - .1, 0) for a in [math.radians(d) for d in range(-30, 211, 20)]]
+    o = tube(pts, .16, SATIN_GOLD()); o.data.bevel_resolution = 8
+    for a in [math.radians(d) for d in (0, 40, 140, 180)]:
+        sphere((math.cos(a) * .85, math.sin(a) * .95 - .1, .14), (.05, .05, .02), DARK_GOLD(), 12)
+
+def cactus():
+    """A saguaro: a ribbed trunk with two arms and a pink flower."""
+    g = CACTUS_GREEN()
+    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=.32, depth=2.0, location=(0, 0, 0)); trunk = bpy.context.object
+    trunk.rotation_euler = (math.radians(90), 0, 0); add(trunk, g); bpy.ops.object.shade_smooth()
+    sphere((0, 1.0, 0), (.32, .32, .32), g, 24)
+    tube([(.3, .1, 0), (.75, .15, 0), (.8, .55, 0), (.8, .85, 0)], .2, g); sphere((.8, .9, 0), (.2, .2, .2), g, 20)
+    tube([(-.3, -.2, 0), (-.7, -.15, 0), (-.75, .2, 0), (-.75, .45, 0)], .18, g); sphere((-.75, .5, 0), (.18, .18, .18), g, 20)
+    sphere((.05, 1.3, .1), (.14, .1, .1), mat('Flower', (1, .25, .55), rough=.4, sss=.3), 16)
+
+def poster():
+    """A WANTED poster on aged paper, nailed up."""
+    rounded_box((1.5, 2.0, .06), .03, PAPER(), loc=(0, 0, 0))
+    text('WANTED', .34, .02, .005, INK(), loc=(0, .62, .05))
+    text('$', 1.0, .03, .01, INK(), loc=(0, -.05, .05))
+    text('REWARD', .2, .02, .004, INK(), loc=(0, -.68, .05))
+    sphere((0, .9, .07), (.06, .06, .03), DARK_STEEL(), 12)
+
+def lasso():
+    """A coiled lasso: a loop of rope and its tail."""
+    bpy.ops.mesh.primitive_torus_add(major_radius=.85, minor_radius=.09, major_segments=96, location=(0, 0, 0)); loop = bpy.context.object
+    loop.scale = (1, .8, 1); add(loop, ROPE()); bpy.ops.object.shade_smooth()
+    bpy.ops.mesh.primitive_torus_add(major_radius=.72, minor_radius=.09, major_segments=96, location=(.08, -.05, .12)); add(bpy.context.object, ROPE()); bpy.ops.object.shade_smooth()
+    tube([(.7, -.5, .1), (1.0, -.8, .1), (1.1, -1.2, .1), (.9, -1.45, .1)], .09, ROPE())
+
+def wild_sign():
+    """WILD burned into a wooden plank, gold letters."""
+    rounded_box((2.4, 1.1, .2), .06, WOOD(), loc=(0, 0, 0))
+    text('WILD', .78, .08, .02, GOLD(), loc=(0, -.04, .14))
+    for x in (-1.05, 1.05): sphere((x, .4, .12), (.06, .06, .03), DARK_STEEL(), 12)
+
+def star_badge(loc, size, material, centre=None):
+    """A six-pointed sheriff's star with a ball on each point; {centre} paints its middle disc (for a printed prize)."""
+    pts = []
+    for i in range(12):
+        r = size * (1 if i % 2 == 0 else .52); a = math.pi / 2 + i * math.pi / 6
+        pts.append((loc[0] + r * math.cos(a), loc[1] + r * math.sin(a)))
+    star = prism(pts, size * .16, loc[2] + size * .08, material, size * .03)
+    for i in range(6):
+        a = math.pi / 2 + i * math.pi / 3
+        sphere((loc[0] + size * 1.04 * math.cos(a), loc[1] + size * 1.04 * math.sin(a), loc[2]), (size * .12,) * 3, material, 16)
+    if centre is not None:
+        bpy.ops.mesh.primitive_cylinder_add(vertices=64, radius=size * .42, depth=size * .05, location=(loc[0], loc[1], loc[2] + size * .1))
+        add(bpy.context.object, centre); bpy.ops.object.shade_smooth()
+    return star
+
+PAINTED_GOLD = lambda: mat('PaintedGold', (.95, .62, .1), rough=.4, coat=.3, emission=(1, .5, .05), strength=.12)
+def prize_star(): star_badge((0, 0, 0), 1.0, SATIN_GOLD(), centre=PAINTED_GOLD())
+def jackpot_star(metal, gem):
+    """A jackpot's star: {metal} with a {gem} at its heart (both made per render: a reset clears materials)."""
+    def build():
+        star_badge((0, 0, 0), 1.0, metal())
+        sphere((0, 0, .2), (.34, .34, .2), gem(), 32)
+    return build
+SILVER_STAR = lambda: mat('SilverStar', (.8, .82, .88), metallic=.75, rough=.32)
+# Stars and the horseshoe in satin gold: a mirror finish on their flat faces reflects the dark of the studio.
+SATIN_GOLD = lambda: mat('SatinGold', (1, .68, .18), metallic=.75, rough=.32)
+GEM = lambda colour: mat('Gem', colour, rough=.05, coat=1, sss=.2)
+
+SHERIFF = {'SEVEN': cowboy_hat, 'BAR': boot, 'BELL': horseshoe, 'STAR': cactus, 'ORANGE': poster, 'CHERRY': lasso, 'WILD': wild_sign,
+           'BADGE': prize_star, 'MINI': jackpot_star(SILVER_STAR, lambda: GEM((.05, .45, .15))), 'MINOR': jackpot_star(SILVER_STAR, lambda: GEM((.05, .15, .6))),
+           'MAJOR': jackpot_star(SATIN_GOLD, lambda: GEM((.6, .02, .05)))}
+
+def sheriff_symbol(name, build):
+    reset(); build(); render(f'SG_{name}')
+
 # ---------------------------------------------------------------- the tiles
 # Each tile: its backdrop (hot centre, middle, edge), its pieces (model, centre, size, turn) and its name.
 EMBER = ((1, .62, .16), (.62, .05, .02), (.07, .0, .02))
@@ -303,6 +401,9 @@ TILES = {
     'BREAK_THE_BANK': dict(bg=EMBER, name='BREAK\nTHE BANK', font='titan', pieces=[
         (lambda: lux_bars(GOLD()), (0, .85, .5), 2.1, (0, 0, 0)), (fire('MAJOR'), (-1.95, 1.15, 0), 1.6, (0, 0, 0)), (fire('FIRE'), (1.95, 1.15, 0), 1.6, (0, 0, 0)),
         (lux('COIN'), (0, 1.9, -.4), 1.2, (0, 0, 0))]),
+    'SHERIFFS_GOLD': dict(bg=SUNSET, name="SHERIFF'S\nGOLD", font='titan', outline=(.14, .04, .0), pieces=[
+        (prize_star, (0, 1.1, .35), 2.3, (0, 0, 8)), (cowboy_hat, (-2.0, 1.0, 0), 2.0, (0, 0, 10)), (horseshoe, (2.05, 1.05, 0), 1.5, (0, 0, -14)),
+        (cactus, (-2.6, 2.1, -.4), 1.4, (0, 0, 0)), (cactus, (2.7, 2.15, -.4), 1.2, (0, 0, 0))]),
     'MONEY_MONSOON': dict(bg=((.7, 1, .75), (.05, .38, .3), (.0, .05, .05)), name='MONEY\nMONSOON', font='titan', outline=(.0, .07, .04), sparkle=(1, .9, .5), pieces=[
         (vault, (0, 1.05, .3), 2.4, (0, 0, 0)), (rain_cloud, (-2.0, 1.4, 0), 1.9, (0, 0, 6)), (rain_cloud, (2.05, 1.45, 0), 1.8, (0, 0, -6)),
         (lambda: lux_bars(GOLD()), (0, .1, .6), 1.3, (0, 0, 0))]),
@@ -436,6 +537,10 @@ def scene_logo(code, spec):
 # Money Monsoon's reel symbols (MM_<NAME>, 512px, clear background); MM picks them all.
 for name, build in MONSOON.items():
     if (ONLY and f'MM_{name}' in ONLY) or 'MM' in ONLY: monsoon_symbol(name, build)
+
+# Sheriff's Gold's reel symbols (SG_<NAME>, named by the engine's symbols: SEVEN is the hat, BADGE the prize star); SG picks them all.
+for name, build in SHERIFF.items():
+    if (ONLY and f'SG_{name}' in ONLY) or 'SG' in ONLY: sheriff_symbol(name, build)
 
 # Names on the command line pick what to render: a game code (its tile), BG_<CODE> / LOGO_<CODE>, or BG / LOGO /
 # TILES for all of a kind. Nothing renders everything.

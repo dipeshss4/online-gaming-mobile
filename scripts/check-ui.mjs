@@ -73,6 +73,9 @@ const games = [
   { code: 'BREAK_THE_BANK', name: 'Break the Bank', description: 'Fire Link.', minStake: 0.2, maxStake: 10, engineType: 'FIRE_LINK', featuredSymbol: '7',
     engine: { layout: 'FIRE_LINK', symbols: ['SEVEN', 'BAR', 'BELL', 'STAR', 'ORANGE', 'CHERRY', 'WILD', 'F1', 'F2', 'MINI'], payline: [], rules: ['Six fireballs start the Fire Link.'], paytable: [] },
     presentation: { badge: 'NEW · FIRE LINK', tileSubtitle: 'GRAND 1,000X' } },
+  { code: 'SHERIFFS_GOLD', name: "Sheriff's Gold", description: 'Hold and win in the West.', minStake: 0.2, maxStake: 10, engineType: 'FIRE_LINK', featuredSymbol: 'STAR',
+    engine: { layout: 'FIRE_LINK', symbols: ['SEVEN', 'BAR', 'BELL', 'STAR', 'ORANGE', 'CHERRY', 'WILD', 'F1', 'F2', 'MINI'], payline: [], rules: ['Six sheriff stars start the Gold Rush.'], paytable: [] },
+    presentation: { badge: 'NEW · HOLD & WIN', tileSubtitle: 'GRAND 1,000X' } },
   { code: 'MONEY_MONSOON', name: 'Money Monsoon', description: 'Cash rains; the vault collects.', minStake: 0.15, maxStake: 30, engineType: 'CASH_5X3', featuredSymbol: 'STAR',
     engine: { layout: 'CASH_5X3', symbols: ['CROWN', 'DIAMOND', 'GOLD', 'WATCH', 'CHIPS', 'DICE', 'CARDS', 'WILD', 'CASH', 'VAULT'], payline: [], rules: ['The VAULT collects every CASH coin.'], paytable: [] },
     presentation: { badge: 'NEW · CASH COLLECT', tileSubtitle: 'THE VAULT COLLECTS' } },
@@ -258,6 +261,12 @@ await page.route('**/api/**', async route => {
       const screen = ['COIN', 'COIN', 'COIN', 'JET', 'RING', 'YACHT', 'DOUBLE', 'YACHT', 'YACHT', 'YACHT', 'SILVER', 'GOLD', 'WATCH', 'LIMO', 'GOLD']
       return json({ requestId: body.requestId, betId: 'll1', gameCode: 'LUXURY_LIFE', symbols: screen, stake: body.stake,
         payout: 10.12, balance: 177.07, currency: 'USD', outcome: 'JACKPOT', multiplier: 67.47 })
+    }
+    if (path === '/api/games/SHERIFFS_GOLD/play') {
+      // The same round as Break the Bank's below, in the West: seven stars start the Gold Rush and a MAJOR drops in.
+      const base = ['F2', 'BELL', 'F5', 'CHERRY', 'MINI', 'ORANGE', 'F1', 'STAR', 'F3', 'BAR', 'CHERRY', 'F10', 'BELL', 'SEVEN', 'ORANGE', 'STAR', 'BAR', 'F8', 'CHERRY', 'BELL']
+      return json({ requestId: body.requestId, betId: 'sg1', gameCode: 'SHERIFFS_GOLD', symbols: [...base, 'LINK', 'R', '13:MAJOR', '1:F5', 'R', 'R', 'R'], stake: body.stake,
+        payout: 41.8, balance: 167.1, currency: 'USD', outcome: 'JACKPOT', multiplier: 209 })
     }
     if (path === '/api/games/BREAK_THE_BANK/play') {
       // Seven fireballs start the Fire Link; one respin lands two more (a MAJOR among them), then three blanks.
@@ -702,6 +711,22 @@ await page.getByRole('button', { name: /Tap to skip the count/ }).click({ timeou
 await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
 await audit('33-fire-link-done')
 console.log('## fire link  (seven fireballs, a MAJOR drops in, respins run out, 41.80)')
+await page.getByLabel('Back to lobby').first().click()
+
+// Sheriff's Gold: the same hold-and-spin in the West: the stars start the Gold Rush, a MAJOR star drops in, 41.80.
+await page.getByLabel("Play Sheriff's Gold").first().click()
+await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {})
+await page.getByLabel(/^Reel 5:/).waitFor({ timeout: 15000 }).catch(() => findings.push("sheriff's gold: the five reels did not show"))
+await audit('41-sheriffs-gold')
+await page.getByRole('button', { name: 'Spin', exact: true }).click()
+await page.getByText('GOLD RUSH!').waitFor({ timeout: 15000 }).catch(() => findings.push("sheriff's gold: no GOLD RUSH banner"))
+await page.getByLabel('MAJOR jackpot').first().waitFor({ timeout: 15000 }).catch(() => findings.push("sheriff's gold: the MAJOR never dropped in"))
+await page.screenshot({ path: `${OUT}/41a-sheriffs-gold-rush.png` })
+await page.getByText('WIN 41.80').waitFor({ timeout: 20000 }).catch(() => findings.push("sheriff's gold: the round never showed the server's 41.80"))
+await page.getByRole('button', { name: /Tap to skip the count/ }).click({ timeout: 8000 }).catch(() => {})
+await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
+await audit('42-sheriffs-gold-done')
+console.log("## sheriff's gold  (seven stars, the Gold Rush, a MAJOR star, 41.80)")
 await page.getByLabel('Back to lobby').first().click()
 
 // Luxury Life: five yachts and a DOUBLE on the middle line; each paying line is drawn in turn, then MEGA WIN and 10.12.

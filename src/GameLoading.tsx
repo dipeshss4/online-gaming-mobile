@@ -20,6 +20,8 @@ const BY_KIND: Record<string, string[]> = {
   CASH_5X3: ['CASH coins land on reels one to four, each with a prize.', 'The VAULT on reel five collects every coin on the screen.'],
   LINES_5X3: ['Fifteen lines pay left to right from the first reel.', 'Every DOUBLE wild in a win doubles it: two make it 4x.'],
   FIRE_LINK: ['Six or more fireballs start the Fire Link.', 'Fill all twenty cells for the GRAND: 1,000x your bet.'],
+  // A game with its own words for a shared layout.
+  SHERIFFS_GOLD: ['Six or more sheriff stars start the Gold Rush.', 'Fill all twenty cells for the GRAND: 1,000x your bet.'],
   KENO: ['Mark up to 10 numbers. Quick pick chooses for you.', 'More numbers marked: rarer, bigger wins, up to 10,000x.'],
 };
 const THEMES: Record<string, [string, string]> = { FISH: ['#1fa6d6', '#041630'], CRASH: ['#2f7dff', '#0a1030'], ROULETTE: ['#1fae6a', '#06180f'], GRID_3X3: ['#ff6a1a', '#1a0602'], FIRE_LINK: ['#ff5a1a', '#1a0402'], LINES_5X3: ['#e8c45a', '#14041c'], KENO: ['#22e1ff', '#0b0626'], CLASSIC_5L: ['#ff3a00', '#1a0204'] };
@@ -28,7 +30,7 @@ const kindOf = (game: Game) => game.engineType === 'CRASH' || game.code === 'ASC
 export function GameLoading({ game, legal, onDone }: { game: Game; legal?: string; onDone: () => void }) {
   const { width, height } = useWindowDimensions(), landscape = width > height;
   const kind = kindOf(game), [glow, deep] = THEMES[kind] ?? ['#b84dff', '#12052b'];
-  const tips = [...(BY_KIND[kind] ?? []), ...(game.engine?.rules ?? []).slice(0, 2), ...GENERIC];
+  const tips = [...(BY_KIND[game.code] ?? BY_KIND[kind] ?? []), ...(game.engine?.rules ?? []).slice(0, 2), ...GENERIC];
   const [tip, setTip] = useState(() => Math.floor(Math.random() * tips.length));
   const [percent, setPercent] = useState(0);
   const progress = useRef(new Animated.Value(0)).current, fade = useRef(new Animated.Value(1)).current;
