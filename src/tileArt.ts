@@ -26,6 +26,7 @@ export const TILE_ART: Record<string, number> = {
   SHERIFFS_GOLD: require('../assets/tiles/SHERIFFS_GOLD.jpg'),
   SIMPLE_DOLLAR: require('../assets/tiles/SIMPLE_DOLLAR.jpg'),
   SOLAR_SEVENS: require('../assets/tiles/SOLAR_SEVENS.jpg'),
+  STARBALL_KENO: require('../assets/tiles/STARBALL_KENO.jpg'),
   STARS_STRIPES_7S: require('../assets/tiles/STARS_STRIPES_7S.jpg'),
   TEN_X_TRIPLE: require('../assets/tiles/TEN_X_TRIPLE.jpg'),
   TRIPLE_MATCH_SCRATCH: require('../assets/tiles/TRIPLE_MATCH_SCRATCH.jpg'),

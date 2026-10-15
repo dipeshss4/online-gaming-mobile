@@ -558,6 +558,8 @@ TILES = {
     'SHERIFFS_GOLD': dict(bg=SUNSET, name="SHERIFF'S\nGOLD", font='titan', outline=(.14, .04, .0), pieces=[
         (prize_star, (0, 1.1, .35), 2.3, (0, 0, 8)), (cowboy_hat, (-2.0, 1.0, 0), 2.0, (0, 0, 10)), (horseshoe, (2.05, 1.05, 0), 1.5, (0, 0, -14)),
         (cactus, (-2.6, 2.1, -.4), 1.4, (0, 0, 0)), (cactus, (2.7, 2.15, -.4), 1.2, (0, 0, 0))]),
+    'STARBALL_KENO': dict(bg=((1, .9, .55), (.35, .1, .6), (.02, .0, .08)), name='STARBALL\nKENO', font='titan', outline=(.05, .0, .12), sparkle=(1, .95, .7), rays=26, ray_strength=.35, pieces=[
+        (star, (0, 1.25, .4), 2.1, (0, 0, 0)), (keno, (-1.95, .9, 0), 1.9, (0, 0, 10)), (keno, (1.95, .9, 0), 1.9, (0, 0, -10))]),
     'KRAKENS_DEEP': dict(bg=((.85, .5, 1), (.25, .02, .4), (.01, .0, .05)), name="KRAKEN'S\nDEEP", font='titan', outline=(.06, .0, .1), sparkle=(.8, .6, 1), pieces=[
         (kraken, (0, 1.05, .2), 3.0, (0, 0, 0)), (lux('COIN'), (-2.35, .7, .4), 1.0, (0, 0, 15)), (lambda: lux_bars(GOLD()), (2.3, .65, .4), 1.2, (0, 0, -10))]),
     'SHARK_FRENZY': dict(bg=OCEAN, name='SHARK\nFRENZY', font='titan', outline=(.0, .04, .1), sparkle=(.7, 1, 1), pieces=[
