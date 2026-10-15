@@ -50,6 +50,9 @@ export function NativeKeno({ game, token, userId, initialBalance, onClose, onSet
 
   const shownPicks = pending?.gameCode === game.code && pending.selection ? pending.selection.split('-').map(Number) : picks;
   const hits = shownPicks.filter(n => drawn.includes(n)).length;
+  // Starball Keno: the twentieth ball drawn is the Starball; on one of the player's numbers it multiplies the win.
+  const starX = Number(game.engine?.art?.starball ?? 0), starball = starX && drawn.length === 20 ? drawn[19] : null;
+  const starHit = starball !== null && shownPicks.includes(starball) && !!result && result.payout > 0;
   const table = paysFor(game, shownPicks.length);
   const editable = !busy && !pending;
 
@@ -90,8 +93,11 @@ export function NativeKeno({ game, token, userId, initialBalance, onClose, onSet
       const balls = data.symbols.slice(1).map(Number), mine = bet.selection.split('-').map(Number);
       // The balls come out one at a time; a ball on the ticket gets its own sound.
       for (let i = 1; i <= balls.length && alive.current; i++) {
+        // The Starball comes last, after a pause.
+        if (starX && i === balls.length) { sound.play('tease'); await pace.pace.wait(900); }
         setDrawn(balls.slice(0, i));
         if (mine.includes(balls[i - 1])) { sound.play('reel-stop'); feel('select'); }
+        if (starX && i === balls.length && mine.includes(balls[i - 1])) { sound.play('bigwin'); feel('heavy'); }
         await pace.pace.wait(140);
       }
       if (!alive.current) return;
@@ -115,10 +121,11 @@ export function NativeKeno({ game, token, userId, initialBalance, onClose, onSet
 
   const board = (cell: number, columns: number) => <View style={[k.board, { width: cell * columns + 12 }]} accessibilityLabel="Keno board">
     {Array.from({ length: NUMBERS }, (_, i) => i + 1).map(n => {
-      const marked = shownPicks.includes(n), out = drawn.includes(n), hit = marked && out;
+      const marked = shownPicks.includes(n), out = drawn.includes(n), hit = marked && out, star = n === starball;
       return <Tap key={n} haptic="none" disabled={!editable} accessibilityLabel={`Number ${n}${marked ? ', marked' : ''}${out ? ', drawn' : ''}`} accessibilityState={{ selected: marked }}
         onPress={() => toggle(n)} style={{ width: cell, height: cell, padding: 2 }}>
-        {hit ? <LinearGradient colors={['#5aff9d', '#12a85a']} style={k.ball}><Text style={[k.number, { color: '#04220f', fontSize: Math.max(11, cell * .4) }]}>{n}</Text></LinearGradient>
+        {star ? <LinearGradient colors={['#fff6c0', '#ffb01f', '#a8600a']} style={[k.ball, k.star]}><Text style={[k.number, { color: '#3a1c00', fontSize: Math.max(11, cell * .4) }]}>{n}</Text></LinearGradient>
+          : hit ? <LinearGradient colors={['#5aff9d', '#12a85a']} style={k.ball}><Text style={[k.number, { color: '#04220f', fontSize: Math.max(11, cell * .4) }]}>{n}</Text></LinearGradient>
           : marked ? <LinearGradient colors={['#ffe45c', '#ff9f1a']} style={k.ball}><Text style={[k.number, { color: c.goldInk, fontSize: Math.max(11, cell * .4) }]}>{n}</Text></LinearGradient>
           : <View style={[k.ball, k.plain, out && k.out]}><Text style={[k.number, { fontSize: Math.max(11, cell * .36) }, out && { color: '#ffffff' }]}>{n}</Text></View>}
       </Tap>;
@@ -131,6 +138,8 @@ export function NativeKeno({ game, token, userId, initialBalance, onClose, onSet
       <View style={k.stat}><Text style={k.statLabel}>MARKED</Text><Text style={k.statValue}>{shownPicks.length}/{MAX_PICKS}</Text></View>
       <View style={k.stat}><Text style={k.statLabel}>DRAWN</Text><Text style={k.statValue}>{drawn.length}/20</Text></View>
       <View style={k.stat}><Text style={k.statLabel}>HITS</Text><Text style={[k.statValue, { color: c.win }]}>{hits}</Text></View>
+      {starX > 0 && <View style={[k.stat, starHit && { borderWidth: 1.5, borderColor: c.gold }]}><Text style={k.statLabel}>STARBALL</Text>
+        <Text style={[k.statValue, { color: c.gold }]}>{starHit ? `×${starX}!` : starball ?? '★'}</Text></View>}
     </View>
     <View style={k.row}>
       <Tap haptic="select" disabled={!editable} onPress={quickPick} style={[k.small, { flex: 1 }]}><Text style={s.accent} numberOfLines={1}>⚡ Quick</Text></Tap>
@@ -142,7 +151,7 @@ export function NativeKeno({ game, token, userId, initialBalance, onClose, onSet
     </View>)}</ScrollView>
   </LinearGradient>;
 
-  const status = busy ? 'DRAWING…' : result ? `${hits} ${hits === 1 ? 'HIT' : 'HITS'} · ${result.payout > 0 ? `WIN ${cash(result.payout)}` : 'NO WIN THIS DRAW'}` : 'MARK YOUR NUMBERS';
+  const status = busy ? 'DRAWING…' : result ? `${hits} ${hits === 1 ? 'HIT' : 'HITS'} · ${result.payout > 0 ? `WIN ${cash(result.payout)}` : 'NO WIN THIS DRAW'}${starHit ? ` · STARBALL ×${starX}` : ''}` : 'MARK YOUR NUMBERS';
   return <GameShell game={game} play={{ ...pace, stake: pending ? pending.stake : Number(stake) || game.minStake }} balance={wallet} onBack={onClose} backDisabled={busy} status={status}
     notice={error ? <Text accessibilityRole="alert" style={s.error}>{error}</Text>
       : pending && !busy ? `Pending: ${pending.gameCode} · ${cash(pending.stake)}. ${pending.gameCode !== game.code ? 'Open that game to recover the ticket.' : 'PLAY resends this exact ticket, not a new bet.'}` : undefined}
@@ -175,6 +184,7 @@ const k = StyleSheet.create({
   stage: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, borderRightWidth: 1, borderRightColor: '#22e1ff44' },
   board: { flexDirection: 'row', flexWrap: 'wrap', padding: 4, borderRadius: 14, borderWidth: 2, borderColor: '#22e1ff', backgroundColor: '#0e1a3a' },
   ball: { flex: 1, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  star: { borderWidth: 2, borderColor: '#fff3b0', shadowColor: '#ffd23f', shadowOpacity: 1, shadowRadius: 10, shadowOffset: { width: 0, height: 0 }, elevation: 8 },
   plain: { backgroundColor: '#1d2a55', borderWidth: 1, borderColor: '#3c5a9a' },
   out: { backgroundColor: '#3c7bff', borderColor: '#9ec0ff' },
   number: { color: '#bfd4ff', fontWeight: '900' },

@@ -1,4 +1,5 @@
 import type { Ctx2D, Gradient } from './skiaCtx'
+import { FISH_THEMES, type FishTheme } from './themes'
 
 /**
  * Dragon Tide's art, the same drawings as the website's fish table (frontend/src/FishTable.tsx), drawn through a
@@ -242,16 +243,16 @@ export const DRAGON_TRAIL = 26, TRAIL_GAP = 13
 
 // ------------------------------------------------------------------ the static seabed, drawn once
 
-export function paintSeabed(c: Ctx2D) {
+export function paintSeabed(c: Ctx2D, theme: FishTheme = FISH_THEMES.DRAGON_TIDE) {
   const sea = c.createLinearGradient(0, 0, 0, H)
-  sea.addColorStop(0, '#0e6c8f'); sea.addColorStop(.35, '#0a4467'); sea.addColorStop(.75, '#06264a'); sea.addColorStop(1, '#041630')
+  sea.addColorStop(0, theme.sea[0]); sea.addColorStop(.35, theme.sea[1]); sea.addColorStop(.75, theme.sea[2]); sea.addColorStop(1, theme.sea[3])
   c.fillStyle = sea; c.fillRect(0, 0, W, H)
-  const glow = c.createRadialGradient(W / 2, -80, 40, W / 2, -80, 700); glow.addColorStop(0, '#7fe9ff55'); glow.addColorStop(1, '#7fe9ff00')
+  const glow = c.createRadialGradient(W / 2, -80, 40, W / 2, -80, 700); glow.addColorStop(0, theme.glow); glow.addColorStop(1, theme.glow.slice(0, 7) + '00')
   c.fillStyle = glow; c.fillRect(0, 0, W, H)
   // Far rocks, then sand, then near coral.
-  c.fillStyle = '#0a2b45'
+  c.fillStyle = theme.rocks
   c.beginPath(); c.moveTo(0, H); for (let x = 0; x <= W; x += 40) c.lineTo(x, H - 150 - Math.sin(x / 130) * 40 - Math.sin(x / 47) * 12); c.lineTo(W, H); c.fill()
-  const sand = c.createLinearGradient(0, H - 110, 0, H); sand.addColorStop(0, '#2c5a6e'); sand.addColorStop(1, '#173347')
+  const sand = c.createLinearGradient(0, H - 110, 0, H); sand.addColorStop(0, theme.sand[0]); sand.addColorStop(1, theme.sand[1])
   c.fillStyle = sand; c.beginPath(); c.moveTo(0, H); for (let x = 0; x <= W; x += 20) c.lineTo(x, H - 78 - Math.sin(x / 90) * 14); c.lineTo(W, H); c.fill()
   const coral = (x: number, y: number, color: string, scale: number) => {
     c.strokeStyle = color; c.lineCap = 'round'
@@ -263,9 +264,9 @@ export function paintSeabed(c: Ctx2D) {
     }
     branch(x, y, -Math.PI / 2, 38 * scale, 9 * scale, 5)
   }
-  coral(90, H - 70, '#e2507a', 1.1); coral(210, H - 64, '#f39a3b', .8); coral(1080, H - 72, '#b35be0', 1.2); coral(1190, H - 66, '#e2507a', .75); coral(700, H - 60, '#f39a3b', .6)
+  coral(90, H - 70, theme.coral[0], 1.1); coral(210, H - 64, theme.coral[1], .8); coral(1080, H - 72, theme.coral[2], 1.2); coral(1190, H - 66, theme.coral[3], .75); coral(700, H - 60, theme.coral[4], .6)
   for (const [x, y, rx] of [[330, H - 60, 60], [940, H - 56, 80], [560, H - 48, 40]]) {
-    const rock = c.createRadialGradient(x - rx * .3, y - 20, 5, x, y, rx); rock.addColorStop(0, '#46708a'); rock.addColorStop(1, '#16324a')
+    const rock = c.createRadialGradient(x - rx * .3, y - 20, 5, x, y, rx); rock.addColorStop(0, theme.rock[0]); rock.addColorStop(1, theme.rock[1])
     c.fillStyle = rock; c.beginPath(); c.ellipse(x, y, rx, rx * .45, 0, Math.PI, 0); c.fill()
   }
   // Treasure chest, half buried.
