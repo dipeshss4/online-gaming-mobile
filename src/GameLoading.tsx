@@ -21,6 +21,7 @@ const BY_KIND: Record<string, string[]> = {
   STARS_STRIPES_7S: ['Red, white and blue 7s in that order pay 250x.', 'Any three of one colour pay: red, white or blue.'],
   DIAMOND_WILDS: ['Diamond wilds multiply: a 2X and a 3X make 6x.', 'Three diamonds pay three 7s, multiplied.'],
   INFERNO_JACKPOT: ['The fourth reel multiplies your win up to 10x.', 'Three JACKPOT flames pay 1,000x your bet.'],
+  HEXA_KENO: ['Mark up to 8 hexes; 10 of 40 are drawn.', 'Every win spins the HEX SPINNER: x1, x2 or x5 your win.'],
   STARBALL_KENO: ['The 20th ball is the STARBALL: on your number, your win is 4x.', 'Mark 1 to 10 numbers; more picks, bigger prizes.'],
   CASH_5X3: ['CASH coins land on reels one to four, each with a prize.', 'The VAULT on reel five collects every coin on the screen.'],
   LINES_5X3: ['Fifteen lines pay left to right from the first reel.', 'Every DOUBLE wild in a win doubles it: two make it 4x.'],

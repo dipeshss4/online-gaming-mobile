@@ -9,6 +9,7 @@ export const TILE_ART: Record<string, number> = {
   DRAGON_TIDE: require('../assets/tiles/DRAGON_TIDE.jpg'),
   FRUIT_RUSH: require('../assets/tiles/FRUIT_RUSH.jpg'),
   GALAXY_KENO: require('../assets/tiles/GALAXY_KENO.jpg'),
+  HEXA_KENO: require('../assets/tiles/HEXA_KENO.jpg'),
   HOT_7S: require('../assets/tiles/HOT_7S.jpg'),
   INFERNO_JACKPOT: require('../assets/tiles/INFERNO_JACKPOT.jpg'),
   JADE_FORTUNE: require('../assets/tiles/JADE_FORTUNE.jpg'),

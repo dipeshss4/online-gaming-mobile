@@ -312,6 +312,32 @@ def star_badge(loc, size, material, centre=None):
     return star
 
 PAINTED_GOLD = lambda: mat('PaintedGold', (.95, .62, .1), rough=.4, coat=.3, emission=(1, .5, .05), strength=.12)
+def hex_points(cx, cy, r):
+    """A pointy-top hexagon's corners."""
+    return [(cx + r * math.cos(math.pi / 2 + i * math.pi / 3), cy + r * math.sin(math.pi / 2 + i * math.pi / 3)) for i in range(6)]
+
+def honeycomb():
+    """Hexa Keno's board: seven glossy hexes, some marked gold and one a green hit, each with its number."""
+    cells = [((0, 0), 18, 'hit'), ((.9, 0), 7, 'blue'), ((-.9, 0), 33, 'gold'), ((.45, .78), 26, 'blue'), ((-.45, .78), 2, 'gold'),
+             ((.45, -.78), 40, 'blue'), ((-.45, -.78), 11, 'blue')]
+    looks = {'blue': ((.01, .06, .45), (1, 1, 1)), 'gold': ((.9, .38, .0), (.12, .03, .0)), 'hit': ((.0, .4, .1), (1, 1, 1))}
+    for (x, y), n, look in cells:
+        fill, ink = looks[look]
+        prism(hex_points(x, y, .5), .12, .12, SATIN_GOLD(), .02)
+        prism(hex_points(x, y, .43), .1, .17, mat('Hex' + look, fill, rough=.25, coat=.4), .03)
+        text(str(n), .36 if n < 10 else .3, .03, .005, mat('HexInk' + look, ink, rough=.4), loc=(x, y - .03, .18))
+
+def hex_spinner():
+    """The Hex Spinner: a gold hexagonal frame of six faces around a glowing x5."""
+    prism(hex_points(0, 0, 1.0), .2, .1, SATIN_GOLD(), .04)
+    prism(hex_points(0, 0, .86), .12, .16, mat('SpinFace', (.08, .0, .2), rough=.35, coat=.3), .02)
+    for i in range(6):
+        a = math.pi / 2 + i * math.pi / 3 + math.pi / 6
+        sphere((.83 * math.cos(a), .83 * math.sin(a), .16), (.07, .07, .05), GLOW((1, .9, .5), 6), 16)
+    prism(hex_points(0, 0, .55), .1, .22, mat('SpinHub', (.0, .02, .06), rough=.3, coat=.5), .03)
+    prism(hex_points(0, 0, .6), .06, .19, mat('SpinRim', (.0, .7, 1), emission=(.0, .7, 1), strength=3), .0)
+    text('×5', .55, .08, .015, SATIN_GOLD(), loc=(0, -.07, .26))
+
 def prize_star(): star_badge((0, 0, 0), 1.0, SATIN_GOLD(), centre=PAINTED_GOLD())
 def jackpot_star(metal, gem):
     """A jackpot's star: {metal} with a {gem} at its heart (both made per render: a reset clears materials)."""
@@ -560,6 +586,8 @@ TILES = {
         (cactus, (-2.6, 2.1, -.4), 1.4, (0, 0, 0)), (cactus, (2.7, 2.15, -.4), 1.2, (0, 0, 0))]),
     'STARBALL_KENO': dict(bg=((1, .9, .55), (.35, .1, .6), (.02, .0, .08)), name='STARBALL\nKENO', font='titan', outline=(.05, .0, .12), sparkle=(1, .95, .7), rays=26, ray_strength=.35, pieces=[
         (star, (0, 1.25, .4), 2.1, (0, 0, 0)), (keno, (-1.95, .9, 0), 1.9, (0, 0, 10)), (keno, (1.95, .9, 0), 1.9, (0, 0, -10))]),
+    'HEXA_KENO': dict(bg=((.55, 1, .95), (.02, .35, .5), (.0, .03, .08)), name='HEXA\nKENO', font='titan', outline=(.0, .05, .08), sparkle=(.7, 1, 1), rays=24, ray_strength=.3, pieces=[
+        (hex_spinner, (0, 1.2, .4), 1.9, (0, 0, 0)), (honeycomb, (-2.0, .9, 0), 1.6, (0, 0, 8)), (honeycomb, (2.0, .9, 0), 1.6, (0, 0, -8))]),
     'KRAKENS_DEEP': dict(bg=((.85, .5, 1), (.25, .02, .4), (.01, .0, .05)), name="KRAKEN'S\nDEEP", font='titan', outline=(.06, .0, .1), sparkle=(.8, .6, 1), pieces=[
         (kraken, (0, 1.05, .2), 3.0, (0, 0, 0)), (lux('COIN'), (-2.35, .7, .4), 1.0, (0, 0, 15)), (lambda: lux_bars(GOLD()), (2.3, .65, .4), 1.2, (0, 0, -10))]),
     'SHARK_FRENZY': dict(bg=OCEAN, name='SHARK\nFRENZY', font='titan', outline=(.0, .04, .1), sparkle=(.7, 1, 1), pieces=[
