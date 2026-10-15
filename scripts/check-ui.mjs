@@ -22,7 +22,7 @@ catch { defaults = { brand: { logoGlyph: '7', tagline: 'THE ORIGINAL COLLECTION'
   signIn: { formKicker: "MEMBERS' ENTRANCE", loginTitle: 'Welcome back.', loginSubtitle: 'Your next game is waiting.', registerTitle: 'Join the floor.', registerSubtitle: 'Create your demo player account.', registrationClosed: 'New accounts are paused right now.' },
   lobby: { welcomeLabel: 'THE ORIGINAL COLLECTION', heroEnabled: true, featuredGameCode: 'HOT_7S', heroEyebrow: 'IN THE SPOTLIGHT', heroHeadline: 'A classic feeling.', heroAccent: 'A fresh spin.', heroBody: 'Discover {game} and find your rhythm.', heroNote: 'PLAY WITH DEMO CREDITS · NO CASH VALUE', heroArtLabel: 'ONLINE GAME ORIGINAL', quickLinkTitle: 'Your game. Your pace.', quickLinkBody: 'Original games, one demo wallet.', libraryEyebrow: 'FIND YOUR NEXT FAVORITE', defaultBadge: 'ONLINE GAME ORIGINAL' } } }
 const findings = []
-let luxuryRounds = 0, luxuryFree = false
+let luxuryRounds = 0, luxuryFree = false, diamondRounds = 0
 const now = new Date().toISOString()
 
 // The welcome pop-up and new-message pop-up are switched off until their own scenario, so they do not cover the
@@ -73,6 +73,21 @@ const games = [
   { code: 'BREAK_THE_BANK', name: 'Break the Bank', description: 'Fire Link.', minStake: 0.2, maxStake: 10, engineType: 'FIRE_LINK', featuredSymbol: '7',
     engine: { layout: 'FIRE_LINK', symbols: ['SEVEN', 'BAR', 'BELL', 'STAR', 'ORANGE', 'CHERRY', 'WILD', 'F1', 'F2', 'MINI'], payline: [], rules: ['Six fireballs start the Fire Link.'], paytable: [] },
     presentation: { badge: 'NEW · FIRE LINK', tileSubtitle: 'GRAND 1,000X' } },
+  { code: 'STARS_STRIPES_7S', name: "Stars & Stripes 7s", description: 'Classic reels.', minStake: 0.1, maxStake: 50, engineType: 'CLASSIC_3X3', featuredSymbol: '7',
+    engine: { layout: 'CLASSIC_3X3', symbols: ['RED7', 'WHITE7', 'BLUE7', 'BAR3', 'BAR2', 'BAR1', 'BLANK'], payline: [], rules: ['Classic reels.'], lines: [[3, 4, 5]], paytable: [{ label: 'Red, white and blue 7s in order', pattern: ['RED7', 'WHITE7', 'BLUE7'], multiplier: 250 }, { label: 'Any three bars', pattern: ['BAR1|BAR2|BAR3', 'BAR1|BAR2|BAR3', 'BAR1|BAR2|BAR3'], multiplier: 5 }] },
+    presentation: { badge: 'NEW · CLASSIC' } },
+  { code: 'DIAMOND_WILDS', name: "Diamond Wilds", description: 'Classic reels.', minStake: 0.1, maxStake: 50, engineType: 'CLASSIC_3X3', featuredSymbol: '7',
+    engine: { layout: 'CLASSIC_3X3', symbols: ['SEVEN', 'BAR3', 'BAR2', 'BAR1', 'CHERRY', 'BLANK', 'WILD2', 'WILD3', 'WILD5'], payline: [], rules: ['Classic reels.'], lines: [[3, 4, 5], [0, 1, 2], [6, 7, 8], [0, 4, 8], [6, 4, 2]], paytable: [{ label: 'Three 7s', pattern: ['SEVEN', 'SEVEN', 'SEVEN'], multiplier: 50 }, { label: 'Three cherries', pattern: ['CHERRY', 'CHERRY', 'CHERRY'], multiplier: 15 }, { label: 'Any three bars', pattern: ['BAR1|BAR2|BAR3', 'BAR1|BAR2|BAR3', 'BAR1|BAR2|BAR3'], multiplier: 5 }] },
+    presentation: { badge: 'NEW · CLASSIC' } },
+  { code: 'INFERNO_JACKPOT', name: "Inferno Jackpot", description: 'Classic reels.', minStake: 0.1, maxStake: 50, engineType: 'CLASSIC_3X3', featuredSymbol: '7',
+    engine: { layout: 'CLASSIC_3X3', symbols: ['JACKPOT', 'FIRE7', 'SEVEN', 'BAR3', 'BAR2', 'BAR1', 'BLANK'], payline: [], rules: ['Classic reels.'], lines: [[3, 4, 5]], paytable: [{ label: 'Three JACKPOT flames', pattern: ['JACKPOT', 'JACKPOT', 'JACKPOT'], multiplier: 1000 }, { label: 'Three fire 7s', pattern: ['FIRE7', 'FIRE7', 'FIRE7'], multiplier: 100 }], art: { multipliers: '1,2,3,5,10' } },
+    presentation: { badge: 'NEW · CLASSIC' } },
+  { code: 'SHERIFFS_GOLD', name: "Sheriff's Gold", description: 'Hold and win in the West.', minStake: 0.2, maxStake: 10, engineType: 'FIRE_LINK', featuredSymbol: 'STAR',
+    engine: { layout: 'FIRE_LINK', symbols: ['SEVEN', 'BAR', 'BELL', 'STAR', 'ORANGE', 'CHERRY', 'WILD', 'F1', 'F2', 'MINI'], payline: [], rules: ['Six sheriff stars start the Gold Rush.'], paytable: [] },
+    presentation: { badge: 'NEW · HOLD & WIN', tileSubtitle: 'GRAND 1,000X' } },
+  { code: 'MONEY_MONSOON', name: 'Money Monsoon', description: 'Cash rains; the vault collects.', minStake: 0.15, maxStake: 30, engineType: 'CASH_5X3', featuredSymbol: 'STAR',
+    engine: { layout: 'CASH_5X3', symbols: ['CROWN', 'DIAMOND', 'GOLD', 'WATCH', 'CHIPS', 'DICE', 'CARDS', 'WILD', 'CASH', 'VAULT'], payline: [], rules: ['The VAULT collects every CASH coin.'], paytable: [] },
+    presentation: { badge: 'NEW · CASH COLLECT', tileSubtitle: 'THE VAULT COLLECTS' } },
   { code: 'LUXURY_LIFE', name: 'Luxury Life', description: 'Fifteen lines, DOUBLE wilds.', minStake: 0.15, maxStake: 30, engineType: 'LINES_5X3', featuredSymbol: 'STAR',
     engine: { layout: 'LINES_5X3', symbols: ['YACHT', 'JET', 'LIMO', 'RING', 'WATCH', 'GOLD', 'COIN', 'SILVER', 'DOUBLE'], payline: [], rules: ['DOUBLE wilds double every win.'], paytable: [],
       lines: [[5, 6, 7, 8, 9], [0, 1, 2, 3, 4], [10, 11, 12, 13, 14], [0, 6, 12, 8, 4], [10, 6, 2, 8, 14], [0, 1, 7, 13, 14], [10, 11, 7, 3, 4], [5, 1, 2, 3, 9],
@@ -230,6 +245,12 @@ await page.route('**/api/**', async route => {
       return json({ requestId: body.requestId, betId: 'd2', gameCode: 'VEGAS_JACKPOT_DEVIL_HEART', symbols: [...screen, 'JP20'], stake: body.stake,
         payout: 2, balance: 127.78, currency: 'USD', outcome: 'JACKPOT', multiplier: 20 })
     }
+    if (path === '/api/games/MONEY_MONSOON/play') {
+      // Three coins (5x, 2x and 25x the bet) and the VAULT on reel five: it collects 32 bets; no line pays.
+      const screen = ['CASH:5', 'DICE', 'CARDS', 'CHIPS', 'GOLD', 'WATCH', 'CASH:2', 'DICE', 'CARDS', 'VAULT', 'CHIPS', 'GOLD', 'WATCH', 'CASH:25', 'DICE']
+      return json({ requestId: body.requestId, betId: 'mm1', gameCode: 'MONEY_MONSOON', symbols: screen, stake: body.stake,
+        payout: Math.round(32 * body.stake * 100) / 100, balance: 174.8, currency: 'USD', outcome: 'JACKPOT', multiplier: 32 })
+    }
     if (path === '/api/games/LUXURY_LIFE/play' && luxuryFree) {
       // Three KEYs (2x the bet) start 8 free spins; the third pays three coins on the top line, tripled: 2.80x.
       luxuryFree = false
@@ -249,6 +270,35 @@ await page.route('**/api/**', async route => {
       const screen = ['COIN', 'COIN', 'COIN', 'JET', 'RING', 'YACHT', 'DOUBLE', 'YACHT', 'YACHT', 'YACHT', 'SILVER', 'GOLD', 'WATCH', 'LIMO', 'GOLD']
       return json({ requestId: body.requestId, betId: 'll1', gameCode: 'LUXURY_LIFE', symbols: screen, stake: body.stake,
         payout: 10.12, balance: 177.07, currency: 'USD', outcome: 'JACKPOT', multiplier: 67.47 })
+    }
+    if (path === '/api/games/STARS_STRIPES_7S/play') {
+      // Red, white and blue in order on the line: 250x.
+      return json({ requestId: body.requestId, betId: 'ss1', gameCode: 'STARS_STRIPES_7S', symbols: ['BLANK', 'BAR1', 'BLANK', 'RED7', 'WHITE7', 'BLUE7', 'BAR2', 'BLANK', 'BAR3'], stake: body.stake,
+        payout: Math.round(250 * body.stake * 100) / 100, balance: 150.5, currency: 'USD', outcome: 'JACKPOT', multiplier: 250 })
+    }
+    if (path === '/api/games/DIAMOND_WILDS/play' && diamondRounds++ > 0) {
+      // Three scatters start eight free spins; the first lands three 7s (50 line bets, a fifth of the bet, doubled): 20x.
+      const blank = Array(9).fill('BLANK')
+      const symbols = ['SCATTER', 'BAR1', 'BLANK', 'BLANK', 'BLANK', 'SCATTER', 'BAR2', 'SCATTER', 'BLANK', 'FREE:8',
+        'BLANK', 'BAR1', 'BLANK', 'SEVEN', 'SEVEN', 'SEVEN', 'BAR2', 'BLANK', 'BLANK', ...Array.from({ length: 7 }, () => blank).flat()]
+      return json({ requestId: body.requestId, betId: `dw${diamondRounds}`, gameCode: 'DIAMOND_WILDS', symbols, stake: body.stake,
+        payout: Math.round(20 * body.stake * 100) / 100, balance: 129.4, currency: 'USD', outcome: 'BIG_WIN', multiplier: 20 })
+    }
+    if (path === '/api/games/DIAMOND_WILDS/play') {
+      // A 2X diamond between two 7s on the middle line: 50 line bets doubled, a fifth of the bet each: 20x.
+      return json({ requestId: body.requestId, betId: 'dw1', gameCode: 'DIAMOND_WILDS', symbols: ['BLANK', 'BAR1', 'BAR3', 'SEVEN', 'WILD2', 'SEVEN', 'CHERRY', 'BLANK', 'BAR2'], stake: body.stake,
+        payout: Math.round(20 * body.stake * 100) / 100, balance: 127.4, currency: 'USD', outcome: 'BIG_WIN', multiplier: 20 })
+    }
+    if (path === '/api/games/INFERNO_JACKPOT/play') {
+      // Three fire 7s and a 5x on the multiplier reel: 500x.
+      return json({ requestId: body.requestId, betId: 'ij1', gameCode: 'INFERNO_JACKPOT', symbols: ['BLANK', 'BAR1', 'BLANK', 'FIRE7', 'FIRE7', 'FIRE7', 'BAR2', 'BLANK', 'SEVEN', 'X:5'], stake: body.stake,
+        payout: Math.round(500 * body.stake * 100) / 100, balance: 175.4, currency: 'USD', outcome: 'JACKPOT', multiplier: 500 })
+    }
+    if (path === '/api/games/SHERIFFS_GOLD/play') {
+      // The same round as Break the Bank's below, in the West: seven stars start the Gold Rush and a MAJOR drops in.
+      const base = ['F2', 'BELL', 'F5', 'CHERRY', 'MINI', 'ORANGE', 'F1', 'STAR', 'F3', 'BAR', 'CHERRY', 'F10', 'BELL', 'SEVEN', 'ORANGE', 'STAR', 'BAR', 'F8', 'CHERRY', 'BELL']
+      return json({ requestId: body.requestId, betId: 'sg1', gameCode: 'SHERIFFS_GOLD', symbols: [...base, 'LINK', 'R', '13:MAJOR', '1:F5', 'R', 'R', 'R'], stake: body.stake,
+        payout: 41.8, balance: 167.1, currency: 'USD', outcome: 'JACKPOT', multiplier: 209 })
     }
     if (path === '/api/games/BREAK_THE_BANK/play') {
       // Seven fireballs start the Fire Link; one respin lands two more (a MAJOR among them), then three blanks.
@@ -695,6 +745,77 @@ await audit('33-fire-link-done')
 console.log('## fire link  (seven fireballs, a MAJOR drops in, respins run out, 41.80)')
 await page.getByLabel('Back to lobby').first().click()
 
+// Sheriff's Gold: the same hold-and-spin in the West: the stars start the Gold Rush, a MAJOR star drops in, 41.80.
+await page.getByLabel("Play Sheriff's Gold").first().click()
+await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {})
+await page.getByLabel(/^Reel 5:/).waitFor({ timeout: 15000 }).catch(() => findings.push("sheriff's gold: the five reels did not show"))
+await audit('41-sheriffs-gold')
+await page.getByRole('button', { name: 'Spin', exact: true }).click()
+await page.getByText('GOLD RUSH!').waitFor({ timeout: 15000 }).catch(() => findings.push("sheriff's gold: no GOLD RUSH banner"))
+await page.getByLabel('MAJOR jackpot').first().waitFor({ timeout: 15000 }).catch(() => findings.push("sheriff's gold: the MAJOR never dropped in"))
+await page.screenshot({ path: `${OUT}/41a-sheriffs-gold-rush.png` })
+await page.getByText('WIN 41.80').waitFor({ timeout: 20000 }).catch(() => findings.push("sheriff's gold: the round never showed the server's 41.80"))
+await page.getByRole('button', { name: /Tap to skip the count/ }).click({ timeout: 8000 }).catch(() => {})
+await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
+await audit('42-sheriffs-gold-done')
+console.log("## sheriff's gold  (seven stars, the Gold Rush, a MAJOR star, 41.80)")
+await page.getByLabel('Back to lobby').first().click()
+
+await page.getByRole('tab', { name: 'SLOTS' }).click()
+await page.getByLabel("Play Stars & Stripes 7s").first().click()
+await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {})
+await page.getByLabel('Spin').first().waitFor({ timeout: 15000 }).catch(() => findings.push("Stars & Stripes 7s: the game did not open"))
+await audit('43-stars-stripes')
+await page.getByRole('button', { name: 'Spin', exact: true }).click()
+await page.getByText(/^RED, WHITE AND BLUE 7S IN ORDER · /).first().waitFor({ timeout: 15000 }).catch(() => findings.push("Stars & Stripes 7s: never showed ^RED, WHITE AND BLUE 7S IN ORDER · "))
+await page.screenshot({ path: `${OUT}/43-stars-stripesa.png` })
+await page.getByText('WIN 25.00').waitFor({ timeout: 20000 }).catch(() => findings.push("Stars & Stripes 7s: the round never showed the server's 25.00"))
+await page.getByRole('button', { name: /Tap to skip the count/ }).click({ timeout: 8000 }).catch(() => {})
+await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
+await audit('43-stars-stripes-done')
+console.log('## stars & stripes  (red, white and blue in order, 250x, 25.00)')
+await page.getByLabel('Back to lobby').first().click()
+
+await page.getByRole('tab', { name: 'SLOTS' }).click()
+await page.getByLabel("Play Diamond Wilds").first().click()
+await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {})
+await page.getByLabel('Spin').first().waitFor({ timeout: 15000 }).catch(() => findings.push("Diamond Wilds: the game did not open"))
+await audit('44-diamond-wilds')
+await page.getByRole('button', { name: 'Spin', exact: true }).click()
+await page.getByText(/^THREE 7S · /).first().waitFor({ timeout: 15000 }).catch(() => findings.push("Diamond Wilds: never showed ^THREE 7S · "))
+await page.screenshot({ path: `${OUT}/44-diamond-wildsa.png` })
+await page.getByText('WIN 2.00').waitFor({ timeout: 20000 }).catch(() => findings.push("Diamond Wilds: the round never showed the server's 2.00"))
+await page.getByRole('button', { name: /Tap to skip the count/ }).click({ timeout: 8000 }).catch(() => {})
+await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
+await audit('44-diamond-wilds-done')
+console.log('## diamond wilds  (a 2X diamond doubles three 7s, 2.00)')
+// Free spins (the next round, same game): three scatters start eight, the first pays three 7s doubled, 2.00.
+await page.getByRole('button', { name: 'Spin', exact: true }).click({ timeout: 15000 })
+await page.getByText('8 FREE SPINS').first().waitFor({ timeout: 15000 }).catch(() => findings.push('diamond wilds: the free spins were never announced'))
+await page.getByText(/^FREE SPIN 1 \/ 8|^THREE 7S · .*\(×2\)/).first().waitFor({ timeout: 15000 }).catch(() => findings.push('diamond wilds: free spin 1 never played'))
+await page.screenshot({ path: `${OUT}/44b-diamond-free-spins.png` })
+await page.getByText('WIN 2.00').waitFor({ timeout: 40000 }).catch(() => findings.push("diamond wilds: the free spins never showed the server's 2.00"))
+await page.getByRole('button', { name: /Tap to skip the count/ }).click({ timeout: 8000 }).catch(() => {})
+await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
+await audit('44c-diamond-free-spins-done')
+console.log('## diamond wilds free spins  (three scatters, 8 free spins, three 7s doubled, 2.00)')
+await page.getByLabel('Back to lobby').first().click()
+
+await page.getByRole('tab', { name: 'SLOTS' }).click()
+await page.getByLabel("Play Inferno Jackpot").first().click()
+await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {})
+await page.getByLabel('Spin').first().waitFor({ timeout: 15000 }).catch(() => findings.push("Inferno Jackpot: the game did not open"))
+await audit('45-inferno-jackpot')
+await page.getByRole('button', { name: 'Spin', exact: true }).click()
+await page.getByText('×5 MULTIPLIER!').first().waitFor({ timeout: 15000 }).catch(() => findings.push("Inferno Jackpot: never showed ×5 MULTIPLIER!"))
+await page.screenshot({ path: `${OUT}/45-inferno-jackpota.png` })
+await page.getByText('WIN 50.00').waitFor({ timeout: 20000 }).catch(() => findings.push("Inferno Jackpot: the round never showed the server's 50.00"))
+await page.getByRole('button', { name: /Tap to skip the count/ }).click({ timeout: 8000 }).catch(() => {})
+await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
+await audit('45-inferno-jackpot-done')
+console.log('## inferno jackpot  (three fire 7s, the reel lands 5x, 50.00)')
+await page.getByLabel('Back to lobby').first().click()
+
 // Luxury Life: five yachts and a DOUBLE on the middle line; each paying line is drawn in turn, then MEGA WIN and 10.12.
 await page.getByRole('tab', { name: 'SLOTS' }).click()
 await page.getByLabel('Play Luxury Life').first().click()
@@ -751,6 +872,23 @@ await page.getByText('WIN 0.42').waitFor({ timeout: 60000 }).catch(() => finding
 await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
 await audit('38-free-spins-done')
 console.log('## luxury life free spins  (three KEYs, 8 free spins, a tripled line, 0.42)')
+await page.getByLabel('Back to lobby').first().click()
+
+// Money Monsoon: three coins on reels one to four and the VAULT on reel five; it takes each coin and the round pays 4.80.
+await page.getByRole('tab', { name: 'SLOTS' }).click()
+await page.getByLabel('Play Money Monsoon').first().click()
+await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {})
+await page.getByLabel('Spin').first().waitFor({ timeout: 15000 }).catch(() => findings.push('money monsoon: the game did not open'))
+await audit('39-money-monsoon')
+await page.getByRole('button', { name: 'Spin', exact: true }).click()
+await page.getByText('VAULT COLLECT!').first().waitFor({ timeout: 15000 }).catch(() => findings.push('money monsoon: the vault never collected'))
+await page.waitForTimeout(900)
+await page.screenshot({ path: `${OUT}/39a-money-monsoon-collect.png` })
+await page.getByText('WIN 4.80').waitFor({ timeout: 20000 }).catch(() => findings.push("money monsoon: the round never showed the server's 4.80"))
+await page.getByRole('button', { name: /Tap to skip the count/ }).click({ timeout: 8000 }).catch(() => {})
+await page.getByRole('button', { name: /Tap to collect/ }).click({ timeout: 8000 }).catch(() => {})
+await audit('40-money-monsoon-done')
+console.log('## money monsoon  (three coins, the VAULT collects 32 bets, 4.80)')
 await page.getByLabel('Back to lobby').first().click()
 await page.getByRole('tab', { name: 'OTHER' }).click()
 
