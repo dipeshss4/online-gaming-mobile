@@ -384,6 +384,100 @@ INFERNO = {'JACKPOT': jackpot_flame, 'FIRE7': devil_seven, 'SEVEN': lambda: colo
 for builds in (STARS_STRIPES, DIAMOND, INFERNO): builds['SCATTER'] = video_scatter
 CLASSIC_SETS = {'SS': STARS_STRIPES, 'DW': DIAMOND, 'IJ': INFERNO}
 
+
+# ---------------------------------------------------------------- the fish tables: bosses and seabeds
+def kraken():
+    """The Kraken rising: a tall dark-crimson mantle, glowing slit eyes, and eight heavy arms reaching out and down that
+    taper to curled tips, ringed with pale suckers."""
+    skin = mat('KrakenSkin', (.12, .005, .04), rough=.32, coat=.8, sss=.15, bump=.12, bump_scale=14)
+    spots = mat('KrakenSpots', (.08, .0, .03), rough=.4, coat=.6)
+    sucker = mat('Sucker', (.85, .42, .38), rough=.4, sss=.3)
+    sphere((0, .8, -.1), (.8, 1.35, .7), skin, 64)
+    sphere((0, -.2, 0), (.95, .6, .7), skin, 48)
+    for x, y, r in ((-.3, 1.3, .12), (.25, 1.0, .1), (-.15, .6, .08), (.35, 1.6, .09)): sphere((x, y, .55), (r, r, .05), spots, 16)
+    for side in (-1, 1):
+        sphere((side * .42, -.12, .58), (.24, .2, .12), mat('EyeGlow', (1, .75, .1), rough=.1, emission=(1, .55, .05), strength=4), 32)
+        sphere((side * .42, -.12, .69), (.05, .16, .04), mat('Pupil', (.0, .0, .0), rough=.2), 16)
+    for i in range(8):
+        a = math.radians(-168 + i * 22.3)
+        side = 1 if math.cos(a) >= 0 else -1
+        pts = []
+        for k in range(7):
+            rr = .55 + k * .5
+            bend = math.radians((k / 6) ** 2 * 70 * side)          # the tip curls upward, away from the body
+            pts.append((math.cos(a + bend) * rr * 1.15, -.45 + math.sin(a + bend) * rr * .8, .2 - k * .04))
+        arm = tube(pts, .3, skin); arm.data.bevel_resolution = 8
+        for j, bp in enumerate(arm.data.splines[0].bezier_points): bp.radius = max(.15, 1 - j * .14)
+        for j in range(1, 6):
+            px, py, pz = pts[j]; r = .07 * max(.4, 1 - j * .13)
+            sphere((px, py - .14 * max(.4, 1 - j * .14), pz + .1), (r, r, r * .5), sucker, 12)
+
+def megalodon():
+    """The Megalodon lunging, side on: a long spindle body (slate above, pale below), a pointed snout over open jaws of
+    white teeth, a black eye, and tall swept fins."""
+    hide = mat('SharkHide', (.08, .1, .14), rough=.3, coat=.6, bump=.04, bump_scale=30)
+    belly = mat('SharkBelly', (.78, .8, .82), rough=.4)
+    body = lathe([(0, -2.3), (.22, -1.9), (.5, -1.0), (.62, -.1), (.58, .7), (.44, 1.4), (.24, 1.85), (.08, 2.1), (0, 2.18)], hide, thickness=.02)
+    body.rotation_euler = (0, math.radians(90), 0); body.scale = (.8, 1, 1)
+    sphere((.1, -.24, .1), (1.75, .3, .42), belly, 48)
+    prism([(-.3, .5), (.2, 1.45), (.75, .45)], .12, .06, hide, .03)
+    prism([(-1.95, .1), (-2.75, 1.0), (-2.5, .05), (-2.85, -.8), (-2.0, -.05)], .12, .06, hide, .03)
+    prism([(.25, -.3), (-.45, -1.05), (.8, -.35)], .1, .25, hide, .03)
+    # Jaws: a dark wedge under the snout, rows of teeth along both edges.
+    prism([(1.15, -.12), (2.0, .05), (1.95, -.18), (1.25, -.42)], .1, .5, mat('Maw', (.2, .0, .02), rough=.5), .02)
+    tooth = mat('Tooth', (.98, .97, .92), rough=.2, coat=.5)
+    for k in range(8):
+        x = 1.3 + k * .09
+        prism([(x - .035, -.11 + k * .019), (x + .035, -.11 + k * .019), (x, -.24 + k * .015)], .03, .56, tooth)
+        prism([(x - .035, -.4 + k * .025), (x + .035, -.4 + k * .025), (x, -.27 + k * .02)], .03, .56, tooth)
+    sphere((1.55, .2, .4), (.08, .08, .04), mat('SharkEye', (.0, .0, .0), rough=.05, coat=1), 16)
+    for k in range(5): rounded_box((.025, .3, .03), .01, mat('Gill', (.03, .04, .06), rough=.5), loc=(.95 - k * .09, -.02, .46))
+
+def seabed_scene(name, sand, deep, glow, decor):
+    """A seabed seen from above for a fish table (16:9): sand fading into deep water at the edges, rocks, coral and
+    shells, softly lit; the table draws its creatures, light shafts and bubbles over it."""
+    stage(16.0, 9.0, 1600)
+    scene = bpy.context.scene; scene.cycles.samples = 64
+    bpy.ops.mesh.primitive_plane_add(size=40, location=(0, 0, -1.2))
+    add(bpy.context.object, mat('Sand', sand, rough=.9, bump=.35, bump_scale=6))
+    rng = random.Random(len(name))
+    rock = mat('Rock', (deep[0] * 1.6 + .05, deep[1] * 1.6 + .05, deep[2] * 1.6 + .06), rough=.8, bump=.4, bump_scale=10)
+    for _ in range(14):
+        x, y = rng.choice([-1, 1]) * rng.uniform(4, 8.5), rng.uniform(-4.5, 4.5)
+        s = rng.uniform(.4, 1.1); sphere((x, y, -1.0), (s * 1.4, s, s * .6), rock, 24)
+    for _ in range(18):
+        x, y = rng.uniform(-8, 8), rng.choice([-1, 1]) * rng.uniform(3.4, 4.6)
+        c = (glow, (1, .5, .3), (.95, .9, .5))[rng.randrange(3)]
+        for k in range(3):
+            a = rng.uniform(0, math.tau)
+            tube([(x, y, -1), (x + math.cos(a) * .3, y + math.sin(a) * .3, -.6), (x + math.cos(a) * .5, y + math.sin(a) * .5, -.3)], .07, mat('Coral', c, rough=.5, sss=.3, emission=c, strength=.15))
+    for build, n in decor:
+        for _ in range(n):
+            group(build, (rng.uniform(-7.5, 7.5), rng.choice([-1, 1]) * rng.uniform(2.8, 4.2), -.9), rng.uniform(.5, .9), (0, 0, rng.uniform(0, 360)))
+    # Lit from above like shallow water; the table darkens its own edges and adds light shafts and bubbles.
+    light('Sun', (0, 0, 14), 9000, (.85, .95, 1), 14)
+    scene.render.filepath = os.path.join(OUT, f'{name}.png')
+    bpy.ops.render.render(write_still=True)
+    print('rendered', name)
+
+def shell():
+    lathe([(0, .0), (.5, .1), (.7, .3), (.6, .55), (.2, .7), (0, .72)], mat('Shell', (.95, .8, .7), rough=.3, coat=.6, sss=.2), steps=12, thickness=.03)
+def starfish():
+    pts = []
+    for i in range(10):
+        r = 1 if i % 2 == 0 else .42; a = math.pi / 2 + i * math.pi / 5; pts.append((r * math.cos(a), r * math.sin(a)))
+    prism(pts, .18, .09, mat('Star', (1, .45, .2), rough=.5, bump=.3, bump_scale=40), .06)
+def skull():
+    sphere((0, 0, 0), (.6, .7, .5), mat('Bone', (.85, .82, .72), rough=.6, bump=.2, bump_scale=30), 32)
+    for x in (-.22, .22): sphere((x, .05, .38), (.16, .18, .1), mat('Hollow', (.02, .02, .02), rough=.9), 16)
+
+FISH_TABLES = {
+    'KRAKENS_DEEP': dict(boss=kraken, bossName='FT_KRAKEN', seabed=dict(name='FS_KRAKENS_DEEP', sand=(.18, .14, .2), deep=(.03, .0, .08), glow=(.6, .2, 1),
+        decor=[(skull, 3), (lambda: lux_bars(GOLD()), 2), (shell, 4)])),
+    'SHARK_FRENZY': dict(boss=megalodon, bossName='FT_MEGALODON', seabed=dict(name='FS_SHARK_FRENZY', sand=(.85, .72, .5), deep=(.0, .12, .3), glow=(1, .4, .5),
+        decor=[(starfish, 5), (shell, 6), (LUXURY['COIN'], 3)])),
+}
+
 # ---------------------------------------------------------------- the tiles
 # Each tile: its backdrop (hot centre, middle, edge), its pieces (model, centre, size, turn) and its name.
 EMBER = ((1, .62, .16), (.62, .05, .02), (.07, .0, .02))
@@ -464,6 +558,10 @@ TILES = {
     'SHERIFFS_GOLD': dict(bg=SUNSET, name="SHERIFF'S\nGOLD", font='titan', outline=(.14, .04, .0), pieces=[
         (prize_star, (0, 1.1, .35), 2.3, (0, 0, 8)), (cowboy_hat, (-2.0, 1.0, 0), 2.0, (0, 0, 10)), (horseshoe, (2.05, 1.05, 0), 1.5, (0, 0, -14)),
         (cactus, (-2.6, 2.1, -.4), 1.4, (0, 0, 0)), (cactus, (2.7, 2.15, -.4), 1.2, (0, 0, 0))]),
+    'KRAKENS_DEEP': dict(bg=((.85, .5, 1), (.25, .02, .4), (.01, .0, .05)), name="KRAKEN'S\nDEEP", font='titan', outline=(.06, .0, .1), sparkle=(.8, .6, 1), pieces=[
+        (kraken, (0, 1.05, .2), 3.0, (0, 0, 0)), (lux('COIN'), (-2.35, .7, .4), 1.0, (0, 0, 15)), (lambda: lux_bars(GOLD()), (2.3, .65, .4), 1.2, (0, 0, -10))]),
+    'SHARK_FRENZY': dict(bg=OCEAN, name='SHARK\nFRENZY', font='titan', outline=(.0, .04, .1), sparkle=(.7, 1, 1), pieces=[
+        (megalodon, (0, 1.1, .2), 4.2, (0, 0, 6)), (starfish, (-2.4, .5, .4), .9, (0, 0, 20)), (lux('COIN'), (2.4, .55, .4), 1.0, (0, 0, -15))]),
     'MONEY_MONSOON': dict(bg=((.7, 1, .75), (.05, .38, .3), (.0, .05, .05)), name='MONEY\nMONSOON', font='titan', outline=(.0, .07, .04), sparkle=(1, .9, .5), pieces=[
         (vault, (0, 1.05, .3), 2.4, (0, 0, 0)), (rain_cloud, (-2.0, 1.4, 0), 1.9, (0, 0, 6)), (rain_cloud, (2.05, 1.45, 0), 1.8, (0, 0, -6)),
         (lambda: lux_bars(GOLD()), (0, .1, .6), 1.3, (0, 0, 0))]),
@@ -606,6 +704,11 @@ for name, build in SHERIFF.items():
 for prefix, builds in CLASSIC_SETS.items():
     for name, build in builds.items():
         if (ONLY and f'{prefix}_{name}' in ONLY) or prefix in ONLY: reset(); build(); render(f'{prefix}_{name}')
+
+# The fish tables' bosses (FT_<NAME>, clear background) and seabeds (FS_<CODE>, 16:9); FT / FS pick a kind.
+for code, spec in FISH_TABLES.items():
+    if (ONLY and spec['bossName'] in ONLY) or 'FT' in ONLY: reset(); spec['boss'](); render(spec['bossName'])
+    if (ONLY and spec['seabed']['name'] in ONLY) or 'FS' in ONLY: seabed_scene(**spec['seabed'])
 
 # Names on the command line pick what to render: a game code (its tile), BG_<CODE> / LOGO_<CODE>, or BG / LOGO /
 # TILES for all of a kind. Nothing renders everything.

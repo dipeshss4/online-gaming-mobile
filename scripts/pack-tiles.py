@@ -66,6 +66,9 @@ for folder, longest in (('assets/logos', 560), ('../frontend/public/art/logos', 
     if logos: print('wrote', folder, len(logos), 'logos,', sum(os.path.getsize(os.path.join(out, f'{c}.png')) for c in logos) // 1024, 'KB')
 # Each game's own reel symbols, by render prefix and folder (MM_<NAME> to monsoon/, ...), trimmed to their art.
 SYMBOL_SETS = {'MM': 'monsoon', 'SG': 'sheriff', 'SS': 'stars-stripes', 'DW': 'diamond-wilds', 'IJ': 'inferno'}
+# The fish tables' bosses are drawn large, so they keep more pixels.
+SYMBOL_SETS['FT'] = 'fish-bosses'
+SYMBOL_SIZE = {'FT': 640}
 packed = 0
 for prefix, name in SYMBOL_SETS.items():
     symbols = sorted(f[len(prefix) + 1:-4] for f in os.listdir(RENDERS) if f.startswith(prefix + '_') and f.endswith('.png'))
@@ -75,7 +78,7 @@ for prefix, name in SYMBOL_SETS.items():
             art = Image.open(os.path.join(RENDERS, f'{prefix}_{symbol}.png')).convert('RGBA')
             box = art.getchannel('A').point(lambda a: 255 if a > 8 else 0).getbbox(); pad = int(max(box[2] - box[0], box[3] - box[1]) * .04)
             art = art.crop((max(0, box[0] - pad), max(0, box[1] - pad), min(art.width, box[2] + pad), min(art.height, box[3] + pad)))
-            k = 300 / max(art.size); art.resize((round(art.width * k), round(art.height * k)), Image.LANCZOS).save(os.path.join(out, f'{symbol}.png'), optimize=True)
+            k = SYMBOL_SIZE.get(prefix, 300) / max(art.size); art.resize((round(art.width * k), round(art.height * k)), Image.LANCZOS).save(os.path.join(out, f'{symbol}.png'), optimize=True)
         if symbols: print('wrote', folder, len(symbols), 'symbols')
     packed += len(symbols)
 

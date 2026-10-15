@@ -47,6 +47,12 @@ const games = [
         ['OCTOPUS', 'Octopus', 20], ['STINGRAY', 'Stingray', 30], ['SWORDFISH', 'Swordfish', 50], ['SHARK', 'Great Shark', 80], ['WHALE', 'Golden Whale', 120]].map(([code, label, multiplier]) => ({ label, multiplier, pattern: [code, 'HIT'] }))
         .concat([100, 150, 200, 300, 500].map(x => ({ label: `Tide Dragon ${x}x`, multiplier: x, pattern: ['DRAGON', `HIT${x}`] }))) },
     presentation: { glyph: '🐉', tileSubtitle: 'Fish table · Up to 500x' } },
+  { code: 'KRAKENS_DEEP', name: "Kraken's Deep", description: 'Fish-table shooter.', minStake: 0.1, maxStake: 10, engineType: 'FISH', featuredSymbol: 'DRAGON',
+    engine: { layout: 'FISH', symbols: ['SHRIMP', 'SHARK', 'DRAGON'], payline: [0, 1], rules: ['Each bullet costs the bet when it hits a creature.'],
+      paytable: [['SHRIMP', 'Shrimp', 2], ['CLOWNFISH', 'Clownfish', 3], ['PUFFER', 'Pufferfish', 5], ['ANGELFISH', 'Angelfish', 8], ['TURTLE', 'Sea Turtle', 12], ['LANTERN', 'Lanternfish', 15],
+        ['OCTOPUS', 'Octopus', 20], ['STINGRAY', 'Stingray', 30], ['SWORDFISH', 'Swordfish', 50], ['SHARK', 'Great Shark', 80], ['WHALE', 'Golden Whale', 120]].map(([code, label, multiplier]) => ({ label, multiplier, pattern: [code, 'HIT'] }))
+        .concat([100, 150, 200, 300, 500].map(x => ({ label: `Tide Dragon ${x}x`, multiplier: x, pattern: ['DRAGON', `HIT${x}`] }))) },
+    presentation: { glyph: '🐉', tileSubtitle: 'Fish table · Up to 500x' } },
   { code: 'VEGAS_JACKPOT_DEVIL_HEART', name: 'Vegas Jackpot: Devil Heart', description: 'Five lines, locking wilds.', minStake: 0.1, maxStake: 50, engineType: 'CLASSIC_5L', featuredSymbol: 'SEVEN',
     engine: { layout: 'CLASSIC_5L', symbols: ['SEVEN', 'BAR3', 'BAR2', 'BAR1', 'WILD', 'X2', 'JACKPOT', 'BLANK'], payline: [], rules: ['Three reels and five fixed lines.'], paytable: [],
       lines: [[3, 4, 5], [0, 1, 2], [6, 7, 8], [0, 4, 8], [6, 4, 2]] },
@@ -731,6 +737,14 @@ if (await page.getByLabel('Play Hot 7s').count()) findings.push('lobby: a slot s
 await audit('24-lobby-other')
 await page.getByRole('tab', { name: 'FISHING' }).click()
 await page.getByLabel('Play Dragon Tide').first().waitFor({ timeout: 5000 }).catch(() => findings.push('lobby: the fish table is not under FISHING'))
+// Kraken's Deep: another fish table in its own look (violet abyss, tinted creatures, the Kraken as its boss).
+await page.getByLabel("Play Kraken's Deep").first().click({ timeout: 5000 }).catch(() => findings.push("lobby: Kraken's Deep is not under FISHING"))
+await page.getByTestId('game-loading').waitFor({ state: 'detached', timeout: 15000 }).catch(() => {})
+await page.getByText('‹ Lobby').waitFor({ timeout: 20000 }).catch(() => findings.push("kraken's deep: the table did not open"))
+await page.waitForTimeout(2500)
+await audit('20b-krakens-deep')
+await page.getByText('‹ Lobby').click()
+console.log("## kraken's deep  (its own fish table opens from FISHING)")
 await page.getByRole('tab', { name: 'OTHER' }).click()
 
 // Break the Bank: seven fireballs start the Fire Link, a MAJOR drops in, the respins run out, and the total pays.
