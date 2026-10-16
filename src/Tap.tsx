@@ -11,7 +11,7 @@ import { Feel, c, feel, useReducedMotion } from './theme';
  * something that feels native on either phone.
  */
 export function Tap({ children, onPress, onLongPress, style, disabled, haptic = 'tap', accessibilityLabel, accessibilityRole = 'button',
-  accessibilityState, hitSlop = 6, scale = 0.97, ripple = true }: {
+  accessibilityState, hitSlop = 6, scale = 0.97, ripple = true, offscreen = false }: {
   children: React.ReactNode;
   onPress?: () => void;
   onLongPress?: () => void;
@@ -25,6 +25,8 @@ export function Tap({ children, onPress, onLongPress, style, disabled, haptic = 
   hitSlop?: number;
   scale?: number;
   ripple?: boolean;
+  /** Dim as one layer (for children built of overlapping shapes, which otherwise show their overlaps when faded). */
+  offscreen?: boolean;
 }) {
   const reduced = useReducedMotion();
   return <Pressable
@@ -32,6 +34,7 @@ export function Tap({ children, onPress, onLongPress, style, disabled, haptic = 
     accessibilityLabel={accessibilityLabel}
     accessibilityState={{ disabled: !!disabled, ...accessibilityState }}
     disabled={disabled}
+    needsOffscreenAlphaCompositing={offscreen}
     hitSlop={hitSlop}
     android_ripple={ripple && Platform.OS === 'android' ? { color: '#ffd23f26' } : undefined}
     onLongPress={onLongPress}

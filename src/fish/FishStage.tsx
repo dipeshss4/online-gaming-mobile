@@ -1,13 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ScrollView, StyleSheet, Text, View, useWindowDimensions, type GestureResponderEvent } from 'react-native';
-import { Canvas, Picture, Skia, type SkPicture } from '@shopify/react-native-skia';
+import { Canvas, Picture, Skia, useImage, type SkPicture } from '@shopify/react-native-skia';
 import { useSharedValue } from 'react-native-reanimated';
 import { randomUUID } from 'expo-crypto';
 import * as Haptics from 'expo-haptics';
 import { ApiError, type Balance, type Game, type PlayResult, request } from '../api';
 import { sound } from '../sound';
 import { Tap } from '../Tap';
+import { GameLogo } from '../GameLogo';
 import { Ctx2D } from './skiaCtx';
+import { creatureSize, FISH_CODES, frameOf, reachOf, SHADOW, themeOfFish } from './themes';
+import { CANNONS, CAUSTICS, FISH_SHEETS, SEABEDS } from './sprites';
 import { CANNON, DRAGON_TRAIL, H, SPECIES, TAU, TRAIL_GAP, W, byCode, drawCannon, drawDragonBody, paintSeabed, type Fish, type Species } from './art';
 
 /**
@@ -26,6 +29,14 @@ const money = (n: number) => n.toFixed(2);
 
 export default function FishStage({ game, token, initialBalance, onClose, onSettled }: FishProps) {
   const { width, height } = useWindowDimensions();
+  // The table's look: its own cast of rendered creatures (sheets of swimming frames), its sea floor and its boss.
+  const theme = themeOfFish(game.code), sheets = FISH_SHEETS[game.code] ?? FISH_SHEETS.DRAGON_TIDE;
+  // One image per creature code, always in the same order, so the hooks line up on every render.
+  const images = FISH_CODES.map(code => useImage(sheets[code]?.source ?? null)); // eslint-disable-line react-hooks/rules-of-hooks
+  const seabedImage = useImage(SEABEDS[game.code] ?? SEABEDS.DRAGON_TIDE), causticImage = useImage(CAUSTICS);
+  const cannonArt = CANNONS[game.code] ?? CANNONS.DRAGON_TIDE;
+  const turrets = [useImage(cannonArt.tiers[0]), useImage(cannonArt.tiers[1]), useImage(cannonArt.tiers[2])], seatImage = useImage(cannonArt.seat);
+  const art = useRef({ images, seabedImage, causticImage, turrets, seatImage }); art.current = { images, seabedImage, causticImage, turrets, seatImage };
   // The table keeps its 16:9 shape and fills as much of the screen as it can.
   const stageW = Math.min(width, height * 16 / 9), stageH = stageW * 9 / 16, scale = stageW / W;
   const stakes = [0.1, 0.2, 0.3, 0.5, 1, 2, 3, 5, 10, 20, 50, 100].filter(s => s >= game.minStake - 1e-9 && s <= game.maxStake + 1e-9);
@@ -78,8 +89,12 @@ export default function FishStage({ game, token, initialBalance, onClose, onSett
     let reduced = false; void AccessibilityInfo.isReduceMotionEnabled().then(value => { reduced = value; });
     // The seabed never changes: record it once and replay it every frame.
     const seabedRecorder = Skia.PictureRecorder();
-    paintSeabed(new Ctx2D(seabedRecorder.beginRecording(Skia.XYWHRect(0, 0, W, H))));
+    paintSeabed(new Ctx2D(seabedRecorder.beginRecording(Skia.XYWHRect(0, 0, W, H))), theme);
     const seabed = seabedRecorder.finishRecordingAsPicture();
+    // The boss is a rendered sprite on every table now; until its sheet has loaded it is the drawn Tide Dragon.
+    const sprite = !!sheets.DRAGON;
+    const imageOf = (code: string) => { const i = FISH_CODES.indexOf(code as never); return i < 0 ? null : art.current.images[i]; };
+    const sizeOf = (f: Fish) => { const sheet = sheets[f.s.code]; return sheet ? creatureSize(sheet, f.s.code, f.s.r) : { w: f.s.r * 3, h: f.s.r * 2 }; };
 
     const spawn = (s: Species, from?: { dir: 1 | -1; y: number; x?: number }) => {
       const dir: 1 | -1 = from?.dir ?? (Math.random() < .5 ? 1 : -1), baseY = from?.y ?? 70 + Math.random() * (H - 260);
@@ -109,7 +124,7 @@ export default function FishStage({ game, token, initialBalance, onClose, onSett
       if (schoolIn <= 0) { school(); schoolIn = 25 + Math.random() * 15; }
       if (w.dragonIn <= 0 && !w.fish.some(f => f.s.code === 'DRAGON' && !f.caught)) {
         setWarning(true); later(2600, () => setWarning(false));
-        later(1800, () => { const d = spawn(byCode.DRAGON, { dir: Math.random() < .5 ? 1 : -1, y: H * .38 }); d.x = d.dir > 0 ? -140 : W + 140; });
+        later(1800, () => { const d = spawn(byCode.DRAGON, { dir: Math.random() < .5 ? 1 : -1, y: H * .38 }); const half = sprite ? sizeOf(d).w / 2 : 140; d.x = d.dir > 0 ? -half : W + half; });
         w.dragonIn = 75 + Math.random() * 30;
       }
       // ---- fish
@@ -118,9 +133,10 @@ export default function FishStage({ game, token, initialBalance, onClose, onSett
         if (f.caught) { f.caught += dt; continue; }
         const px = f.x, py = f.y;
         f.x += f.dir * f.speed * dt; f.y = f.baseY + Math.sin(f.t * f.freq + f.phase) * f.amp; f.heading = Math.atan2(f.y - py, f.x - px);
-        if (f.s.code === 'DRAGON') { const head = f.trail[0]; if (!head || Math.hypot(head.x - f.x, head.y - f.y) >= TRAIL_GAP) { f.trail.unshift({ x: f.x, y: f.y }); if (f.trail.length > DRAGON_TRAIL) f.trail.pop(); } }
+        if (f.s.code === 'DRAGON' && !sprite) { const head = f.trail[0]; if (!head || Math.hypot(head.x - f.x, head.y - f.y) >= TRAIL_GAP) { f.trail.unshift({ x: f.x, y: f.y }); if (f.trail.length > DRAGON_TRAIL) f.trail.pop(); } }
       }
-      const tail = (f: Fish) => f.s.code === 'DRAGON' ? DRAGON_TRAIL * TRAIL_GAP : 0;
+      // A creature leaves once all of it is past the edge.
+      const tail = (f: Fish) => sheets[f.s.code] ? sizeOf(f).w / 2 : f.s.code === 'DRAGON' ? DRAGON_TRAIL * TRAIL_GAP : 0;
       w.fish = w.fish.filter(f => f.caught ? f.caught < 1.1 : f.dir > 0 ? f.x < W + f.s.r * 3 + tail(f) : f.x > -f.s.r * 3 - tail(f));
       if (w.lock !== null && !w.fish.some(f => f.id === w.lock && !f.caught && f.x > 0 && f.x < W)) w.lock = null;
       const locked = w.lock === null ? null : w.fish.find(f => f.id === w.lock) ?? null;
@@ -146,8 +162,11 @@ export default function FishStage({ game, token, initialBalance, onClose, onSett
         if (b.y < 8) { b.y = 8; b.vy = Math.abs(b.vy); } else if (b.y > H - 90 && b.vy > 0) b.vy = -Math.abs(b.vy);
         for (const f of lockFish ? [lockFish] : w.fish) {
           if (f.caught || f.x < -20 || f.x > W + 20) continue;
-          const points = f.s.code === 'DRAGON' ? [{ x: f.x, y: f.y }, ...f.trail.filter((_, i) => i % 2 === 0)] : [{ x: f.x, y: f.y }];
-          const radius = f.s.r * f.s.hit + 8;
+          // A sprite boss is hit anywhere along its long body: its middle and four points towards the ends.
+          const reach = sprite ? sizeOf(f).w * .38 : 0;
+          const points = f.s.code !== 'DRAGON' ? [{ x: f.x, y: f.y }] : sprite ? [0, -1, 1, -.5, .5].map(k => ({ x: f.x + k * reach, y: f.y }))
+            : [{ x: f.x, y: f.y }, ...f.trail.filter((_, i) => i % 2 === 0)];
+          const radius = (f.s.code === 'DRAGON' ? f.s.r : reachOf(f.s.code, f.s.r)) * f.s.hit + 8;
           if (points.some((p, i) => Math.hypot(b.x - p.x, b.y - p.y) < (i === 0 ? radius : radius * .5))) {
             b.life = 0; b.hit = true; w.nets.push({ x: b.x, y: b.y, t: 0, gold: (stakes[b.level] ?? 0) >= 5 });
             void settleRef.current(f, stakes[b.level] ?? L.stake); break;
@@ -167,36 +186,56 @@ export default function FishStage({ game, token, initialBalance, onClose, onSett
       const c = new Ctx2D(recorder.beginRecording(Skia.XYWHRect(0, 0, W * L.scale, H * L.scale)));
       c.save(); c.scale(L.scale, L.scale);
       if (w.shake > 0 && !reduced) c.translate((Math.random() - .5) * 14 * w.shake, (Math.random() - .5) * 14 * w.shake);
-      c.drawPicture(seabed);
+      const floor = art.current.seabedImage, glint = art.current.causticImage;
+      if (floor) c.drawImage(floor, 0, 0, W, H); else c.drawPicture(seabed);
       c.globalCompositeOperation = 'lighter';
-      for (let i = 0; i < 6; i++) {
+      // Light off the waves, sliding over the floor: two layers of the caustics tile drifting different ways.
+      if (glint && !reduced) {
+        for (const [speedX, speedY, size, alpha] of [[14, 9, 420, theme.caustics], [-11, 13, 560, theme.caustics * .7]] as const) {
+          c.globalAlpha = alpha; const ox = ((clock * speedX) % size + size) % size - size, oy = ((clock * speedY) % size + size) % size - size;
+          for (let x = ox; x < W; x += size) for (let y = oy; y < H; y += size) c.drawImage(glint, x, y, size, size);
+        }
+        c.globalAlpha = 1;
+      }
+      if (theme.light) for (let i = 0; i < 6; i++) {
         const x = (i * 240 + Math.sin(clock * .2 + i) * 60) % (W + 200) - 100, g = c.createLinearGradient(x, 0, x - 120, H * .8);
-        g.addColorStop(0, 'rgba(140,240,255,.10)'); g.addColorStop(1, 'rgba(140,240,255,0)');
+        g.addColorStop(0, theme.light); g.addColorStop(1, theme.light.replace(/[\d.]+\)$/, '0)'));
         c.fillStyle = g; c.beginPath(); c.moveTo(x, 0); c.lineTo(x + 70, 0); c.lineTo(x - 80, H * .8); c.lineTo(x - 190, H * .8); c.fill();
       }
       c.globalCompositeOperation = 'source-over';
-      c.lineCap = 'round';
-      for (let i = 0; i < 16; i++) {
-        const x = 40 + i * 80 + (i % 3) * 13, h = 70 + (i * 37) % 60, sway = Math.sin(clock * 1.3 + i) * 14;
-        c.strokeStyle = i % 2 ? '#1f8a6e' : '#2aa37a'; c.lineWidth = 7; c.beginPath(); c.moveTo(x, H - 60); c.quadraticCurveTo(x + sway, H - 60 - h * .5, x + sway * 1.6, H - 60 - h); c.stroke();
-      }
-      for (const f of [...w.fish].sort((a, b) => a.s.r - b.s.r)) {
-        const dying = f.caught > 0;
-        if (f.flash > 0) c.saveLayer(); else c.save();
+      // Creatures smallest first so the big ones swim over, each with its shadow on the floor; then tags and the lock ring.
+      const order = [...w.fish].sort((a, b) => a.s.r - b.s.r);
+      const isBoss = (f: Fish) => f.s.code === 'DRAGON';
+      const body = (f: Fish, shadow: boolean) => {
+        const dying = f.caught > 0, sheet = sheets[f.s.code], image = sheet ? imageOf(f.s.code) : null;
+        if (shadow && (!image || !sheet)) return;
+        if (f.flash > 0 && !shadow) c.saveLayer(); else c.save();
         if (dying) c.globalAlpha = Math.max(0, 1 - f.caught / 1.1);
-        if (f.s.code === 'DRAGON') {
-          const fire = c.createRadialGradient(f.x, f.y, 10, f.x, f.y, 180); fire.addColorStop(0, 'rgba(255,120,40,.35)'); fire.addColorStop(1, 'rgba(255,60,20,0)');
-          c.fillStyle = fire; c.beginPath(); c.arc(f.x, f.y, 180, 0, TAU); c.fill(); drawDragonBody(c, f, f.t);
+        if (isBoss(f) && !shadow) {
+          const aura = c.createRadialGradient(f.x, f.y, 10, f.x, f.y, 220); aura.addColorStop(0, theme.boss.aura); aura.addColorStop(1, theme.boss.aura.replace(/[\d.]+\)$/, '0)'));
+          c.fillStyle = aura; c.beginPath(); c.arc(f.x, f.y, 220, 0, TAU); c.fill();
+          if (!image) drawDragonBody(c, f, f.t);
         }
-        c.translate(f.x, f.y);
+        // The shadow falls a little below and right, as if lit from above the water.
+        c.translate(f.x + (shadow ? f.s.r * .25 + 6 : 0), f.y + (shadow ? f.s.r * .4 + 10 : 0));
         let angle = f.heading; if (f.dir < 0) { c.scale(-1, 1); angle = Math.PI - angle; }
         c.rotate(Math.max(-.35, Math.min(.35, Math.atan2(Math.sin(angle), Math.cos(angle)) * .6)));
         if (dying) { c.rotate(f.caught * 9); c.scale(1 + f.caught * .4, 1 + f.caught * .4); }
-        f.s.draw(c, f.s.r, f.t);
-        if (f.flash > 0) { c.globalCompositeOperation = 'source-atop'; c.fillStyle = `rgba(255,70,70,${Math.min(1, f.flash * 2)})`; c.fillRect(-f.s.r * 2, -f.s.r * 2, f.s.r * 4, f.s.r * 4); }
+        if (image && sheet) {
+          const { w: dw, h: dh } = creatureSize(sheet, f.s.code, f.s.r), i = frameOf(f.s.code, f.t, f.speed);
+          if (shadow) c.saveLayerFiltered(SHADOW);
+          c.drawImageRect(image, (i % 4) * sheet.fw, Math.floor(i / 4) * sheet.fh, sheet.fw, sheet.fh, -dw / 2, -dh / 2, dw, dh);
+          if (shadow) c.restore();
+        } else f.s.draw(c, f.s.r, f.t);
+        if (f.flash > 0 && !shadow) { c.globalCompositeOperation = 'source-atop'; c.fillStyle = `rgba(255,70,70,${Math.min(1, f.flash * 2)})`; c.fillRect(-f.s.r * 3, -f.s.r * 2, f.s.r * 6, f.s.r * 4); }
         c.restore();
-        if (!dying && f.s.r >= 56) {
-          const tag = f.s.code === 'DRAGON' ? '×100–500' : `×${multiplierOf(f.s.code)}`;
+      };
+      for (const f of order) body(f, true);
+      for (const f of order) if (!isBoss(f)) body(f, false);
+      for (const f of order) if (isBoss(f)) body(f, false);
+      for (const f of order) {
+        if (!(f.caught > 0) && f.s.r >= 56) {
+          const tag = isBoss(f) ? '×100–500' : `×${multiplierOf(f.s.code)}`;
           c.font = '800 20px sans-serif'; c.textAlign = 'center';
           const tw = c.measureText(tag).width + 20;
           c.fillStyle = 'rgba(20,6,40,.75)'; c.beginPath(); c.roundRect(f.x - tw / 2, f.y + f.s.r * .75, tw, 28, 14); c.fill();
@@ -237,7 +276,13 @@ export default function FishStage({ game, token, initialBalance, onClose, onSett
       const aimAt = locked ? { x: locked.x, y: locked.y } : w.aim, angle = Math.atan2(aimAt.y - CANNON.y, aimAt.x - CANNON.x);
       c.save(); c.strokeStyle = 'rgba(255,255,255,.18)'; c.setLineDash([6, 10]); c.lineWidth = 2;
       c.beginPath(); c.moveTo(CANNON.x + Math.cos(angle) * 110, CANNON.y + Math.sin(angle) * 110); c.lineTo(CANNON.x + Math.cos(angle) * 260, CANNON.y + Math.sin(angle) * 260); c.stroke(); c.restore();
-      drawCannon(c, angle, L.level, stakes.length, w.recoil);
+      // The table's cannon: its seat, and the turret for the bet's tier (grander as the bet rises), kicking back as it fires.
+      const tier = stakes.length <= 1 ? 0 : Math.min(2, Math.floor(L.level / (stakes.length - 1) * 2.999)), turret = art.current.turrets[tier], seatImage = art.current.seatImage;
+      if (seatImage && turret) {
+        const sw = 400, sh = sw * seatImage.height() / seatImage.width();
+        c.drawImage(seatImage, CANNON.x - sw / 2, H - sh + 8, sw, sh);
+        c.save(); c.translate(CANNON.x, CANNON.y); c.rotate(angle); c.translate(-w.recoil * 8, 0); c.drawImage(turret, -105, -105, 210, 210); c.restore();
+      } else drawCannon(c, angle, L.level, stakes.length, w.recoil);
       c.restore();
       picture.value = recorder.finishRecordingAsPicture();
       hud += dt;
@@ -251,7 +296,7 @@ export default function FishStage({ game, token, initialBalance, onClose, onSett
   const press = (event: GestureResponderEvent) => {
     const w = world.current, p = toWorld(event); w.aim = p; setError('');
     if (live.current.lockMode) {
-      const hit = [...w.fish].filter(f => !f.caught).sort((a, b) => b.s.r - a.s.r).find(f => Math.hypot(f.x - p.x, f.y - p.y) < f.s.r * 1.2 + 24);
+      const hit = [...w.fish].filter(f => !f.caught).sort((a, b) => b.s.r - a.s.r).find(f => Math.hypot(f.x - p.x, f.y - p.y) < reachOf(f.s.code, f.s.r) * 1.2 + 24);
       w.lock = hit ? hit.id : null; if (hit) { sound.play('tap'); return; }
     }
     w.firing = true;
@@ -267,14 +312,14 @@ export default function FishStage({ game, token, initialBalance, onClose, onSett
       </View>
       <View style={st.top} pointerEvents="box-none">
         <Tap onPress={onClose} style={st.chip} accessibilityLabel="Back to games"><Text style={st.chipText}>‹ Lobby</Text></Tap>
-        <Text style={st.title}>{game.name}</Text>
+        <GameLogo game={game} height={30} maxWidth={Math.max(120, stageW - 360)} />
         <View style={st.topRight}>
           <View style={st.credits}><Text style={st.creditsLabel}>CREDITS</Text><Text style={st.creditsValue} testID="fish-balance">{money(wallet)}</Text></View>
           <Tap onPress={() => setInfo(true)} style={st.round} accessibilityLabel="Paytable and rules"><Text style={st.chipText}>i</Text></Tap>
         </View>
       </View>
       {!!last && <View style={st.last} pointerEvents="none"><Text style={st.lastText}>{last}</Text></View>}
-      {warning && <View style={st.warning} pointerEvents="none"><Text style={st.warningKicker}>WARNING</Text><Text style={st.warningTitle}>THE TIDE DRAGON APPROACHES</Text><Text style={st.warningSub}>×100 – ×500</Text></View>}
+      {warning && <View style={st.warning} pointerEvents="none"><Text style={st.warningKicker}>WARNING</Text><Text style={st.warningTitle}>{theme.boss.warning}</Text><Text style={st.warningSub}>×100 – ×500</Text></View>}
       {banner && <View style={[st.banner, banner.mega && st.bannerMega]} pointerEvents="none"><Text style={[st.bannerText, banner.mega && { fontSize: 34 }]}>{banner.text}</Text></View>}
       {!!error && <Tap onPress={() => setError('')} style={st.error} accessibilityLabel="Dismiss"><Text style={st.errorText}>{error}  ×</Text></Tap>}
       <View style={st.bottom} pointerEvents="box-none">
@@ -322,7 +367,6 @@ const st = StyleSheet.create({
   chip: { minHeight: 44, paddingHorizontal: 14, borderRadius: 22, backgroundColor: panel, borderWidth: 1, borderColor: 'rgba(255,255,255,.3)', justifyContent: 'center' },
   chipText: { color: ink, fontWeight: '800', fontSize: 14 },
   round: { width: 44, height: 44, borderRadius: 22, backgroundColor: panel, borderWidth: 1, borderColor: 'rgba(255,255,255,.3)', alignItems: 'center', justifyContent: 'center' },
-  title: { color: gold, fontWeight: '900', fontSize: 18, letterSpacing: 1.5, textShadowColor: '#6b21a8', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 0 },
   credits: { paddingHorizontal: 12, paddingVertical: 3, borderRadius: 12, backgroundColor: panel, borderWidth: 1, borderColor: 'rgba(255,213,74,.6)', alignItems: 'flex-end' },
   creditsLabel: { color: dim, fontSize: 11, letterSpacing: 1.2, fontWeight: '700' },
   creditsValue: { color: gold, fontSize: 17, fontWeight: '900', fontVariant: ['tabular-nums'] },

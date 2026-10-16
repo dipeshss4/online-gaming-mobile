@@ -89,7 +89,7 @@ class SoundDirector {
     this.mix = scene && scene !== 'lobby' ? game?.settings?.sound ?? FULL : FULL;
     const own = scene && scene !== 'lobby' && game?.code && GAME_SOUNDS[game.code] ? game.code : null;
     const opened = own && own !== this.game;
-    if (own !== this.game) { for (const player of this.gamePlayers.values()) player.remove(); this.gamePlayers.clear(); }
+    if (own !== this.game) { for (const player of this.gamePlayers.values()) release(player); this.gamePlayers.clear(); }
     this.game = own;
     // The game's sting plays over its music, which waits underneath until the sting has had its moment.
     if (opened && this.playGame('open')) this.duck(2600);
@@ -151,7 +151,7 @@ class SoundDirector {
       const own = wanted !== 'lobby' && this.game ? GAME_SOUNDS[this.game] : null;
       const key = own ? `game:${this.game}` : wanted;
       if (this.musicKey !== key || !this.music) {
-        this.music?.remove();
+        release(this.music);
         this.music = createAudioPlayer(own ? own.music : MUSIC[wanted]);
         this.music.loop = true;
         this.musicKey = key;
@@ -163,6 +163,17 @@ class SoundDirector {
 }
 
 export const sound = new SoundDirector();
+
+/**
+ * Stops a player and frees it. On Android a released player that was playing keeps on playing (a looping track
+ * forever), so every player is paused before it is removed: otherwise each lobby and game visit would leave its music
+ * running underneath the next.
+ */
+function release(player: AudioPlayer | null | undefined) {
+  if (!player) return;
+  try { player.pause(); } catch { /* already stopped */ }
+  try { player.remove(); } catch { /* already released */ }
+}
 
 /** The player's sound switch, for the speaker button. */
 export function useSoundOn() {

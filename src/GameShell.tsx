@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { LayoutChangeEvent, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Image, LayoutChangeEvent, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { Balance, Game } from './api';
 import { Tap } from './Tap';
@@ -9,11 +9,15 @@ import { GameLogo, themeOf } from './GameLogo';
 import { SpinButton } from './fx/SpinButton';
 import { Ambience } from './fx/Ambience';
 import { BIG_WIN, PlayControls } from './playControls';
+import { SCENE_ART } from './sceneArt';
 
 /**
  * The frame every game is played in, laid out the way the game rooms do it: the game fills the screen, with a slim
  * bar on top (home, the game's logo, sound and credits) and one console along the bottom (info, the bet, WIN and a big
  * SPIN). Rules and the paytable sit behind the info button instead of taking a column of the screen.
+ *
+ * Each game is played over its own rendered scene (scripts/render-tiles.py: its colours and 3D pieces round the edges,
+ * dimmed at the top and bottom so the bars read), under its 3D logo, with the console in a gold frame.
  *
  * {@code children} draws the game into the space left, and is given that space's size so reels can fill it.
  *
@@ -25,6 +29,8 @@ import { BIG_WIN, PlayControls } from './playControls';
 export type Stage = { width: number; height: number };
 
 const AUTO_COUNTS = [10, 25, 50, 100];
+/** The console's frame: polished gold, bright along the top. */
+const GOLD_RIM = ['#fff1b0', '#e0a22a', '#7a4a08', '#c8861a'] as const;
 
 export function GameShell({ game, balance, onBack, backDisabled, status, notice, info, bet, win, spin, controls, overlay, play, children }: {
   game: Game; balance: Balance | null; onBack: () => void; backDisabled?: boolean;
@@ -77,7 +83,12 @@ export function GameShell({ game, balance, onBack, backDisabled, status, notice,
     ? { label: auto ? `STOP ${autoLeft}` : 'STOP', disabled: false, busy, accessibilityLabel: auto ? `Stop autoplay, ${autoLeft} rounds left` : 'Skip to the result',
         onPress: () => { if (auto) stopAuto(); if (busy) play.pace.hurry(); } }
     : spin;
+  const scene = SCENE_ART[game.code];
   return <LinearGradient colors={theme.background} style={g.root}>
+    {!!scene && <>
+      <Image source={scene} resizeMode="cover" style={{ position: 'absolute', top: 0, left: 0, width, height }} accessibilityIgnoresInvertColors />
+      <LinearGradient pointerEvents="none" colors={['#000000a0', '#00000020', '#00000030', '#000000b0']} locations={[0, .22, .7, 1]} style={StyleSheet.absoluteFill} />
+    </>}
     <Ambience mood={theme.mood} tint={theme.frame} />
     <View style={[g.top, compact && { height: 50 }]}>
       <Tap haptic="select" accessibilityLabel="Back to lobby" disabled={backDisabled} onPress={onBack} style={[g.round, { borderColor: theme.frame }, backDisabled && { opacity: .4 }]}><Text style={g.roundText}>⌂</Text></Tap>
@@ -90,7 +101,8 @@ export function GameShell({ game, balance, onBack, backDisabled, status, notice,
     <View style={g.stage} onLayout={measure} onTouchStart={play && busy ? () => play.pace.hurry() : undefined}>{stage.width > 0 && children(stage)}</View>
     {!!status && <Text style={[g.status, { color: theme.accent }]} accessibilityLiveRegion="polite" numberOfLines={1}>{status}</Text>}
     {!!notice && <View style={g.notice}>{typeof notice === 'string' ? <Text style={g.noticeText}>{notice}</Text> : notice}</View>}
-    <View style={[g.console, { borderColor: theme.frame }, !landscape && width < 600 && g.consoleStacked]}>
+    <LinearGradient colors={GOLD_RIM} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={g.consoleRim}>
+    <LinearGradient colors={['#2a1440', '#0d0518', '#05020c']} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={[g.console, !landscape && width < 600 && g.consoleStacked]}>
       <Tap haptic="select" accessibilityLabel="Game information" onPress={() => setOpen(true)} style={[g.round, { borderColor: theme.frame }]}><Text style={g.info}>i</Text></Tap>
       {controls ?? <>
         <View style={[g.bet, !landscape && width < 600 && g.betStacked]}>{bet}</View>
@@ -107,7 +119,8 @@ export function GameShell({ game, balance, onBack, backDisabled, status, notice,
         {spinButton && <View style={{ marginRight: 4 }}><SpinButton label={spinButton.label} size={spinSize} ring={theme.accent} busy={spinButton.busy} disabled={spinButton.disabled}
           accessibilityLabel={spinButton.accessibilityLabel ?? spinButton.label} onPress={spinButton.onPress} /></View>}
       </>}
-    </View>
+    </LinearGradient>
+    </LinearGradient>
     {overlay}
     <Modal visible={picking} transparent animationType="fade" supportedOrientations={['landscape-left', 'landscape-right', 'portrait']} onRequestClose={() => setPicking(false)}>
       <Pressable style={g.shade} onPress={() => setPicking(false)} accessibilityLabel="Close autoplay">
@@ -165,7 +178,9 @@ const g = StyleSheet.create({
   status: { textAlign: 'center', fontWeight: '900', fontSize: 14, letterSpacing: 2.5, paddingVertical: 2, textShadowColor: '#000', textShadowRadius: 6, textShadowOffset: { width: 0, height: 1 } },
   notice: { marginHorizontal: 10, marginBottom: 4, padding: 6, borderRadius: 10, backgroundColor: '#5a0d1ecc', borderWidth: 1, borderColor: c.bad },
   noticeText: { color: c.bad, fontSize: 12, textAlign: 'center' },
-  console: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 8, marginBottom: 8, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 18, borderWidth: 2, backgroundColor: '#000000aa' },
+  consoleRim: { marginHorizontal: 8, marginBottom: 8, padding: 2.5, borderRadius: 20,
+    shadowColor: '#ffb01f', shadowOpacity: .45, shadowRadius: 10, shadowOffset: { width: 0, height: 0 }, elevation: 8 },
+  console: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 17.5 },
   consoleStacked: { flexWrap: 'wrap', justifyContent: 'space-between' },
   bet: { flex: 1, minWidth: 0 },
   betStacked: { flexBasis: '100%', order: 3 } as object,
