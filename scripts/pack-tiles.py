@@ -66,9 +66,8 @@ for folder, longest in (('assets/logos', 560), ('../frontend/public/art/logos', 
     if logos: print('wrote', folder, len(logos), 'logos,', sum(os.path.getsize(os.path.join(out, f'{c}.png')) for c in logos) // 1024, 'KB')
 # Each game's own reel symbols, by render prefix and folder (MM_<NAME> to monsoon/, ...), trimmed to their art.
 SYMBOL_SETS = {'MM': 'monsoon', 'SG': 'sheriff', 'SS': 'stars-stripes', 'DW': 'diamond-wilds', 'IJ': 'inferno'}
-# The fish tables' bosses are drawn large, so they keep more pixels.
-SYMBOL_SETS['FT'] = 'fish-bosses'
-SYMBOL_SIZE = {'FT': 640}
+# (The fish tables' creatures, bosses included, are rendered and packed by render-fish.py and pack-fish.py.)
+SYMBOL_SIZE = {}
 packed = 0
 for prefix, name in SYMBOL_SETS.items():
     symbols = sorted(f[len(prefix) + 1:-4] for f in os.listdir(RENDERS) if f.startswith(prefix + '_') and f.endswith('.png'))

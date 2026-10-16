@@ -60,6 +60,11 @@ export class Ctx2D {
     const paint = Skia.Paint(); paint.setAlphaf(this.state.alpha);
     this.canvas.drawImageRect(image, Skia.XYWHRect(0, 0, image.width(), image.height()), Skia.XYWHRect(x, y, w, h), paint);
   }
+  /** Part of an image ({sx, sy, sw, sh}, in its pixels) scaled into a rectangle: the browser's nine-argument drawImage. */
+  drawImageRect(image: SkImage, sx: number, sy: number, sw: number, sh: number, x: number, y: number, w: number, h: number) {
+    const paint = Skia.Paint(); paint.setAlphaf(this.state.alpha);
+    this.canvas.drawImageRect(image, Skia.XYWHRect(sx, sy, sw, sh), Skia.XYWHRect(x, y, w, h), paint);
+  }
   translate(x: number, y: number) { this.canvas.translate(x, y); }
   rotate(radians: number) { this.canvas.rotate(radians * 180 / Math.PI, 0, 0); }
   scale(x: number, y: number) { this.canvas.scale(x, y); }
